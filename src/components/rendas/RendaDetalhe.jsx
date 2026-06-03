@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import { format } from 'date-fns';
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -30,7 +30,7 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onMarcarRe
 
   const { data: despesas = [] } = useQuery({
     queryKey: ['despesas_prop', renda?.propriedade_id],
-    queryFn: () => base44.entities.DespesaPropriedade.filter({ propriedade_id: renda.propriedade_id }),
+    queryFn: () => agenciaAvenida.entities.DespesaPropriedade.filter({ propriedade_id: renda.propriedade_id }),
     enabled: !!renda?.propriedade_id,
   });
 
@@ -50,24 +50,24 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onMarcarRe
   const valorTransferencia = renda.valor_renda - comissaoValor - fechoConfig.custo_recibo - fechoConfig.custo_sepa - totalDespesas;
 
   const saveDespesa = useMutation({
-    mutationFn: (d) => base44.entities.DespesaPropriedade.create({ ...d, propriedade_id: renda.propriedade_id, renda_mensal_id: renda.id }),
+    mutationFn: (d) => agenciaAvenida.entities.DespesaPropriedade.create({ ...d, propriedade_id: renda.propriedade_id, renda_mensal_id: renda.id }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['despesas_prop', renda.propriedade_id] }); setShowDespForm(false); setDespForm(emptyDespesa); },
   });
 
   const removeDespesa = useMutation({
-    mutationFn: (id) => base44.entities.DespesaPropriedade.delete(id),
+    mutationFn: (id) => agenciaAvenida.entities.DespesaPropriedade.delete(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['despesas_prop', renda.propriedade_id] }),
   });
 
   const marcarRecebida = useMutation({
-    mutationFn: () => base44.entities.RendaMensal.update(renda.id, {
+    mutationFn: () => agenciaAvenida.entities.RendaMensal.update(renda.id, {
       estado: 'recebida', data_recebimento: dataPagamento, metodo_pagamento: metodoPagamento
     }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['rendas'] }); setMarcandoPago(false); onMarcarRecebida?.(); },
   });
 
   const efetuarFecho = useMutation({
-    mutationFn: () => base44.entities.RendaMensal.update(renda.id, {
+    mutationFn: () => agenciaAvenida.entities.RendaMensal.update(renda.id, {
       fechada: true,
       data_fecho: format(new Date(), 'yyyy-MM-dd'),
       valor_transferencia_proprietario: valorTransferencia,

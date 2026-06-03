@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { FileText, CreditCard, AlertTriangle, Download, CheckCircle, Clock, Plus, X, LogOut, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
-const LOGO_URL = "https://media.base44.com/images/public/user_69ea73b562cec41faae7023d/560647939_264be9ba-be8e-4182-ac20-e19ea39feb71.jpeg";
+const LOGO_URL = "https://media.agenciaAvenida.com/images/public/user_69ea73b562cec41faae7023d/560647939_264be9ba-be8e-4182-ac20-e19ea39feb71.jpeg";
 
 export default function PortalCondomino() {
   const [user, setUser] = useState(null);
@@ -20,15 +20,15 @@ export default function PortalCondomino() {
   const [fracaoSelecionada, setFracaoSelecionada] = useState('all');
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    agenciaAvenida.auth.me().then(setUser).catch(() => {});
   }, []);
 
-  const { data: quotas = [] } = useQuery({ queryKey: ['quotas-portal'], queryFn: () => base44.entities.Quota.list('-data_emissao', 50) });
-  const { data: documentos = [] } = useQuery({ queryKey: ['documentos-portal'], queryFn: () => base44.entities.Documento.filter({ publico: true }, '-data', 20) });
-  const { data: ocorrencias = [] } = useQuery({ queryKey: ['ocorrencias-portal'], queryFn: () => base44.entities.Ocorrencia.list('-data_abertura', 20) });
-  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => base44.entities.Condominio.list() });
-  const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => base44.entities.Fracao.list() });
-  const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas-portal'], queryFn: () => base44.entities.Pessoa.list() });
+  const { data: quotas = [] } = useQuery({ queryKey: ['quotas-portal'], queryFn: () => agenciaAvenida.entities.Quota.list('-data_emissao', 50) });
+  const { data: documentos = [] } = useQuery({ queryKey: ['documentos-portal'], queryFn: () => agenciaAvenida.entities.Documento.filter({ publico: true }, '-data', 20) });
+  const { data: ocorrencias = [] } = useQuery({ queryKey: ['ocorrencias-portal'], queryFn: () => agenciaAvenida.entities.Ocorrencia.list('-data_abertura', 20) });
+  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
+  const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => agenciaAvenida.entities.Fracao.list() });
+  const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas-portal'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
 
   // Descobrir frações e condomínios associados ao utilizador pelo email
   const pessoaUser = pessoas.find(p => p.email === user?.email);
@@ -54,7 +54,7 @@ export default function PortalCondomino() {
     : condominiosUser.length === 1 ? condominiosUser[0] : null;
 
   const handleSubmitOcorrencia = async () => {
-    const ocorrencia = await base44.entities.Ocorrencia.create({
+    const ocorrencia = await agenciaAvenida.entities.Ocorrencia.create({
       ...ocorrForm,
       estado: 'aberta',
       data_abertura: format(new Date(), 'yyyy-MM-dd'),
@@ -62,7 +62,7 @@ export default function PortalCondomino() {
       fracao_id: fracaoSelecionada !== 'all' ? fracaoSelecionada : undefined,
       condominio_id: condominioAtual?.id,
     });
-    await base44.entities.Notificacao.create({
+    await agenciaAvenida.entities.Notificacao.create({
       titulo: `Nova ocorrência: ${ocorrForm.titulo}`,
       mensagem: `Reportada por ${user?.email || 'condómino'} · ${ocorrForm.tipo} · ${ocorrForm.prioridade === 'urgente' ? 'URGENTE' : ocorrForm.prioridade}`,
       tipo: 'ocorrencia',
@@ -99,7 +99,7 @@ export default function PortalCondomino() {
                 <p className="text-xs text-muted-foreground">{user.email}</p>
               </div>
               <button
-                onClick={() => base44.auth.logout()}
+                onClick={() => agenciaAvenida.auth.logout()}
                 title="Sair"
                 className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
               >

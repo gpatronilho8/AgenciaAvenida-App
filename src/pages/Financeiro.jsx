@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import PageHeader from '@/components/ui/PageHeader';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -16,10 +16,10 @@ export default function Financeiro() {
   const [periodoFim, setPeriodoFim] = useState(format(endOfMonth(hoje), 'yyyy-MM-dd'));
   const [contaFiltro, setContaFiltro] = useState('all'); // 'all' | 'banco' | 'caixa'
 
-  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => base44.entities.Condominio.list() });
-  const { data: quotas = [] } = useQuery({ queryKey: ['quotas'], queryFn: () => base44.entities.Quota.list() });
-  const { data: movimentos = [] } = useQuery({ queryKey: ['movimentos'], queryFn: () => base44.entities.Movimento.list() });
-  const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => base44.entities.Fracao.list() });
+  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
+  const { data: quotas = [] } = useQuery({ queryKey: ['quotas'], queryFn: () => agenciaAvenida.entities.Quota.list() });
+  const { data: movimentos = [] } = useQuery({ queryKey: ['movimentos'], queryFn: () => agenciaAvenida.entities.Movimento.list() });
+  const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => agenciaAvenida.entities.Fracao.list() });
 
   const getFracaoCodigo = (id) => fracoes.find(f => f.id === id)?.codigo || '';
 

@@ -6,9 +6,9 @@ import {
   LogOut, Menu, X, ChevronLeft, HomeIcon, Layers, Scale, CalendarDays
 } from 'lucide-react';
 import { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 
-const LOGO_URL = "https://media.base44.com/images/public/69ea73bcbb97ac6a352ec27e/c82d79a2f_aa_white.png";
+const LOGO_URL = "https://media.agenciaAvenida.com/images/public/69ea73bcbb97ac6a352ec27e/c82d79a2f_aa_white.png";
 
 const navByModule = {
   condominios: [
@@ -105,7 +105,7 @@ export default function ModuleSidebar({ module }) {
           Configurações
         </Link>
         <button
-          onClick={() => base44.auth.logout()}
+          onClick={() => agenciaAvenida.auth.logout()}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-red-500/10 hover:text-red-400 transition-all"
         >
           <LogOut className="w-4 h-4" />

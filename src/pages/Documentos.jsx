@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -87,16 +87,16 @@ export default function Documentos() {
   const [search, setSearch] = useState('');
   const [uploading, setUploading] = useState(false);
 
-  const { data: documentos = [], isLoading } = useQuery({ queryKey: ['documentos'], queryFn: () => base44.entities.Documento.list('-data') });
-  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => base44.entities.Condominio.list() });
+  const { data: documentos = [], isLoading } = useQuery({ queryKey: ['documentos'], queryFn: () => agenciaAvenida.entities.Documento.list('-data') });
+  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
 
   const save = useMutation({
-    mutationFn: (data) => editing ? base44.entities.Documento.update(editing, data) : base44.entities.Documento.create(data),
+    mutationFn: (data) => editing ? agenciaAvenida.entities.Documento.update(editing, data) : agenciaAvenida.entities.Documento.create(data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['documentos'] }); setOpen(false); toast.success('Documento guardado'); },
   });
 
   const del = useMutation({
-    mutationFn: (id) => base44.entities.Documento.delete(id),
+    mutationFn: (id) => agenciaAvenida.entities.Documento.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['documentos'] }); toast.success('Documento eliminado'); },
   });
 
@@ -109,7 +109,7 @@ export default function Documentos() {
     const file = e.target.files[0];
     if (!file) return;
     setUploading(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    const { file_url } = await agenciaAvenida.integrations.Core.UploadFile({ file });
     upd('ficheiro_url', file_url);
     setUploading(false);
     toast.success('Ficheiro carregado');

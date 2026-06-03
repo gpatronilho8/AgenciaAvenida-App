@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Bell, X, CheckCheck, AlertTriangle, FileText, RefreshCw, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 
@@ -30,28 +30,28 @@ export default function NotificationBell() {
 
   const { data: notificacoes = [] } = useQuery({
     queryKey: ['notificacoes'],
-    queryFn: () => base44.entities.Notificacao.list('-created_date', 30),
+    queryFn: () => agenciaAvenida.entities.Notificacao.list('-created_date', 30),
     refetchInterval: 30000,
   });
 
   const naoLidas = notificacoes.filter(n => !n.lida).length;
 
   const marcarLida = useMutation({
-    mutationFn: (id) => base44.entities.Notificacao.update(id, { lida: true }),
+    mutationFn: (id) => agenciaAvenida.entities.Notificacao.update(id, { lida: true }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notificacoes'] }),
   });
 
   const marcarTodasLidas = useMutation({
     mutationFn: async () => {
       const naoLidasList = notificacoes.filter(n => !n.lida);
-      await Promise.all(naoLidasList.map(n => base44.entities.Notificacao.update(n.id, { lida: true })));
+      await Promise.all(naoLidasList.map(n => agenciaAvenida.entities.Notificacao.update(n.id, { lida: true })));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notificacoes'] }),
   });
 
   const limparTodas = useMutation({
     mutationFn: async () => {
-      await Promise.all(notificacoes.map(n => base44.entities.Notificacao.delete(n.id)));
+      await Promise.all(notificacoes.map(n => agenciaAvenida.entities.Notificacao.delete(n.id)));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notificacoes'] }),
   });

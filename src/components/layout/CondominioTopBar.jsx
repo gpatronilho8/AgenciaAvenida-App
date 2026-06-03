@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import { useCondominio } from '@/lib/CondominioContext';
 import { Building2, ChevronDown, Search, LogOut } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
@@ -9,7 +9,7 @@ export default function CondominioTopBar({ module }) {
   const { selectedCondominioId, setSelectedCondominioId } = useCondominio();
   const { data: condominios = [] } = useQuery({
     queryKey: ['condominios'],
-    queryFn: () => base44.entities.Condominio.list(),
+    queryFn: () => agenciaAvenida.entities.Condominio.list(),
   });
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -17,7 +17,7 @@ export default function CondominioTopBar({ module }) {
   const ref = useRef(null);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    agenciaAvenida.auth.me().then(setUser).catch(() => {});
   }, []);
 
   const selected = condominios.find(c => c.id === selectedCondominioId);
@@ -108,7 +108,7 @@ export default function CondominioTopBar({ module }) {
               {user.full_name?.charAt(0)?.toUpperCase() || 'U'}
             </div>
             <button
-              onClick={() => base44.auth.logout()}
+              onClick={() => agenciaAvenida.auth.logout()}
               title="Sair"
               className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
             >

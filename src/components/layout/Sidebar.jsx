@@ -5,10 +5,10 @@ import {
   Receipt, AlertTriangle, FileText, BarChart3, Settings, LogOut, Menu, X
 } from 'lucide-react';
 import { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import CondominioSelector from './CondominioSelector';
 
-const LOGO_URL = "https://media.base44.com/images/public/user_69ea73b562cec41faae7023d/560647939_264be9ba-be8e-4182-ac20-e19ea39feb71.jpeg";
+const LOGO_URL = "https://media.agenciaAvenida.com/images/public/user_69ea73b562cec41faae7023d/560647939_264be9ba-be8e-4182-ac20-e19ea39feb71.jpeg";
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
@@ -26,7 +26,7 @@ export default function Sidebar() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const handleLogout = () => base44.auth.logout();
+  const handleLogout = () => agenciaAvenida.auth.logout();
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">

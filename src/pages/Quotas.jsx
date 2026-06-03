@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/button';
@@ -49,21 +49,21 @@ export default function Quotas() {
   const [mapaOpen, setMapaOpen] = useState(false);
   const [pagamentoDialog, setPagamentoDialog] = useState(null); // quota a pagar
 
-  const { data: quotas = [], isLoading } = useQuery({ queryKey: ['quotas'], queryFn: () => base44.entities.Quota.list('-data_emissao') });
-  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => base44.entities.Condominio.list() });
-  const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => base44.entities.Fracao.list() });
-  const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => base44.entities.Pessoa.list() });
+  const { data: quotas = [], isLoading } = useQuery({ queryKey: ['quotas'], queryFn: () => agenciaAvenida.entities.Quota.list('-data_emissao') });
+  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
+  const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => agenciaAvenida.entities.Fracao.list() });
+  const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
 
   const save = useMutation({
-    mutationFn: (data) => editing ? base44.entities.Quota.update(editing, data) : base44.entities.Quota.create(data),
+    mutationFn: (data) => editing ? agenciaAvenida.entities.Quota.update(editing, data) : agenciaAvenida.entities.Quota.create(data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['quotas'] }); setOpen(false); toast.success('Quota guardada'); },
   });
 
   const marcarPago = useMutation({
     mutationFn: async ({ id, dataPagamento, metodo, conta, quota }) => {
-      await base44.entities.Quota.update(id, { estado: 'pago', data_pagamento: dataPagamento, metodo_pagamento: metodo });
+      await agenciaAvenida.entities.Quota.update(id, { estado: 'pago', data_pagamento: dataPagamento, metodo_pagamento: metodo });
       const fracao = fracoes.find(f => f.id === quota.fracao_id);
-      await base44.entities.Movimento.create({
+      await agenciaAvenida.entities.Movimento.create({
         condominio_id: quota.condominio_id,
         tipo: 'receita',
         categoria: 'quota',
@@ -74,11 +74,11 @@ export default function Quotas() {
         metodo_pagamento: metodo,
         referencia_id: id,
       });
-      const conds = await base44.entities.Condominio.list();
+      const conds = await agenciaAvenida.entities.Condominio.list();
       const cond = conds.find(c => c.id === quota.condominio_id);
       if (cond) {
         const campo = conta === 'caixa' ? 'saldo_caixa' : 'saldo_banco';
-        await base44.entities.Condominio.update(cond.id, { [campo]: (cond[campo] || 0) + (quota.valor || 0) });
+        await agenciaAvenida.entities.Condominio.update(cond.id, { [campo]: (cond[campo] || 0) + (quota.valor || 0) });
       }
     },
     onSuccess: (_, vars) => {

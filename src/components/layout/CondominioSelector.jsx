@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import { useCondominio } from '@/lib/CondominioContext';
 import { Building2, ChevronDown } from 'lucide-react';
 
@@ -7,7 +7,7 @@ export default function CondominioSelector() {
   const { selectedCondominioId, setSelectedCondominioId } = useCondominio();
   const { data: condominios = [] } = useQuery({
     queryKey: ['condominios'],
-    queryFn: () => base44.entities.Condominio.list(),
+    queryFn: () => agenciaAvenida.entities.Condominio.list(),
   });
 
   const selected = condominios.find(c => c.id === selectedCondominioId);

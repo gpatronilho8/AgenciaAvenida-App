@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,13 +26,13 @@ export default function Assembleias() {
 
   const { data: assembleias = [], isLoading } = useQuery({
     queryKey: ['assembleias'],
-    queryFn: () => base44.entities.Assembleia.list('-data')
+    queryFn: () => agenciaAvenida.entities.Assembleia.list('-data')
   });
-  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => base44.entities.Condominio.list() });
-  const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => base44.entities.Fracao.list() });
+  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
+  const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => agenciaAvenida.entities.Fracao.list() });
 
   const del = useMutation({
-    mutationFn: (id) => base44.entities.Assembleia.delete(id),
+    mutationFn: (id) => agenciaAvenida.entities.Assembleia.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['assembleias'] }); toast.success('Assembleia eliminada'); }
   });
 

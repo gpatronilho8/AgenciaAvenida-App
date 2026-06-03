@@ -1,13 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 import { Building2, Home, FileText, ArrowRight, LogOut, AlertTriangle, Pencil, Printer } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/button';
 
-const LOGO_WHITE = "https://media.base44.com/images/public/69ea73bcbb97ac6a352ec27e/c82d79a2f_aa_white.png";
+const LOGO_WHITE = "https://media.agenciaAvenida.com/images/public/69ea73bcbb97ac6a352ec27e/c82d79a2f_aa_white.png";
 
 const modules = [
   {
@@ -78,10 +78,10 @@ export default function Hub() {
   const [user, setUser] = useState(null);
   const [previewOcorrencia, setPreviewOcorrencia] = useState(null);
 
-  const { data: ocorrencias = [] } = useQuery({ queryKey: ['ocorrencias-hub'], queryFn: () => base44.entities.Ocorrencia.filter({ estado: 'aberta' }, '-data_abertura', 5) });
+  const { data: ocorrencias = [] } = useQuery({ queryKey: ['ocorrencias-hub'], queryFn: () => agenciaAvenida.entities.Ocorrencia.filter({ estado: 'aberta' }, '-data_abertura', 5) });
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    agenciaAvenida.auth.me().then(setUser).catch(() => {});
   }, []);
 
   const firstName = user?.full_name?.split(' ')[0] || '';
@@ -111,7 +111,7 @@ export default function Hub() {
               {user.full_name?.charAt(0)?.toUpperCase() || 'U'}
             </div>
             <button
-              onClick={() => base44.auth.logout()}
+              onClick={() => agenciaAvenida.auth.logout()}
               title="Sair"
               className="ml-1 p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
             >

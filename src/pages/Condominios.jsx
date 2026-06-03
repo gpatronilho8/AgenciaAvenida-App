@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,10 +76,10 @@ export default function Condominios() {
   const [editing, setEditing] = useState(null);
   const [preview, setPreview] = useState(null);
 
-  const { data: condominios = [], isLoading } = useQuery({ queryKey: ['condominios'], queryFn: () => base44.entities.Condominio.list() });
+  const { data: condominios = [], isLoading } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
 
   const save = useMutation({
-    mutationFn: (data) => editing ? base44.entities.Condominio.update(editing, data) : base44.entities.Condominio.create(data),
+    mutationFn: (data) => editing ? agenciaAvenida.entities.Condominio.update(editing, data) : agenciaAvenida.entities.Condominio.create(data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['condominios'] }); setOpen(false); toast.success('Condomínio guardado'); },
   });
 

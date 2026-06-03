@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,16 +62,16 @@ export default function Processos() {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(null);
 
-  const { data: processos = [] } = useQuery({ queryKey: ['processos'], queryFn: () => base44.entities.Processo.list() });
-  const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => base44.entities.Pessoa.list() });
-  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => base44.entities.User.list() });
+  const { data: processos = [] } = useQuery({ queryKey: ['processos'], queryFn: () => agenciaAvenida.entities.Processo.list() });
+  const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
+  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => agenciaAvenida.entities.User.list() });
 
   const save = useMutation({
     mutationFn: async (d) => {
       if (editing) {
-        const updated = await base44.entities.Processo.update(editing, d);
+        const updated = await agenciaAvenida.entities.Processo.update(editing, d);
         const pessoa = pessoas.find(p => p.id === d.pessoa_id);
-        await base44.entities.Notificacao.create({
+        await agenciaAvenida.entities.Notificacao.create({
           titulo: `Processo atualizado: ${d.tipo === 'outro' && d.tipo_personalizado ? d.tipo_personalizado : (TIPOS[d.tipo] || d.tipo)}`,
           mensagem: `Estado: ${ESTADOS[d.estado]?.label || d.estado} · ${pessoa?.nome || ''}`,
           tipo: 'processo_atualizado',
@@ -80,9 +80,9 @@ export default function Processos() {
         });
         return updated;
       } else {
-        const created = await base44.entities.Processo.create(d);
+        const created = await agenciaAvenida.entities.Processo.create(d);
         const pessoa = pessoas.find(p => p.id === d.pessoa_id);
-        await base44.entities.Notificacao.create({
+        await agenciaAvenida.entities.Notificacao.create({
           titulo: `Novo processo: ${d.tipo === 'outro' && d.tipo_personalizado ? d.tipo_personalizado : (TIPOS[d.tipo] || d.tipo)}`,
           mensagem: `Atribuído a ${pessoa?.nome || '—'} · ${d.prioridade === 'urgente' ? 'URGENTE' : 'Normal'}`,
           tipo: 'processo_novo',
@@ -96,7 +96,7 @@ export default function Processos() {
   });
 
   const remove = useMutation({
-    mutationFn: (id) => base44.entities.Processo.delete(id),
+    mutationFn: (id) => agenciaAvenida.entities.Processo.delete(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['processos'] }),
   });
 
@@ -134,7 +134,7 @@ export default function Processos() {
     const file = e.target.files[0];
     if (!file) return;
     setUploading(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    const { file_url } = await agenciaAvenida.integrations.Core.UploadFile({ file });
     const doc = { nome: file.name, url: file_url };
     setForm(f => ({ ...f, documentos: [...(f.documentos || []), doc] }));
     setUploading(false);

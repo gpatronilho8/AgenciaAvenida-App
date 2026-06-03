@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,15 +20,15 @@ export default function PropriedadesLista() {
   const [form, setForm] = useState(empty);
   const [editing, setEditing] = useState(null);
 
-  const { data: propriedades = [] } = useQuery({ queryKey: ['propriedades'], queryFn: () => base44.entities.Propriedade.list() });
-  const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => base44.entities.Pessoa.list() });
-  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => base44.entities.User.list() });
+  const { data: propriedades = [] } = useQuery({ queryKey: ['propriedades'], queryFn: () => agenciaAvenida.entities.Propriedade.list() });
+  const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
+  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => agenciaAvenida.entities.User.list() });
 
   const proprietarios = pessoas.filter(p => p.tipo === 'proprietario');
   const inquilinos = pessoas.filter(p => p.tipo === 'inquilino');
 
   const save = useMutation({
-    mutationFn: (d) => editing ? base44.entities.Propriedade.update(editing, d) : base44.entities.Propriedade.create(d),
+    mutationFn: (d) => editing ? agenciaAvenida.entities.Propriedade.update(editing, d) : agenciaAvenida.entities.Propriedade.create(d),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['propriedades'] }); setOpen(false); },
   });
 

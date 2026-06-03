@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,10 +17,10 @@ export default function ConfiguracaoQuotas({ open, onClose }) {
   const [tab, setTab] = useState('config'); // config | extraordinaria
   const [loading, setLoading] = useState(false);
 
-  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => base44.entities.Condominio.list() });
-  const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => base44.entities.Fracao.list() });
-  const { data: configs = [] } = useQuery({ queryKey: ['config-quotas'], queryFn: () => base44.entities.ConfiguracaoQuota.list() });
-  const { data: quotas = [] } = useQuery({ queryKey: ['quotas'], queryFn: () => base44.entities.Quota.list() });
+  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
+  const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => agenciaAvenida.entities.Fracao.list() });
+  const { data: configs = [] } = useQuery({ queryKey: ['config-quotas'], queryFn: () => agenciaAvenida.entities.ConfiguracaoQuota.list() });
+  const { data: quotas = [] } = useQuery({ queryKey: ['quotas'], queryFn: () => agenciaAvenida.entities.Quota.list() });
 
   const condId = selectedCondominioId !== 'all' ? selectedCondominioId : (condominios[0]?.id || '');
   const [formCond, setFormCond] = useState(condId);
@@ -37,8 +37,8 @@ export default function ConfiguracaoQuotas({ open, onClose }) {
 
   const saveConfig = useMutation({
     mutationFn: (d) => configAtual
-      ? base44.entities.ConfiguracaoQuota.update(configAtual.id, d)
-      : base44.entities.ConfiguracaoQuota.create({ ...d, condominio_id: formCond }),
+      ? agenciaAvenida.entities.ConfiguracaoQuota.update(configAtual.id, d)
+      : agenciaAvenida.entities.ConfiguracaoQuota.create({ ...d, condominio_id: formCond }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['config-quotas'] }); toast.success('Configuração guardada'); },
   });
 
@@ -66,7 +66,7 @@ export default function ConfiguracaoQuotas({ open, onClose }) {
 
       const dataVenc = `${anoAtual}-${String(mesAtual).padStart(2, '0')}-${String(cfg.dia_vencimento || 8).padStart(2, '0')}`;
 
-      await base44.entities.Quota.create({
+      await agenciaAvenida.entities.Quota.create({
         condominio_id: formCond,
         fracao_id: f.id,
         tipo: 'mensal',
@@ -95,7 +95,7 @@ export default function ConfiguracaoQuotas({ open, onClose }) {
     for (let rep = 0; rep < (parseInt(extraForm.repeticoes) || 1); rep++) {
       const data = format(addMonths(new Date(extraForm.data_inicio), rep), 'yyyy-MM-dd');
       for (const f of frac) {
-        await base44.entities.Quota.create({
+        await agenciaAvenida.entities.Quota.create({
           condominio_id: formCond,
           fracao_id: f.id,
           tipo: 'extraordinaria',

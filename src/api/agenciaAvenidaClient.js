@@ -1,8 +1,8 @@
-// src/api/base44Client.js
+// src/api/agenciaAvenidaClient.js
 // Mock do cliente para garantir a independência da interface visual.
 // Mais tarde, estas funções vão ligar-se diretamente ao nosso motor em Python/Flask.
 
-export const base44 = {
+export const agenciaAvenida = {
   auth: {
     login: async (email, password) => {
       console.log("Simulação de Login para:", email);
@@ -42,4 +42,4 @@ export const base44 = {
 };
 
 // Substitui a função original deles para evitar erros na inicialização
-export const createClient = () => base44;
+export const createClient = () => agenciaAvenida;

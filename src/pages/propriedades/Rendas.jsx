@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -28,10 +28,10 @@ export default function Rendas() {
   const [detalhe, setDetalhe] = useState(null);
   const [filterStaff, setFilterStaff] = useState('all');
 
-  const { data: propriedades = [] } = useQuery({ queryKey: ['propriedades'], queryFn: () => base44.entities.Propriedade.list() });
-  const { data: rendas = [] } = useQuery({ queryKey: ['rendas'], queryFn: () => base44.entities.RendaMensal.list() });
-  const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => base44.entities.Pessoa.list() });
-  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => base44.entities.User.list() });
+  const { data: propriedades = [] } = useQuery({ queryKey: ['propriedades'], queryFn: () => agenciaAvenida.entities.Propriedade.list() });
+  const { data: rendas = [] } = useQuery({ queryKey: ['rendas'], queryFn: () => agenciaAvenida.entities.RendaMensal.list() });
+  const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
+  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => agenciaAvenida.entities.User.list() });
 
   const getStaffName = (id) => {
     if (!id) return null;
@@ -60,7 +60,7 @@ export default function Rendas() {
           valor_renda: p.renda_mensal || 0,
           estado: 'pendente',
         }));
-      if (toCreate.length > 0) await base44.entities.RendaMensal.bulkCreate(toCreate);
+      if (toCreate.length > 0) await agenciaAvenida.entities.RendaMensal.bulkCreate(toCreate);
       return toCreate.length;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['rendas'] }),

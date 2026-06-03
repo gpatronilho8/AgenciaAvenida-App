@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Download, Mail, Send, X } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import { toast } from 'sonner';
 
 export default function ReciboPDFDialog({ open, onClose, onDownload, emailDestinatario, nomeDestinatario, tipoDoc = 'Recibo' }) {
@@ -23,7 +23,7 @@ export default function ReciboPDFDialog({ open, onClose, onDownload, emailDestin
       // Generate the doc (returns doc object)
       const doc = onDownload(true); // true = return without saving
       // Send email notification
-      await base44.integrations.Core.SendEmail({
+      await agenciaAvenida.integrations.Core.SendEmail({
         to: email,
         subject: `${tipoDoc} — Agência Avenida`,
         body: `Olá${nomeDestinatario ? ` ${nomeDestinatario}` : ''},\n\nSegue em anexo o seu ${tipoDoc.toLowerCase()}.\n\nCom os melhores cumprimentos,\nAgência Avenida`,

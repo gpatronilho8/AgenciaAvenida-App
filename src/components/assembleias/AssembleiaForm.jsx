@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,8 +24,8 @@ export default function AssembleiaForm({ open, onClose, assembleia, condominios 
 
   const save = useMutation({
     mutationFn: (data) => assembleia
-      ? base44.entities.Assembleia.update(assembleia.id, data)
-      : base44.entities.Assembleia.create(data),
+      ? agenciaAvenida.entities.Assembleia.update(assembleia.id, data)
+      : agenciaAvenida.entities.Assembleia.create(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['assembleias'] });
       toast.success('Assembleia guardada');

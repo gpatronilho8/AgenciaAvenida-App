@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import { Home, Euro, Clock, CheckCircle, TrendingUp, AlertCircle } from 'lucide-react';
 import PageHeader from '@/components/ui/PageHeader';
 import { format, startOfMonth } from 'date-fns';
@@ -32,9 +32,9 @@ function StatCard({ title, value, icon: Icon, color = 'blue', subtitle, to }) {
 }
 
 export default function PropriedadesDashboard() {
-  const { data: propriedades = [] } = useQuery({ queryKey: ['propriedades'], queryFn: () => base44.entities.Propriedade.list() });
-  const { data: rendas = [] } = useQuery({ queryKey: ['rendas'], queryFn: () => base44.entities.RendaMensal.list() });
-  const { data: despesas = [] } = useQuery({ queryKey: ['despesas_prop'], queryFn: () => base44.entities.DespesaPropriedade.list() });
+  const { data: propriedades = [] } = useQuery({ queryKey: ['propriedades'], queryFn: () => agenciaAvenida.entities.Propriedade.list() });
+  const { data: rendas = [] } = useQuery({ queryKey: ['rendas'], queryFn: () => agenciaAvenida.entities.RendaMensal.list() });
+  const { data: despesas = [] } = useQuery({ queryKey: ['despesas_prop'], queryFn: () => agenciaAvenida.entities.DespesaPropriedade.list() });
 
   const hoje = new Date();
   const mesAtual = hoje.getMonth() + 1;

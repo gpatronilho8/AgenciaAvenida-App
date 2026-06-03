@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,14 +41,14 @@ export default function Movimentos() {
 
   const { data: movimentos = [], isLoading } = useQuery({
     queryKey: ['movimentos'],
-    queryFn: () => base44.entities.Movimento.list('-data')
+    queryFn: () => agenciaAvenida.entities.Movimento.list('-data')
   });
-  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => base44.entities.Condominio.list() });
+  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
 
   const save = useMutation({
     mutationFn: (data) => editing
-      ? base44.entities.Movimento.update(editing, data)
-      : base44.entities.Movimento.create(data),
+      ? agenciaAvenida.entities.Movimento.update(editing, data)
+      : agenciaAvenida.entities.Movimento.create(data),
     onSuccess: async (saved, vars) => {
       // Atualizar saldo do condomínio
       const cond = condominios.find(c => c.id === vars.condominio_id);
@@ -63,13 +63,13 @@ export default function Movimentos() {
             const prevField = prev.conta === 'banco' ? 'saldo_banco' : 'saldo_caixa';
             const prevChange = prev.tipo === 'receita' ? -(prev.valor || 0) : (prev.valor || 0);
             const updates = { [prevField]: (cond[prevField] || 0) + prevChange };
-            await base44.entities.Condominio.update(cond.id, updates);
+            await agenciaAvenida.entities.Condominio.update(cond.id, updates);
           }
         }
-        const condAtual = await base44.entities.Condominio.list();
+        const condAtual = await agenciaAvenida.entities.Condominio.list();
         const condNow = condAtual.find(c => c.id === vars.condominio_id);
         if (condNow) {
-          await base44.entities.Condominio.update(cond.id, {
+          await agenciaAvenida.entities.Condominio.update(cond.id, {
             [saldoField]: (condNow[saldoField] || 0) + change
           });
         }
@@ -83,13 +83,13 @@ export default function Movimentos() {
 
   const del = useMutation({
     mutationFn: async (m) => {
-      await base44.entities.Movimento.delete(m.id);
+      await agenciaAvenida.entities.Movimento.delete(m.id);
       // Reverter saldo
       const cond = condominios.find(c => c.id === m.condominio_id);
       if (cond) {
         const saldoField = m.conta === 'banco' ? 'saldo_banco' : 'saldo_caixa';
         const change = m.tipo === 'receita' ? -(m.valor || 0) : (m.valor || 0);
-        await base44.entities.Condominio.update(cond.id, {
+        await agenciaAvenida.entities.Condominio.update(cond.id, {
           [saldoField]: (cond[saldoField] || 0) + change
         });
       }

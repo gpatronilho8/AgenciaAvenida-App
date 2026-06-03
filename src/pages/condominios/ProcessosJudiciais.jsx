@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,25 +46,25 @@ export default function ProcessosJudiciais() {
   const [novoCusto, setNovoCusto] = useState({ descricao: '', valor: '', fase: 'carta_normal', data: format(new Date(), 'yyyy-MM-dd') });
   const [showCustoForm, setShowCustoForm] = useState(false);
 
-  const { data: processos = [] } = useQuery({ queryKey: ['processos-judiciais'], queryFn: () => base44.entities.ProcessoJudicial.list('-created_date') });
-  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => base44.entities.Condominio.list() });
-  const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => base44.entities.Fracao.list() });
-  const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => base44.entities.Pessoa.list() });
+  const { data: processos = [] } = useQuery({ queryKey: ['processos-judiciais'], queryFn: () => agenciaAvenida.entities.ProcessoJudicial.list('-created_date') });
+  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
+  const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => agenciaAvenida.entities.Fracao.list() });
+  const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
 
   const save = useMutation({
-    mutationFn: (d) => editing ? base44.entities.ProcessoJudicial.update(editing, d) : base44.entities.ProcessoJudicial.create(d),
+    mutationFn: (d) => editing ? agenciaAvenida.entities.ProcessoJudicial.update(editing, d) : agenciaAvenida.entities.ProcessoJudicial.create(d),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['processos-judiciais'] }); setOpen(false); toast.success('Processo guardado'); },
   });
 
   const remove = useMutation({
-    mutationFn: (id) => base44.entities.ProcessoJudicial.delete(id),
+    mutationFn: (id) => agenciaAvenida.entities.ProcessoJudicial.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['processos-judiciais'] }); toast.success('Processo eliminado'); },
   });
 
   const lancarDespesa = useMutation({
     mutationFn: async ({ processo, custoIdx }) => {
       const custo = processo.custos[custoIdx];
-      const despesa = await base44.entities.Despesa.create({
+      const despesa = await agenciaAvenida.entities.Despesa.create({
         condominio_id: processo.condominio_id,
         descricao: `Processo judicial: ${custo.descricao}`,
         valor: custo.valor,
@@ -73,7 +73,7 @@ export default function ProcessosJudiciais() {
       });
       const custos = [...processo.custos];
       custos[custoIdx] = { ...custo, despesa_lancada: true, despesa_id: despesa.id };
-      return base44.entities.ProcessoJudicial.update(processo.id, { custos });
+      return agenciaAvenida.entities.ProcessoJudicial.update(processo.id, { custos });
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['processos-judiciais'] }); toast.success('Despesa lançada no condomínio'); },
   });

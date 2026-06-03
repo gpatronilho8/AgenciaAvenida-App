@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import { Building2, CreditCard, AlertTriangle, TrendingUp, Euro, Clock, CheckCircle } from 'lucide-react';
 import PageHeader from '@/components/ui/PageHeader';
 import { format, startOfMonth, endOfMonth, isAfter } from 'date-fns';
@@ -42,10 +42,10 @@ function ClickableStatCard({ title, value, icon: Icon, color = 'blue', subtitle,
 
 export default function Dashboard() {
   const { selectedCondominioId } = useCondominio();
-  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => base44.entities.Condominio.list() });
-  const { data: quotas = [] } = useQuery({ queryKey: ['quotas'], queryFn: () => base44.entities.Quota.list() });
-  const { data: ocorrencias = [] } = useQuery({ queryKey: ['ocorrencias'], queryFn: () => base44.entities.Ocorrencia.list() });
-  const { data: despesas = [] } = useQuery({ queryKey: ['despesas'], queryFn: () => base44.entities.Despesa.list() });
+  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
+  const { data: quotas = [] } = useQuery({ queryKey: ['quotas'], queryFn: () => agenciaAvenida.entities.Quota.list() });
+  const { data: ocorrencias = [] } = useQuery({ queryKey: ['ocorrencias'], queryFn: () => agenciaAvenida.entities.Ocorrencia.list() });
+  const { data: despesas = [] } = useQuery({ queryKey: ['despesas'], queryFn: () => agenciaAvenida.entities.Despesa.list() });
 
   const hoje = new Date();
   const inicioMes = startOfMonth(hoje);

@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { Mail, Bell, Building2, Shield } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 
 export default function Configuracoes() {
   const [emailConfig, setEmailConfig] = useState({
@@ -26,8 +26,8 @@ export default function Configuracoes() {
   };
 
   const handleTestEmail = async () => {
-    const user = await base44.auth.me();
-    await base44.integrations.Core.SendEmail({
+    const user = await agenciaAvenida.auth.me();
+    await agenciaAvenida.integrations.Core.SendEmail({
       to: user.email,
       subject: 'Teste - Agência Avenida',
       body: `<h2>Email de teste</h2><p>As suas configurações de email estão a funcionar corretamente.</p><p><strong>Agência Avenida</strong> - Gestão de Condomínios</p>`,

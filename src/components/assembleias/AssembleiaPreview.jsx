@@ -2,7 +2,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Edit, Printer, Download, Mail } from 'lucide-react';
 import { toast } from 'sonner';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import { useState } from 'react';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import jsPDF from 'jspdf';
@@ -110,7 +110,7 @@ export default function AssembleiaPreview({ open, onClose, assembleia, condomini
   const [sending, setSending] = useState(false);
 
   const saveUrl = useMutation({
-    mutationFn: ({ field, url }) => base44.entities.Assembleia.update(assembleia.id, { [field]: url }),
+    mutationFn: ({ field, url }) => agenciaAvenida.entities.Assembleia.update(assembleia.id, { [field]: url }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['assembleias'] })
   });
 
@@ -121,7 +121,7 @@ export default function AssembleiaPreview({ open, onClose, assembleia, condomini
     } else if (action === 'upload') {
       const blob = doc.output('blob');
       const file = new File([blob], `convocatoria_${assembleia.id}.pdf`, { type: 'application/pdf' });
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await agenciaAvenida.integrations.Core.UploadFile({ file });
       await saveUrl.mutateAsync({ field: 'convocatoria_pdf_url', url: file_url });
       toast.success('Convocatória gerada e guardada');
     }
@@ -135,7 +135,7 @@ export default function AssembleiaPreview({ open, onClose, assembleia, condomini
     } else if (action === 'upload') {
       const blob = doc.output('blob');
       const file = new File([blob], `ata_${assembleia.id}.pdf`, { type: 'application/pdf' });
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await agenciaAvenida.integrations.Core.UploadFile({ file });
       await saveUrl.mutateAsync({ field: 'ata_pdf_url', url: file_url });
       toast.success('Ata gerada e guardada');
     }
@@ -149,7 +149,7 @@ export default function AssembleiaPreview({ open, onClose, assembleia, condomini
   const handleEmail = async () => {
     setSending(true);
     // Simular envio (integração real exigiria backend)
-    await base44.entities.Assembleia.update(assembleia.id, { email_enviado: true });
+    await agenciaAvenida.entities.Assembleia.update(assembleia.id, { email_enviado: true });
     qc.invalidateQueries({ queryKey: ['assembleias'] });
     toast.success('Email de convocatória enviado aos condóminos');
     setSending(false);

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,15 +70,15 @@ export default function Pessoas() {
   const [filterTipo, setFilterTipo] = useState('all');
   const [preview, setPreview] = useState(null);
 
-  const { data: pessoas = [], isLoading } = useQuery({ queryKey: ['pessoas'], queryFn: () => base44.entities.Pessoa.list() });
+  const { data: pessoas = [], isLoading } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
 
   const save = useMutation({
-    mutationFn: (data) => editing ? base44.entities.Pessoa.update(editing, data) : base44.entities.Pessoa.create(data),
+    mutationFn: (data) => editing ? agenciaAvenida.entities.Pessoa.update(editing, data) : agenciaAvenida.entities.Pessoa.create(data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['pessoas'] }); setOpen(false); toast.success('Entidade guardada'); },
   });
 
   const del = useMutation({
-    mutationFn: (id) => base44.entities.Pessoa.delete(id),
+    mutationFn: (id) => agenciaAvenida.entities.Pessoa.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['pessoas'] }); toast.success('Entidade eliminada'); },
   });
 

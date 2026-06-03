@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/button';
@@ -106,23 +106,23 @@ export default function Ocorrencias() {
   const [filterAtribuido, setFilterAtribuido] = useState('all');
   const [uploading, setUploading] = useState(false);
 
-  const { data: ocorrencias = [], isLoading } = useQuery({ queryKey: ['ocorrencias'], queryFn: () => base44.entities.Ocorrencia.list('-data_abertura') });
-  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => base44.entities.Condominio.list() });
-  const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => base44.entities.Fracao.list() });
-  const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => base44.entities.Pessoa.list() });
+  const { data: ocorrencias = [], isLoading } = useQuery({ queryKey: ['ocorrencias'], queryFn: () => agenciaAvenida.entities.Ocorrencia.list('-data_abertura') });
+  const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
+  const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => agenciaAvenida.entities.Fracao.list() });
+  const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
 
   const save = useMutation({
-    mutationFn: (data) => editing ? base44.entities.Ocorrencia.update(editing, data) : base44.entities.Ocorrencia.create(data),
+    mutationFn: (data) => editing ? agenciaAvenida.entities.Ocorrencia.update(editing, data) : agenciaAvenida.entities.Ocorrencia.create(data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['ocorrencias'] }); setOpen(false); toast.success('Ocorrência guardada'); },
   });
 
   const avancar = useMutation({
-    mutationFn: ({ id, estado }) => base44.entities.Ocorrencia.update(id, { estado, ...(estado === 'resolvida' ? { data_resolucao: format(new Date(), 'yyyy-MM-dd') } : {}) }),
+    mutationFn: ({ id, estado }) => agenciaAvenida.entities.Ocorrencia.update(id, { estado, ...(estado === 'resolvida' ? { data_resolucao: format(new Date(), 'yyyy-MM-dd') } : {}) }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['ocorrencias'] }); toast.success('Estado atualizado'); },
   });
 
   const del = useMutation({
-    mutationFn: (id) => base44.entities.Ocorrencia.delete(id),
+    mutationFn: (id) => agenciaAvenida.entities.Ocorrencia.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['ocorrencias'] }); toast.success('Ocorrência eliminada'); },
   });
 
@@ -147,7 +147,7 @@ export default function Ocorrencias() {
     setUploading(true);
     const urls = [];
     for (const file of files) {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await agenciaAvenida.integrations.Core.UploadFile({ file });
       urls.push(file_url);
     }
     setForm(p => ({ ...p, fotos_urls: [...(p.fotos_urls || []), ...urls] }));
@@ -157,7 +157,7 @@ export default function Ocorrencias() {
 
   const removeAnexo = (idx) => setForm(p => ({ ...p, fotos_urls: p.fotos_urls.filter((_, i) => i !== idx) }));
 
-  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => base44.entities.User.list() });
+  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => agenciaAvenida.entities.User.list() });
 
   const filtered = ocorrencias.filter(o => {
     const matchSearch = !search || o.titulo?.toLowerCase().includes(search.toLowerCase());
