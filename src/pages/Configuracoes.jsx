@@ -91,7 +91,7 @@ export default function Configuracoes() {
           <div className="space-y-3 text-sm">
             <div className="flex justify-between py-2 border-b border-border">
               <span className="text-muted-foreground">Aplicação</span>
-              <span className="font-medium">Agência Avenida — Gestão de Condomínios</span>
+              <span className="font-medium">Agência Avenida — Plataforma de Gestão</span>
             </div>
             <div className="flex justify-between py-2 border-b border-border">
               <span className="text-muted-foreground">Versão</span>

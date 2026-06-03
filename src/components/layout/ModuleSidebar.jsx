@@ -3,12 +3,11 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Building2, Home, Users, CreditCard,
   Receipt, AlertTriangle, FileText, Settings,
-  LogOut, Menu, X, ChevronLeft, HomeIcon, Layers, Scale, CalendarDays
+  Menu, X, ChevronLeft, HomeIcon, Layers, Scale, CalendarDays
 } from 'lucide-react';
 import { useState } from 'react';
-import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 
-const LOGO_URL = "https://media.agenciaAvenida.com/images/public/69ea73bcbb97ac6a352ec27e/c82d79a2f_aa_white.png";
+const LOGO_URL = "/aa_white.png";
 
 const navByModule = {
   condominios: [
@@ -20,7 +19,6 @@ const navByModule = {
     { label: 'Financeiro', icon: Receipt, path: '/condominios/movimentos' },
     { label: 'Ocorrências', icon: AlertTriangle, path: '/condominios/ocorrencias' },
     { label: 'Documentos', icon: FileText, path: '/condominios/documentos' },
-
     { label: 'Proc. Judiciais', icon: Scale, path: '/condominios/processos-judiciais' },
     { label: 'Assembleias', icon: CalendarDays, path: '/condominios/assembleias' },
   ],
@@ -88,7 +86,7 @@ export default function ModuleSidebar({ module }) {
         })}
       </nav>
 
-      {/* Bottom */}
+      {/* Bottom - Removido o botão Sair */}
       <div className="px-3 py-4 border-t border-sidebar-border space-y-0.5">
         <button
           onClick={() => navigate('/')}
@@ -104,13 +102,6 @@ export default function ModuleSidebar({ module }) {
           <Settings className="w-4 h-4" />
           Configurações
         </Link>
-        <button
-          onClick={() => agenciaAvenida.auth.logout()}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-red-500/10 hover:text-red-400 transition-all"
-        >
-          <LogOut className="w-4 h-4" />
-          Sair
-        </button>
       </div>
     </div>
   );

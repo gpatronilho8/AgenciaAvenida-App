@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
-const LOGO_URL = "https://media.agenciaAvenida.com/images/public/user_69ea73b562cec41faae7023d/560647939_264be9ba-be8e-4182-ac20-e19ea39feb71.jpeg";
+const LOGO_URL = "/aa_regular.jpg";
 
 export default function PortalCondomino() {
   const [user, setUser] = useState(null);
@@ -155,10 +155,10 @@ export default function PortalCondomino() {
             )}
             <div>
               <p className={`font-bold text-lg ${totalDivida > 0 ? 'text-red-800' : 'text-green-800'}`}>
-                {totalDivida > 0 ? `Dívida pendente: €${totalDivida.toFixed(2)}` : 'Conta regularizada'}
+                {totalDivida > 0 ? `Dívida Pendente: €${totalDivida.toFixed(2)}` : 'Conta Regularizada'}
               </p>
               <p className="text-sm text-muted-foreground">
-                {pendentes.length > 0 ? `${pendentes.length} quota(s) por regularizar` : 'Todas as quotas estão pagas'}
+                {pendentes.length > 0 ? `${pendentes.length} quota(s) por regularizar!` : 'Todas as quotas estão pagas!'}
               </p>
             </div>
           </div>
@@ -216,7 +216,7 @@ export default function PortalCondomino() {
                     </div>
                   </div>
                 ))}
-                {pagas.length === 0 && <p className="text-center text-muted-foreground py-8 text-sm">Sem histórico de pagamentos</p>}
+                {pagas.length === 0 && <p className="text-center text-muted-foreground py-8 text-sm">Sem histórico de pagamentos!</p>}
               </div>
             </div>
           </div>
@@ -253,7 +253,7 @@ export default function PortalCondomino() {
                   )}
                 </div>
               ))}
-              {documentos.length === 0 && <p className="col-span-full text-center text-muted-foreground py-8 text-sm">Sem documentos disponíveis</p>}
+              {documentos.length === 0 && <p className="col-span-full text-center text-muted-foreground py-8 text-sm">Sem documentos disponíveis!</p>}
             </div>
           </div>
         )}
@@ -330,7 +330,7 @@ export default function PortalCondomino() {
                 </div>
               ))}
               {ocorrencias.filter(o => o.reportada_por === user?.email).length === 0 && (
-                <p className="text-center text-muted-foreground py-8 text-sm">Nenhuma ocorrência submetida</p>
+                <p className="text-center text-muted-foreground py-8 text-sm">Nenhuma ocorrência submetida!</p>
               )}
             </div>
           </div>

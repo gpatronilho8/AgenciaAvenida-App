@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Building2, Home, FileText, ArrowRight, LogOut, AlertTriangle, Pencil, Printer } from 'lucide-react';
+import { Building2, Home, FileText, ArrowRight, LogOut, Printer } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import { useQuery } from '@tanstack/react-query';
@@ -39,13 +39,6 @@ const modules = [
   },
 ];
 
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return 'Bom dia';
-  if (hour >= 12 && hour < 19) return 'Boa tarde';
-  return 'Boa noite';
-}
-
 function OcorrenciaPreviewDialog({ ocorrencia, onClose }) {
   if (!ocorrencia) return null;
   return (
@@ -78,17 +71,14 @@ export default function Hub() {
   const [user, setUser] = useState(null);
   const [previewOcorrencia, setPreviewOcorrencia] = useState(null);
 
-  const { data: ocorrencias = [] } = useQuery({ queryKey: ['ocorrencias-hub'], queryFn: () => agenciaAvenida.entities.Ocorrencia.filter({ estado: 'aberta' }, '-data_abertura', 5) });
+  const { data: ocorrencias = [] } = useQuery({ 
+    queryKey: ['ocorrencias-hub'], 
+    queryFn: () => agenciaAvenida.entities.Ocorrencia.filter({ estado: 'aberta' }, '-data_abertura', 5) 
+  });
 
   useEffect(() => {
     agenciaAvenida.auth.me().then(setUser).catch(() => {});
   }, []);
-
-  const firstName = user?.full_name?.split(' ')[0] || '';
-  const lastName = user?.full_name?.split(' ').slice(-1)[0] || '';
-  const displayName = firstName && lastName && firstName !== lastName
-    ? `${firstName} ${lastName}`
-    : user?.full_name || '';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col">
@@ -121,16 +111,8 @@ export default function Hub() {
         )}
       </header>
 
-      {/* Main */}
+      {/* Main - Removido o bloco de saudação central para libertar espaço */}
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-12">
-        <div className="text-center mb-12">
-          <img src={LOGO_WHITE} alt="Agência Avenida" className="h-20 w-auto mx-auto mb-6 opacity-90" />
-          <h2 className="text-3xl font-bold text-white mb-2">
-            {getGreeting()}{displayName ? `, ${displayName}` : ''}
-          </h2>
-          <p className="text-slate-400 text-sm">Agência Avenida · Plataforma de Gestão</p>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
           {modules.map((mod) => {
             const Icon = mod.icon;
@@ -143,8 +125,7 @@ export default function Hub() {
                 <div className={`inline-flex p-4 rounded-xl bg-gradient-to-br ${mod.color} mb-5 shadow-lg`}>
                   <Icon className="w-7 h-7 text-white" />
                 </div>
-                <h3 className="text-white font-bold text-xl mb-2">{mod.label}</h3>
-                <p className="text-slate-400 text-sm leading-relaxed mb-6">{mod.description}</p>
+                <h3 className="text-white font-bold text-xl mb-4">{mod.label}</h3>
                 <div className="flex flex-wrap gap-2 mb-6">
                   {mod.stats.map(s => (
                     <span key={s} className="text-xs px-2.5 py-1 rounded-full bg-white/10 text-slate-300">{s}</span>
