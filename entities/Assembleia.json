@@ -1,0 +1,79 @@
+{
+  "name": "Assembleia",
+  "type": "object",
+  "properties": {
+    "condominio_id": {
+      "type": "string"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "ordinaria",
+        "extraordinaria"
+      ],
+      "default": "ordinaria"
+    },
+    "titulo": {
+      "type": "string"
+    },
+    "data": {
+      "type": "string",
+      "format": "date"
+    },
+    "hora": {
+      "type": "string"
+    },
+    "local": {
+      "type": "string"
+    },
+    "segunda_convocatoria_data": {
+      "type": "string",
+      "format": "date"
+    },
+    "segunda_convocatoria_hora": {
+      "type": "string"
+    },
+    "ordem_trabalhos": {
+      "type": "string",
+      "description": "Texto com a ordem de trabalhos"
+    },
+    "ata_numero": {
+      "type": "number"
+    },
+    "ata_texto": {
+      "type": "string",
+      "description": "Texto da ata redigido"
+    },
+    "ata_pdf_url": {
+      "type": "string"
+    },
+    "convocatoria_pdf_url": {
+      "type": "string"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "agendada",
+        "realizada",
+        "cancelada"
+      ],
+      "default": "agendada"
+    },
+    "portal_visivel": {
+      "type": "boolean",
+      "default": false
+    },
+    "email_enviado": {
+      "type": "boolean",
+      "default": false
+    },
+    "notas": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "condominio_id",
+    "titulo",
+    "data"
+  ]
+}

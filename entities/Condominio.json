@@ -1,0 +1,61 @@
+{
+  "name": "Condominio",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "description": "Nome do condom\u00ednio"
+    },
+    "nif": {
+      "type": "string",
+      "description": "NIF do condom\u00ednio"
+    },
+    "morada": {
+      "type": "string",
+      "description": "Morada completa"
+    },
+    "codigo_postal": {
+      "type": "string"
+    },
+    "localidade": {
+      "type": "string"
+    },
+    "telefone": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "iban": {
+      "type": "string",
+      "description": "IBAN conta banc\u00e1ria"
+    },
+    "banco": {
+      "type": "string",
+      "description": "Nome do banco"
+    },
+    "dados_acesso_bancario": {
+      "type": "string",
+      "description": "Dados de acesso ao homebanking / portal banc\u00e1rio"
+    },
+    "saldo_banco": {
+      "type": "number",
+      "default": 0
+    },
+    "saldo_caixa": {
+      "type": "number",
+      "default": 0
+    },
+    "total_fracoes": {
+      "type": "number",
+      "default": 0
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "nome"
+  ]
+}

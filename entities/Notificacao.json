@@ -1,0 +1,33 @@
+{
+  "name": "Notificacao",
+  "type": "object",
+  "properties": {
+    "titulo": {
+      "type": "string"
+    },
+    "mensagem": {
+      "type": "string"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "ocorrencia",
+        "processo_novo",
+        "processo_atualizado"
+      ],
+      "default": "ocorrencia"
+    },
+    "referencia_id": {
+      "type": "string",
+      "description": "ID da ocorr\u00eancia ou processo relacionado"
+    },
+    "lida": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "titulo",
+    "tipo"
+  ]
+}

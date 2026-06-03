@@ -1,0 +1,69 @@
+{
+  "name": "Despesa",
+  "type": "object",
+  "properties": {
+    "condominio_id": {
+      "type": "string"
+    },
+    "fornecedor_id": {
+      "type": "string"
+    },
+    "categoria": {
+      "type": "string",
+      "enum": [
+        "limpeza",
+        "manutencao",
+        "seguros",
+        "eletricidade",
+        "agua",
+        "elevador",
+        "jardim",
+        "administracao",
+        "obras",
+        "outros"
+      ]
+    },
+    "descricao": {
+      "type": "string"
+    },
+    "valor": {
+      "type": "number"
+    },
+    "data": {
+      "type": "string",
+      "format": "date"
+    },
+    "metodo_pagamento": {
+      "type": "string",
+      "enum": [
+        "transferencia",
+        "mb",
+        "mbway",
+        "dinheiro"
+      ]
+    },
+    "conta": {
+      "type": "string",
+      "enum": [
+        "banco",
+        "caixa"
+      ],
+      "default": "banco"
+    },
+    "numero_fatura": {
+      "type": "string"
+    },
+    "documento_url": {
+      "type": "string"
+    },
+    "observacoes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "condominio_id",
+    "valor",
+    "data",
+    "descricao"
+  ]
+}

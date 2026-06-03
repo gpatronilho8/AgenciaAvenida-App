@@ -1,0 +1,55 @@
+{
+  "name": "Pessoa",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "condomino",
+        "fornecedor",
+        "cliente",
+        "advogado"
+      ]
+    },
+    "nif": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "telefone": {
+      "type": "string"
+    },
+    "morada": {
+      "type": "string"
+    },
+    "codigo_postal": {
+      "type": "string"
+    },
+    "localidade": {
+      "type": "string"
+    },
+    "iban": {
+      "type": "string",
+      "description": "IBAN banc\u00e1rio"
+    },
+    "senha_at": {
+      "type": "string",
+      "description": "Senha de acesso ao Portal das Finan\u00e7as (AT)"
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "nome",
+    "tipo"
+  ]
+}

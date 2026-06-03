@@ -1,0 +1,65 @@
+{
+  "name": "RendaMensal",
+  "type": "object",
+  "properties": {
+    "propriedade_id": {
+      "type": "string"
+    },
+    "ano": {
+      "type": "number"
+    },
+    "mes": {
+      "type": "number"
+    },
+    "valor_renda": {
+      "type": "number"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "pendente",
+        "recebida",
+        "atrasada"
+      ],
+      "default": "pendente"
+    },
+    "data_recebimento": {
+      "type": "string",
+      "format": "date"
+    },
+    "metodo_pagamento": {
+      "type": "string",
+      "enum": [
+        "transferencia",
+        "mb",
+        "mbway",
+        "dinheiro",
+        ""
+      ]
+    },
+    "notas": {
+      "type": "string"
+    },
+    "fechada": {
+      "type": "boolean",
+      "default": false
+    },
+    "data_fecho": {
+      "type": "string",
+      "format": "date"
+    },
+    "valor_transferencia_proprietario": {
+      "type": "number"
+    },
+    "data_transferencia": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": [
+    "propriedade_id",
+    "ano",
+    "mes",
+    "valor_renda"
+  ]
+}

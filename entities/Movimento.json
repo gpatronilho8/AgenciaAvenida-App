@@ -1,0 +1,81 @@
+{
+  "name": "Movimento",
+  "type": "object",
+  "properties": {
+    "condominio_id": {
+      "type": "string"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "receita",
+        "despesa"
+      ],
+      "default": "despesa"
+    },
+    "categoria": {
+      "type": "string",
+      "enum": [
+        "quota",
+        "limpeza",
+        "manutencao",
+        "seguros",
+        "eletricidade",
+        "agua",
+        "elevador",
+        "jardim",
+        "administracao",
+        "obras",
+        "outros"
+      ]
+    },
+    "descricao": {
+      "type": "string"
+    },
+    "valor": {
+      "type": "number"
+    },
+    "data": {
+      "type": "string",
+      "format": "date"
+    },
+    "conta": {
+      "type": "string",
+      "enum": [
+        "banco",
+        "caixa"
+      ],
+      "default": "banco"
+    },
+    "metodo_pagamento": {
+      "type": "string",
+      "enum": [
+        "transferencia",
+        "mb",
+        "mbway",
+        "dinheiro",
+        ""
+      ]
+    },
+    "referencia_id": {
+      "type": "string",
+      "description": "ID da quota ou despesa relacionada"
+    },
+    "fornecedor_id": {
+      "type": "string"
+    },
+    "numero_documento": {
+      "type": "string"
+    },
+    "observacoes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "condominio_id",
+    "tipo",
+    "valor",
+    "data",
+    "descricao"
+  ]
+}

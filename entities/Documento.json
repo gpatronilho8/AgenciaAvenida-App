@@ -1,0 +1,46 @@
+{
+  "name": "Documento",
+  "type": "object",
+  "properties": {
+    "condominio_id": {
+      "type": "string"
+    },
+    "titulo": {
+      "type": "string"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "ata",
+        "aviso",
+        "circular",
+        "regulamento",
+        "orcamento",
+        "outro"
+      ]
+    },
+    "data": {
+      "type": "string",
+      "format": "date"
+    },
+    "descricao": {
+      "type": "string"
+    },
+    "ficheiro_url": {
+      "type": "string"
+    },
+    "publico": {
+      "type": "boolean",
+      "default": true
+    },
+    "enviado_por_email": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "condominio_id",
+    "titulo",
+    "tipo"
+  ]
+}

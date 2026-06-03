@@ -1,0 +1,83 @@
+{
+  "name": "Quota",
+  "type": "object",
+  "properties": {
+    "condominio_id": {
+      "type": "string"
+    },
+    "fracao_id": {
+      "type": "string"
+    },
+    "pessoa_id": {
+      "type": "string",
+      "description": "Respons\u00e1vel pelo pagamento"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "mensal",
+        "extraordinaria"
+      ],
+      "default": "mensal"
+    },
+    "descricao": {
+      "type": "string"
+    },
+    "valor": {
+      "type": "number"
+    },
+    "data_emissao": {
+      "type": "string",
+      "format": "date"
+    },
+    "data_vencimento": {
+      "type": "string",
+      "format": "date"
+    },
+    "data_pagamento": {
+      "type": "string",
+      "format": "date"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "pendente",
+        "pago",
+        "vencido",
+        "cancelado"
+      ],
+      "default": "pendente"
+    },
+    "metodo_pagamento": {
+      "type": "string",
+      "enum": [
+        "transferencia",
+        "mb",
+        "mbway",
+        "dinheiro",
+        ""
+      ]
+    },
+    "referencia_mb": {
+      "type": "string"
+    },
+    "numero_recibo": {
+      "type": "string"
+    },
+    "ano": {
+      "type": "number"
+    },
+    "mes": {
+      "type": "number"
+    },
+    "observacoes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "condominio_id",
+    "fracao_id",
+    "valor",
+    "data_emissao"
+  ]
+}

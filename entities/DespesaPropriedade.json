@@ -1,0 +1,56 @@
+{
+  "name": "DespesaPropriedade",
+  "type": "object",
+  "properties": {
+    "propriedade_id": {
+      "type": "string"
+    },
+    "renda_mensal_id": {
+      "type": "string",
+      "description": "Associada a um m\u00eas espec\u00edfico (opcional)"
+    },
+    "descricao": {
+      "type": "string"
+    },
+    "categoria": {
+      "type": "string",
+      "enum": [
+        "reparacao",
+        "manutencao",
+        "condominio",
+        "seguros",
+        "impostos",
+        "comissao_agencia",
+        "outro"
+      ],
+      "default": "outro"
+    },
+    "valor": {
+      "type": "number"
+    },
+    "data": {
+      "type": "string",
+      "format": "date"
+    },
+    "fornecedor_id": {
+      "type": "string"
+    },
+    "documento_url": {
+      "type": "string"
+    },
+    "desconta_proprietario": {
+      "type": "boolean",
+      "default": true,
+      "description": "Se desconta no repasse ao propriet\u00e1rio"
+    },
+    "notas": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "propriedade_id",
+    "valor",
+    "data",
+    "descricao"
+  ]
+}
