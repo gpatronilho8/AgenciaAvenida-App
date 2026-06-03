@@ -7,7 +7,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/button';
 
-const LOGO_WHITE = "https://media.agenciaAvenida.com/images/public/69ea73bcbb97ac6a352ec27e/c82d79a2f_aa_white.png";
+const LOGO_WHITE = "/aa_white.png";
 
 const modules = [
   {

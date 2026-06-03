@@ -1,45 +1,30 @@
 // src/api/agenciaAvenidaClient.js
-// Mock do cliente para garantir a independência da interface visual.
-// Mais tarde, estas funções vão ligar-se diretamente ao nosso motor em Python/Flask.
+// Mock do cliente blindado com Proxy. Nunca mais terás ecrãs em branco!
+
+const funcoesVaziasSeguras = {
+  findMany: async () => [],
+  findOne: async () => null,
+  filter: async () => [],
+  create: async () => ({ id: 'simulado' }),
+  update: async () => ({}),
+  delete: async () => true,
+};
 
 export const agenciaAvenida = {
   auth: {
-    login: async (email, password) => {
-      console.log("Simulação de Login para:", email);
-      return { 
-        user: { email: email, name: "Administrador de Sistema" }, 
-        token: "token-seguro-local" 
-      };
-    },
-    logout: async () => {
-      console.log("Logout simulado com sucesso.");
-    },
-    getCurrentUser: async () => {
-      return { email: "admin@agencia-avenida.pt", name: "Administrador de Sistema" };
-    }
+    login: async () => ({ user: { name: "Administrador" }, token: "token" }),
+    logout: async () => console.log("Logout simulado"),
+    getCurrentUser: async () => ({ email: "admin@agencia-avenida.pt", full_name: "Gonçalo Patronilho" }),
+    me: async () => ({ email: "admin@agencia-avenida.pt", full_name: "Gonçalo Patronilho" }),
   },
-  entities: {
-    Condominio: {
-      findMany: async () => { return []; },
-      findOne: async (id) => { return null; },
-    },
-    Despesa: {
-      findMany: async () => { return []; },
-    },
-    Ocorrencia: {
-      findMany: async () => { return []; },
-    },
-    Propriedade: {
-      findMany: async () => { return []; },
-    },
-    ProcessoJudicial: {
-      findMany: async () => { return []; },
-    },
-    Quota: {
-      findMany: async () => { return []; },
+  // O "Proxy" é um escudo mágico: 
+  // Qualquer tabela (Condominio, Despesa, etc.) que o React tente ler, 
+  // ele devolve as funcoesVaziasSeguras sem dar erro!
+  entities: new Proxy({}, {
+    get: function(target, prop) {
+      return funcoesVaziasSeguras;
     }
-  }
+  })
 };
 
-// Substitui a função original deles para evitar erros na inicialização
 export const createClient = () => agenciaAvenida;
