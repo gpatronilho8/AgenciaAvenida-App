@@ -4,11 +4,11 @@
   "properties": {
     "nome": {
       "type": "string",
-      "description": "Nome do condom\u00ednio"
+      "description": "Nome do condomínio"
     },
     "nif": {
       "type": "string",
-      "description": "NIF do condom\u00ednio"
+      "description": "NIF do condomínio"
     },
     "morada": {
       "type": "string",
@@ -28,7 +28,7 @@
     },
     "iban": {
       "type": "string",
-      "description": "IBAN conta banc\u00e1ria"
+      "description": "IBAN conta bancária"
     },
     "banco": {
       "type": "string",
@@ -36,7 +36,7 @@
     },
     "dados_acesso_bancario": {
       "type": "string",
-      "description": "Dados de acesso ao homebanking / portal banc\u00e1rio"
+      "description": "Dados de acesso ao homebanking / portal bancário"
     },
     "saldo_banco": {
       "type": "number",

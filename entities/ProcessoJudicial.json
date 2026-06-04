@@ -41,10 +41,8 @@
         "carta_devolvida",
         "negociacao",
         "divida_paga",
-        "plano_pagamento",
-        ""
-      ],
-      "default": ""
+        "plano_pagamento"
+      ]
     },
     "data_inicio": {
       "type": "string",

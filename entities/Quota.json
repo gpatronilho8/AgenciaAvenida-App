@@ -10,7 +10,7 @@
     },
     "pessoa_id": {
       "type": "string",
-      "description": "Respons\u00e1vel pelo pagamento"
+      "description": "Responsável pelo pagamento"
     },
     "tipo": {
       "type": "string",
@@ -41,25 +41,21 @@
     "estado": {
       "type": "string",
       "enum": [
-        "pendente",
+        "em_aberto",
         "pago",
         "vencido",
-        "cancelado"
+        "anulado"
       ],
-      "default": "pendente"
+      "default": "em_aberto"
     },
     "metodo_pagamento": {
       "type": "string",
       "enum": [
-        "transferencia",
-        "mb",
-        "mbway",
-        "dinheiro",
-        ""
+        "transferencia_bancaria",
+        "numerario",
+        "debito_direto",
+        "cheque"
       ]
-    },
-    "referencia_mb": {
-      "type": "string"
     },
     "numero_recibo": {
       "type": "string"

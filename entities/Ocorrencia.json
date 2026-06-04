@@ -7,7 +7,7 @@
     },
     "fracao_id": {
       "type": "string",
-      "description": "Fra\u00e7\u00e3o ou \u00e1rea comum"
+      "description": "Fração ou área comum"
     },
     "reportada_por": {
       "type": "string",
@@ -26,6 +26,7 @@
         "manutencao",
         "limpeza",
         "seguranca",
+        "denuncia",
         "outro"
       ]
     },
@@ -74,8 +75,10 @@
         "escadas",
         "garagem",
         "jardim",
-        "cobertura",
+        "terraco",
         "elevador",
+        "piscina",
+        "fachada",
         "outro"
       ]
     },

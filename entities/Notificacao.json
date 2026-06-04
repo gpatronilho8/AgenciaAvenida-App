@@ -13,13 +13,14 @@
       "enum": [
         "ocorrencia",
         "processo_novo",
-        "processo_atualizado"
-      ],
-      "default": "ocorrencia"
+        "processo_atualizado",
+        "comunicacao",
+        "alerta"
+      ]
     },
     "referencia_id": {
       "type": "string",
-      "description": "ID da ocorr\u00eancia ou processo relacionado"
+      "description": "ID da ocorrência ou processo relacionado"
     },
     "lida": {
       "type": "boolean",

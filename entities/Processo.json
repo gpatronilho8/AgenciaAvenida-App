@@ -16,8 +16,7 @@
         "certidao",
         "procuracao",
         "outro"
-      ],
-      "default": "outro"
+      ]
     },
     "tipo_personalizado": {
       "type": "string",
@@ -28,7 +27,7 @@
     },
     "atribuido_a": {
       "type": "string",
-      "description": "ID do utilizador staff ao qual o processo est\u00e1 atribu\u00eddo"
+      "description": "ID do utilizador staff ao qual o processo está atribuído"
     },
     "descricao": {
       "type": "string"
@@ -48,24 +47,24 @@
     "metodo_pagamento": {
       "type": "string",
       "enum": [
-        "transferencia",
-        "mb",
-        "mbway",
-        "dinheiro",
-        ""
+        "transferencia_bancaria",
+        "numerario",
+        "debito_direto",
+        "cheque"
       ]
     },
     "estado": {
       "type": "string",
       "enum": [
-        "pendente",
+        "pendente_inicio",
         "em_curso",
+        "pendente_cliente",
         "aguarda_documentos",
-        "submetido",
+        "pendente_entidade_externa",
         "concluido",
         "cancelado"
       ],
-      "default": "pendente"
+      "default": "pendente_inicio"
     },
     "data_inicio": {
       "type": "string",
@@ -110,10 +109,9 @@
         "recebida_documentacao",
         "submetido_at_prova",
         "comprovativo_enviado_cliente",
-        "submetida_substituicao_at",
-        ""
+        "submetida_substituicao_at"
       ],
-      "description": "Estado espec\u00edfico IRS"
+      "description": "Estado específico IRS"
     },
     "irs_campos": {
       "type": "object",

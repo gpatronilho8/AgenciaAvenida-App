@@ -13,7 +13,7 @@
       "enum": [
         "ata",
         "aviso",
-        "circular",
+        "convocatoria",
         "regulamento",
         "orcamento",
         "outro"

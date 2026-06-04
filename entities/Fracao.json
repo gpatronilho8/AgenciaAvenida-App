@@ -4,25 +4,19 @@
   "properties": {
     "condominio_id": {
       "type": "string",
-      "description": "ID do condom\u00ednio"
+      "description": "ID do condomínio"
     },
-    "codigo": {
+    "codigo_fracao": {
       "type": "string",
       "description": "Ex: A1, B2, 1Dto"
     },
-    "descricao": {
+    "descricao_piso_lado": {
       "type": "string",
       "description": "Ex: Apartamento T2"
     },
-    "piso": {
-      "type": "string"
-    },
     "permilagem": {
       "type": "number",
-      "description": "Permilagem da fra\u00e7\u00e3o"
-    },
-    "area_m2": {
-      "type": "number"
+      "description": "Permilagem da fração"
     },
     "proprietario_id": {
       "type": "string"
@@ -49,12 +43,8 @@
       },
       "description": "Quais os titulares a incluir no recibo"
     },
-    "responsavel_pagamento": {
-      "type": "string",
-      "enum": [
-        "proprietario",
-        "inquilino"
-      ]
+    "pessoa_contacto": {
+      "type": "string"
     },
     "quota_mensal": {
       "type": "number",
@@ -67,6 +57,6 @@
   },
   "required": [
     "condominio_id",
-    "codigo"
+    "codigo_fracao"
   ]
 }

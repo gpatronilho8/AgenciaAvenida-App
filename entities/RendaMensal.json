@@ -17,11 +17,11 @@
     "estado": {
       "type": "string",
       "enum": [
-        "pendente",
+        "em_aberto",
         "recebida",
         "atrasada"
       ],
-      "default": "pendente"
+      "default": "em_aberto"
     },
     "data_recebimento": {
       "type": "string",
@@ -30,11 +30,10 @@
     "metodo_pagamento": {
       "type": "string",
       "enum": [
-        "transferencia",
-        "mb",
-        "mbway",
-        "dinheiro",
-        ""
+        "transferencia_bancaria",
+        "numerario",
+        "debito_direto",
+        "cheque"
       ]
     },
     "notas": {

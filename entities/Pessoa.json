@@ -6,13 +6,17 @@
       "type": "string"
     },
     "tipo": {
-      "type": "string",
-      "enum": [
-        "condomino",
-        "fornecedor",
-        "cliente",
-        "advogado"
-      ]
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "condomino",
+          "fornecedor",
+          "cliente",
+          "banco",
+          "advogado"
+        ]
+      }
     },
     "nif": {
       "type": "string"
@@ -34,11 +38,11 @@
     },
     "iban": {
       "type": "string",
-      "description": "IBAN banc\u00e1rio"
+      "description": "IBAN bancário"
     },
     "senha_at": {
       "type": "string",
-      "description": "Senha de acesso ao Portal das Finan\u00e7as (AT)"
+      "description": "Senha de acesso ao Portal das Finanças (AT)"
     },
     "observacoes": {
       "type": "string"

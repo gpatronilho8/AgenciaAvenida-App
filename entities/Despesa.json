@@ -11,15 +11,19 @@
     "categoria": {
       "type": "string",
       "enum": [
+        "quotas",
         "limpeza",
-        "manutencao",
+        "manutencao_obras",
         "seguros",
         "eletricidade",
         "agua",
         "elevador",
-        "jardim",
-        "administracao",
-        "obras",
+        "recuperacao_divida",
+        "piscina",
+        "acerto_contabilistico",
+        "despesas_administrativas",
+        "despesas_bancarias",
+        "despesas_juridicas",
         "outros"
       ]
     },
@@ -36,10 +40,10 @@
     "metodo_pagamento": {
       "type": "string",
       "enum": [
-        "transferencia",
-        "mb",
-        "mbway",
-        "dinheiro"
+        "transferencia_bancaria",
+        "numerario",
+        "debito_direto",
+        "cheque"
       ]
     },
     "conta": {
@@ -47,8 +51,7 @@
       "enum": [
         "banco",
         "caixa"
-      ],
-      "default": "banco"
+      ]
     },
     "numero_fatura": {
       "type": "string"

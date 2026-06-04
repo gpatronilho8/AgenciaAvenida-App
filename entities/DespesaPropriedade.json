@@ -7,7 +7,7 @@
     },
     "renda_mensal_id": {
       "type": "string",
-      "description": "Associada a um m\u00eas espec\u00edfico (opcional)"
+      "description": "Associada a um mês específico (opcional)"
     },
     "descricao": {
       "type": "string"
@@ -22,8 +22,7 @@
         "impostos",
         "comissao_agencia",
         "outro"
-      ],
-      "default": "outro"
+      ]
     },
     "valor": {
       "type": "number"
@@ -41,7 +40,7 @@
     "desconta_proprietario": {
       "type": "boolean",
       "default": true,
-      "description": "Se desconta no repasse ao propriet\u00e1rio"
+      "description": "Se desconta no repasse ao proprietário"
     },
     "notas": {
       "type": "string"

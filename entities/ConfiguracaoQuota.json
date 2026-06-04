@@ -17,7 +17,7 @@
     "valor_fixo": {
       "type": "number",
       "default": 0,
-      "description": "Valor fixo por fra\u00e7\u00e3o"
+      "description": "Valor fixo por fração"
     },
     "valor_total_permilagem": {
       "type": "number",
@@ -26,17 +26,15 @@
     },
     "dia_vencimento": {
       "type": "number",
-      "default": 8,
-      "description": "Dia do m\u00eas para vencimento"
+      "description": "Dia do mês para vencimento"
     },
     "mes_inicio": {
       "type": "number",
-      "default": 1,
-      "description": "M\u00eas de in\u00edcio de contagem (1-12)"
+      "description": "Mês de início de contagem (1-12)"
     },
     "ano_inicio": {
       "type": "number",
-      "description": "Ano de in\u00edcio"
+      "description": "Ano de início de contagem"
     },
     "ativa": {
       "type": "boolean",
