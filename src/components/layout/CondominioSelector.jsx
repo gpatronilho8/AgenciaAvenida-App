@@ -25,7 +25,7 @@ export default function CondominioSelector() {
           }`}
         >
           <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
-          <span>Todos os Condomínios</span>
+          <span>TODOS</span>
         </button>
         {condominios.map(c => (
           <button

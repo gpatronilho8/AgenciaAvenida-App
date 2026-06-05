@@ -84,4 +84,13 @@
   .font-inter {
     font-family: 'Inter', sans-serif;
   }
+  /* Esconder barra de scroll para Chrome, Safari e Opera */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  /* Esconder barra de scroll para IE, Edge e Firefox */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }

@@ -50,8 +50,8 @@ export default function ModuleSidebar({ module }) {
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo + Module */}
-      <div className="px-5 py-5 border-b border-sidebar-border">
-        <div className="flex items-center gap-3 mb-4">
+      <div className="px-4 py-4 border-b border-sidebar-border">
+        <div className="flex items-center gap-3 mb-3">
           <img src={LOGO_URL} alt="Agência Avenida" className="h-9 w-auto object-contain rounded" />
           <div>
             <p className="text-sidebar-foreground font-semibold text-sm leading-tight">Agência Avenida</p>
@@ -63,8 +63,8 @@ export default function ModuleSidebar({ module }) {
         </div>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+      {/* Nav - AQUI ESTÁ A CLASSE no-scrollbar */}
+      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto no-scrollbar">
         {navItems.map(({ label, icon: Icon, path }) => {
           const isActive = location.pathname === path;
           return (
@@ -73,7 +73,7 @@ export default function ModuleSidebar({ module }) {
               to={path}
               onClick={() => setMobileOpen(false)}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
                 isActive
                   ? 'bg-sidebar-primary/20 text-sidebar-primary'
                   : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
@@ -86,18 +86,18 @@ export default function ModuleSidebar({ module }) {
         })}
       </nav>
 
-      {/* Bottom - Removido o botão Sair */}
-      <div className="px-3 py-4 border-t border-sidebar-border space-y-0.5">
+      {/* Bottom */}
+      <div className="px-3 py-3 border-t border-sidebar-border space-y-0.5">
         <button
           onClick={() => navigate('/')}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all"
         >
           <ChevronLeft className="w-4 h-4" />
           Voltar ao Início
         </button>
         <Link
           to="/configuracoes"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all"
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all"
         >
           <Settings className="w-4 h-4" />
           Configurações
@@ -123,7 +123,9 @@ export default function ModuleSidebar({ module }) {
       )}>
         <SidebarContent />
       </div>
-      <div className="hidden lg:flex flex-col w-64 flex-shrink-0 bg-sidebar h-screen sticky top-0">
+      
+      {/* Largura adaptativa para Desktop */}
+      <div className="hidden lg:flex flex-col w-60 xl:w-64 flex-shrink-0 bg-sidebar h-screen sticky top-0 transition-all duration-300">
         <SidebarContent />
       </div>
     </>
