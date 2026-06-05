@@ -406,7 +406,7 @@ export default function Processos() {
 
   return (
     <div>
-      <PageHeader title="PROCESSOS & SERVIÇOS" subtitle="Gestão de IRS, Renovações de Carta & Outros" action={
+      <PageHeader title="Processos & Serviços" subtitle="Gestão de IRS, Renovações de Carta & Outros" action={
         <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />Novo Processo</Button>
       } />
 
