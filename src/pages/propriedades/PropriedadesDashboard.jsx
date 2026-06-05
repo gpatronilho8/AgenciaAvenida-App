@@ -69,7 +69,7 @@ export default function PropriedadesDashboard() {
         </div>
         <div className="divide-y divide-border">
           {rendasPendentes.length === 0 && (
-            <p className="text-muted-foreground text-sm text-center py-8">Todas as rendas deste mês estão recebidas</p>
+            <p className="text-muted-foreground text-sm text-center py-8">Todas as rendas deste mês estão recebidas!</p>
           )}
           {rendasPendentes.map(r => {
             const prop = propriedades.find(p => p.id === r.propriedade_id);

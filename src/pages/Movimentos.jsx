@@ -132,7 +132,7 @@ export default function Movimentos() {
 
   return (
     <div>
-      <PageHeader title="Financeiro" subtitle="Receitas e despesas por condomínio" action={
+      <PageHeader title="Financeiro" subtitle="Registo de movimentos financeiros" action={
         <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />Novo Movimento</Button>
       } />
 

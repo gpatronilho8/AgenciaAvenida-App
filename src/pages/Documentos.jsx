@@ -123,7 +123,7 @@ export default function Documentos() {
 
   return (
     <div>
-      <PageHeader title="Documentos" subtitle="Atas, avisos, regulamentos e circulares" action={
+      <PageHeader title="Documentos" subtitle="Atas, comunicados, regulamentos, orçamentos e outros documentos" action={
         <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />Novo Documento</Button>
       } />
 

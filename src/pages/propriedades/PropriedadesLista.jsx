@@ -41,7 +41,7 @@ export default function PropriedadesLista() {
 
   return (
     <div>
-      <PageHeader title="Propriedades" subtitle="Moradas geridas pela agência"
+      <PageHeader title="Propriedades" subtitle="Moradas geridas pela Agência Avenida"
         action={<Button onClick={openNew}><Plus className="w-4 h-4 mr-1" />Nova Propriedade</Button>}
       />
       <div className="flex gap-3 mb-6">
@@ -96,7 +96,7 @@ export default function PropriedadesLista() {
         {filtered.length === 0 && (
           <div className="col-span-full text-center py-16 text-muted-foreground">
             <Home className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p>Nenhuma propriedade encontrada</p>
+            <p>Nenhuma propriedade encontrada!</p>
           </div>
         )}
       </div>

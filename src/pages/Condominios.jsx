@@ -18,7 +18,7 @@ function CondominioPreview({ cond, onClose, onEdit }) {
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b print:hidden">
-          <h2 className="font-bold text-lg">Ficha de Condomínio</h2>
+          <h2 className="font-bold text-lg">Detalhe do Condomínio</h2>
           <div className="flex gap-2">
             <button onClick={() => window.print()} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground border rounded-md px-2 py-1">
               <Printer className="w-4 h-4" /> Imprimir
@@ -90,7 +90,7 @@ export default function Condominios() {
 
   return (
     <div>
-      <PageHeader title="Condomínios" subtitle="Gestão de todos os edifícios" action={
+      <PageHeader title="Condomínios" subtitle="Condomínios geridos pela Agência Avenida" action={
         <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />Novo Condomínio</Button>
       } />
 

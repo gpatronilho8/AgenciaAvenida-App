@@ -81,7 +81,7 @@ export default function Rendas() {
 
   return (
     <div>
-      <PageHeader title="Rendas" subtitle="Controlo mensal de recebimentos"
+      <PageHeader title="Rendas" subtitle="Controlo mensal do pagamento das rendas"
         action={
           <Button variant="outline" onClick={() => gerarRendasMes.mutate()} disabled={gerarRendasMes.isPending}>
             <RefreshCw className={`w-4 h-4 mr-2 ${gerarRendasMes.isPending ? 'animate-spin' : ''}`} />
@@ -89,17 +89,6 @@ export default function Rendas() {
           </Button>
         }
       />
-
-      {/* Filtros */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <Select value={filterStaff} onValueChange={setFilterStaff}>
-          <SelectTrigger className="w-52"><SelectValue placeholder="Filtrar por staff" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os colaboradores</SelectItem>
-            {users.map(u => <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
 
       {/* Navegação de mês */}
       <div className="flex items-center gap-3 mb-6 bg-card border border-border rounded-xl p-4 w-fit">
@@ -133,7 +122,7 @@ export default function Rendas() {
           {rendasMes.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
               <Clock className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p>Sem rendas para {MESES[mes - 1]} {ano}</p>
+              <p>Não existem rendas para {MESES[mes - 1]} {ano}</p>
               <p className="text-xs mt-1">Clique em "Gerar Rendas do Mês" para criar automaticamente</p>
             </div>
           )}
