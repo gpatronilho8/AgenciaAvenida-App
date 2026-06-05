@@ -82,8 +82,8 @@ export default function Hub() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col">
-      {/* Header */}
-      <header className="flex items-center justify-between px-8 py-5">
+      {/* Header - Ajustado ligeiramente o preenchimento vertical (py-4 em vez de py-5) */}
+      <header className="flex items-center justify-between px-8 py-4">
         <div className="flex items-center gap-4">
           <img src={LOGO_WHITE} alt="Agência Avenida" className="h-16 w-auto" />
           <div className="border-l border-white/20 pl-4">
@@ -111,22 +111,25 @@ export default function Hub() {
         )}
       </header>
 
-      {/* Main - Removido o bloco de saudação central para libertar espaço */}
-      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
+      {/* Main - py-12 substituído por py-6 para juntar mais o conteúdo ao centro */}
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-5xl">
           {modules.map((mod) => {
             const Icon = mod.icon;
             return (
               <button
                 key={mod.id}
                 onClick={() => navigate(mod.path)}
-                className="group relative bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
+                // O padding principal passou de p-8 para p-6
+                className="group relative bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-2xl p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
               >
-                <div className={`inline-flex p-4 rounded-xl bg-gradient-to-br ${mod.color} mb-5 shadow-lg`}>
-                  <Icon className="w-7 h-7 text-white" />
+                {/* Ícone e margem adaptados para ficarem mais compactos */}
+                <div className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${mod.color} mb-4 shadow-lg`}>
+                  <Icon className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-white font-bold text-xl mb-4">{mod.label}</h3>
-                <div className="flex flex-wrap gap-2 mb-6">
+                {/* Título mais pequeno (text-lg) com margem menor */}
+                <h3 className="text-white font-bold text-lg mb-3">{mod.label}</h3>
+                <div className="flex flex-wrap gap-2 mb-4">
                   {mod.stats.map(s => (
                     <span key={s} className="text-xs px-2.5 py-1 rounded-full bg-white/10 text-slate-300">{s}</span>
                   ))}
@@ -141,7 +144,8 @@ export default function Hub() {
         </div>
       </main>
 
-      <footer className="text-center py-6 text-slate-600 text-xs">
+      {/* Footer com py-4 em vez de py-6 */}
+      <footer className="text-center py-4 text-slate-600 text-xs">
         © {new Date().getFullYear()} Agência Avenida · Plataforma de Gestão
       </footer>
 
