@@ -16,10 +16,8 @@ import CondominiosDashboard from '@/pages/condominios/CondominiosDashboard';
 import Condominios from '@/pages/Condominios';
 import Fracoes from '@/pages/Fracoes';
 import Quotas from '@/pages/Quotas';
-import Despesas from '@/pages/Despesas'; // manter para compatibilidade
 import Ocorrencias from '@/pages/Ocorrencias';
 import Documentos from '@/pages/Documentos';
-import Financeiro from '@/pages/Financeiro';
 import ProcessosJudiciais from '@/pages/condominios/ProcessosJudiciais';
 import Movimentos from '@/pages/Movimentos';
 import Assembleias from '@/pages/condominios/Assembleias';
@@ -28,7 +26,6 @@ import Assembleias from '@/pages/condominios/Assembleias';
 import PropriedadesDashboard from '@/pages/propriedades/PropriedadesDashboard';
 import PropriedadesLista from '@/pages/propriedades/PropriedadesLista';
 import Rendas from '@/pages/propriedades/Rendas';
-// DespesasPropriedade integradas no detalhe da Renda
 
 // Processos module
 import Processos from '@/pages/Processos';
@@ -71,10 +68,8 @@ const AuthenticatedApp = () => {
         <Route path="/condominios/lista" element={<Condominios />} />
         <Route path="/condominios/fracoes" element={<Fracoes />} />
         <Route path="/condominios/quotas" element={<Quotas />} />
-        <Route path="/condominios/despesas" element={<Despesas />} />
         <Route path="/condominios/ocorrencias" element={<Ocorrencias />} />
         <Route path="/condominios/documentos" element={<Documentos />} />
-        <Route path="/condominios/financeiro" element={<Financeiro />} />
         <Route path="/condominios/processos-judiciais" element={<ProcessosJudiciais />} />
         <Route path="/condominios/movimentos" element={<Movimentos />} />
         <Route path="/condominios/assembleias" element={<Assembleias />} />

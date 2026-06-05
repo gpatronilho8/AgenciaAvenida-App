@@ -393,7 +393,7 @@ export default function Condominios() {
                   {bancosList.map(b => (
                     <SelectItem key={b.id} value={b.id}>{b.nome}</SelectItem>
                   ))}
-                  {bancosList.length === 0 && <p className="text-sm p-2 text-muted-foreground text-center">Nenhum banco registado nas Entidades.</p>}
+                  {bancosList.length === 0 && <p className="text-sm p-2 text-muted-foreground text-center">Nenhum Banco Registado</p>}
                 </SelectContent>
               </Select>
             </div>
