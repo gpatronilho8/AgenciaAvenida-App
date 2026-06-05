@@ -142,7 +142,7 @@ export default function ProcessosJudiciais() {
         {filtered.length === 0 && (
           <div className="text-center py-16 bg-card border border-border rounded-xl text-muted-foreground">
             <Scale className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p>Nenhum processo judicial encontrado</p>
+            <p>Nenhum Processo Judicial Encontrado</p>
           </div>
         )}
         {filtered.map(proc => {

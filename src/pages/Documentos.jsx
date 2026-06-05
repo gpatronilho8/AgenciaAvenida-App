@@ -167,7 +167,7 @@ export default function Documentos() {
           </div>
         ))}
         {filtered.length === 0 && !isLoading && (
-          <div className="col-span-full text-center py-16 text-muted-foreground">Nenhum documento encontrado</div>
+          <div className="col-span-full text-center py-16 text-muted-foreground">Nenhum Documento Encontrado</div>
         )}
       </div>
 

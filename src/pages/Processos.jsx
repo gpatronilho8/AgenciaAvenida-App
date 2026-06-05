@@ -220,7 +220,7 @@ function ProcessoPreview({ processo, pessoa, onClose, onEdit, onQuickAction, onU
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground italic mt-2">Nenhum atributo selecionado.</p>
+                <p className="text-sm text-muted-foreground italic mt-2">Nenhum Atributo Selecionado</p>
               )}
             </div>
           )}
@@ -474,7 +474,7 @@ export default function Processos() {
           )
         })}
         {filtered.length === 0 && !loadProc && (
-          <div className="col-span-full text-center py-16 text-muted-foreground">Nenhum processo encontrado</div>
+          <div className="col-span-full text-center py-16 text-muted-foreground">Nenhum Processo Encontrado</div>
         )}
       </div>
 

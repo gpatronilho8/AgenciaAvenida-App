@@ -115,7 +115,7 @@ export default function Assembleias() {
             );
           })}
           {filtered.length === 0 && !isLoading && (
-            <div className="col-span-full text-center py-16 text-muted-foreground">Nenhuma assembleia encontrada</div>
+            <div className="col-span-full text-center py-16 text-muted-foreground">Nenhuma Assembleia Encontrada</div>
           )}
         </div>
       )}

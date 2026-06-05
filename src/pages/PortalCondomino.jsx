@@ -330,7 +330,7 @@ export default function PortalCondomino() {
                 </div>
               ))}
               {ocorrencias.filter(o => o.reportada_por === user?.email).length === 0 && (
-                <p className="text-center text-muted-foreground py-8 text-sm">Nenhuma ocorrência submetida!</p>
+                <p className="text-center text-muted-foreground py-8 text-sm">Nenhuma Ocorrência Submetida!</p>
               )}
             </div>
           </div>

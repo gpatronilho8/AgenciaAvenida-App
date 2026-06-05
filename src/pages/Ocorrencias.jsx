@@ -268,7 +268,7 @@ export default function Ocorrencias() {
           </div>
         ))}
         {filtered.length === 0 && !isLoading && (
-          <div className="col-span-full text-center py-16 text-muted-foreground">Nenhuma ocorrência encontrada</div>
+          <div className="col-span-full text-center py-16 text-muted-foreground">Nenhuma Ocorrência Encontrada</div>
         )}
       </div>
 

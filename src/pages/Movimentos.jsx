@@ -239,7 +239,7 @@ export default function Movimentos() {
                 </tr>
               ))}
               {filtered.length === 0 && !isLoading && (
-                <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">Nenhum movimento encontrado</td></tr>
+                <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">Nenhum Movimento Encontrado</td></tr>
               )}
             </tbody>
           </table>

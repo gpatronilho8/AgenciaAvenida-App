@@ -96,7 +96,7 @@ export default function PropriedadesLista() {
         {filtered.length === 0 && (
           <div className="col-span-full text-center py-16 text-muted-foreground">
             <Home className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p>Nenhuma propriedade encontrada!</p>
+            <p>Nenhuma Propriedade Encontrada</p>
           </div>
         )}
       </div>

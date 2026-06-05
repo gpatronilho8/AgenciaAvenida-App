@@ -24,13 +24,11 @@ const TIPOS_DISPONIVEIS = [
   { id: 'banco', label: 'Banco' }
 ];
 
-// O "Aspirador" ultra-robusto que cura problemas de dupla-serialização no Supabase
 const normalizeTipo = (tipoData) => {
   if (!tipoData) return [];
   
   let parsedArray = [];
   
-  // 1. Desempacotar a primeira camada (seja ela array, texto sujo JSON ou texto PostgreSQL)
   if (Array.isArray(tipoData)) {
     parsedArray = tipoData;
   } else if (typeof tipoData === 'string') {
@@ -52,13 +50,11 @@ const normalizeTipo = (tipoData) => {
     }
   }
 
-  // 2. Limpar cada item e tratar casos em que o erro causou gravar um array dentro de outro
   let finalArray = [];
   parsedArray.forEach(item => {
     if (typeof item === 'string') {
-      let clean = item.trim().replace(/^"|"$/g, ''); // Tira aspas nas pontas
+      let clean = item.trim().replace(/^"|"$/g, '');
       
-      // Se houver um array enfiado na string ex: '["condomino","cliente"]'
       if (clean.startsWith('[') && clean.endsWith(']')) {
         try {
           const innerParsed = JSON.parse(clean);
@@ -69,7 +65,6 @@ const normalizeTipo = (tipoData) => {
         } catch(e) {}
       }
       
-      // Limpar mais algum lixo e separar vírgulas penduradas
       clean = clean.replace(/"/g, '').trim();
       if (clean.includes(',')) {
         finalArray.push(...clean.split(',').map(s => s.trim()));
@@ -81,7 +76,6 @@ const normalizeTipo = (tipoData) => {
     }
   });
   
-  // 3. Remover duplicados e palavras vazias
   return [...new Set(finalArray)].filter(Boolean);
 };
 
@@ -173,16 +167,6 @@ export default function Pessoas() {
   const [search, setSearch] = useState('');
   const [filterTipo, setFilterTipo] = useState('all');
   const [preview, setPreview] = useState(null);
-  
-  const [showSenhaForm, setShowSenhaForm] = useState(false);
-
-  useEffect(() => {
-    let timer;
-    if (showSenhaForm) {
-      timer = setTimeout(() => setShowSenhaForm(false), 10000);
-    }
-    return () => clearTimeout(timer);
-  }, [showSenhaForm]);
 
   const { data: pessoas = [], isLoading } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
 
@@ -196,10 +180,9 @@ export default function Pessoas() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['pessoas'] }); toast.success('Entidade eliminada!'); },
   });
 
-  const openNew = () => { setForm(empty); setEditing(null); setShowSenhaForm(false); setOpen(true); };
+  const openNew = () => { setForm(empty); setEditing(null); setOpen(true); };
   
-  // Ao editar passamos o aspirador no tipo para garantir que as caixas marcam perfeitamente
-  const openEdit = (p) => { setForm({ ...p, tipo: normalizeTipo(p.tipo) }); setEditing(p.id); setShowSenhaForm(false); setOpen(true); };
+  const openEdit = (p) => { setForm({ ...p, tipo: normalizeTipo(p.tipo) }); setEditing(p.id); setOpen(true); };
   
   const upd = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -292,7 +275,7 @@ export default function Pessoas() {
           )
         })}
         {filtered.length === 0 && !isLoading && (
-          <div className="col-span-full text-center py-16 text-muted-foreground">Nenhuma entidade encontrada</div>
+          <div className="col-span-full text-center py-16 text-muted-foreground">Nenhuma Entidade Encontrada</div>
         )}
       </div>
 
@@ -333,27 +316,15 @@ export default function Pessoas() {
               </div>
             ))}
 
+            {/* ADICIONADO: Caixa de texto simples para a Senha AT */}
             {isClienteForm && (
               <div>
                 <Label>Senha AT</Label>
-                <div className="flex gap-2 mt-1">
-                  <Input 
-                    type={showSenhaForm ? "text" : "password"} 
-                    value={form.senha_at || ''} 
-                    onChange={e => upd('senha_at', e.target.value)} 
-                    className="font-mono"
-                  />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="icon" 
-                    className="flex-shrink-0"
-                    onClick={() => setShowSenhaForm(!showSenhaForm)}
-                    title="Mostrar por 10s"
-                  >
-                    {showSenhaForm ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}
-                  </Button>
-                </div>
+                <Input 
+                  className="mt-1 font-mono" 
+                  value={form.senha_at || ''} 
+                  onChange={e => upd('senha_at', e.target.value)} 
+                />
               </div>
             )}
             

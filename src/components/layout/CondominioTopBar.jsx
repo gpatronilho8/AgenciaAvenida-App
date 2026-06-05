@@ -3,7 +3,7 @@ import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import { useCondominio } from '@/lib/CondominioContext';
 import { Building2, ChevronDown, Search, LogOut } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
-import { useLocation } from 'react-router-dom'; // 1. Importado para sabermos a página atual
+import { useLocation } from 'react-router-dom';
 import NotificationBell from '@/components/NotificationBell';
 
 export default function CondominioTopBar({ module }) {
@@ -17,18 +17,23 @@ export default function CondominioTopBar({ module }) {
   const [user, setUser] = useState(null);
   const ref = useRef(null);
   
-  const location = useLocation(); // 2. Lê o endereço exato (ex: '/pessoas')
+  const location = useLocation();
 
   useEffect(() => {
     agenciaAvenida.auth.me().then(setUser).catch(() => {});
   }, []);
 
   const selected = condominios.find(c => c.id === selectedCondominioId);
-  const label = selected ? selected.nome : 'Todos os Condomínios';
+  
+  const label = selected 
+    ? (selected.codigo ? `(${selected.codigo}) ${selected.nome}` : selected.nome) 
+    : 'Todos os Condomínios';
 
-  const filtered = condominios.filter(c =>
-    !search || c.nome?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = condominios.filter(c => {
+    if (!search) return true;
+    const term = search.toLowerCase();
+    return c.nome?.toLowerCase().includes(term) || c.codigo?.toLowerCase().includes(term);
+  });
 
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setSearch(''); } };
@@ -36,17 +41,16 @@ export default function CondominioTopBar({ module }) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // 3. REGRA DE NEGÓCIO: Não mostrar o seletor nestas páginas porque são dados globais da agência
-  const paginasGlobais = ['/pessoas', '/configuracoes'];
+  // ADICIONADO: '/condominios/lista' para que o seletor desapareça na página da lista geral
+  const paginasGlobais = ['/pessoas', '/configuracoes', '/condominios/lista'];
   const mostrarSeletor = module === 'condominios' && !paginasGlobais.includes(location.pathname);
 
   return (
     <div className="border-b border-border bg-background px-6 py-2.5 flex items-center gap-3 flex-shrink-0 min-h-[57px]">
-      {/* O Seletor agora só aparece se for condominios E não for uma página global */}
       {mostrarSeletor && (
         <>
           <Building2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Condomínio:</span>
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden sm:inline-block">Condomínio:</span>
           <div className="relative" ref={ref}>
             <button
               onClick={() => { setOpen(!open); setSearch(''); }}
@@ -64,7 +68,7 @@ export default function CondominioTopBar({ module }) {
                       autoFocus
                       value={search}
                       onChange={e => setSearch(e.target.value)}
-                      placeholder="Pesquisar condomínio..."
+                      placeholder="Pesquisar por nome ou ID..."
                       className="w-full pl-7 pr-3 py-1.5 text-sm bg-muted rounded-lg outline-none"
                     />
                   </div>
@@ -87,11 +91,14 @@ export default function CondominioTopBar({ module }) {
                     }`}
                   >
                     <div className={`w-2 h-2 rounded-full flex-shrink-0 ${selectedCondominioId === c.id ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
-                    <span className="truncate">{c.nome}</span>
+                    <span className="truncate">
+                      {c.codigo && <span className="font-bold mr-1.5 opacity-80">({c.codigo})</span>}
+                      {c.nome}
+                    </span>
                   </button>
                 ))}
                 {filtered.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-3">Sem resultados</p>
+                  <p className="text-xs text-muted-foreground text-center py-3">Sem Resultados</p>
                 )}
               </div>
             )}
@@ -99,10 +106,8 @@ export default function CondominioTopBar({ module }) {
         </>
       )}
 
-      {/* Spacer empurra tudo o resto para a direita */}
       <div className="flex-1" />
 
-      {/* Notifications + User — sempre visível */}
       <div className="flex items-center gap-3">
         <NotificationBell />
         {user && (

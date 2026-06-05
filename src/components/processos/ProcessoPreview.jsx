@@ -129,7 +129,7 @@ export default function ProcessoPreview({ processo, pessoaNome, staffNome, onClo
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-blue-500 italic">Nenhum atributo selecionado</p>
+                <p className="text-sm text-blue-500 italic">Nenhum Atributo Selecionado</p>
               )}
             </div>
           )}

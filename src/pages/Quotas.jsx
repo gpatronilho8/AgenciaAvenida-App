@@ -260,7 +260,7 @@ export default function Quotas() {
                 </tr>
               ))}
               {filtered.length === 0 && !isLoading && (
-                <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">Nenhuma quota encontrada</td></tr>
+                <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">Nenhuma Quota Encontrada</td></tr>
               )}
             </tbody>
           </table>

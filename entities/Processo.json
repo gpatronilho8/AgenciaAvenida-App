@@ -6,15 +6,10 @@
       "type": "string",
       "enum": [
         "irs",
-        "carta_conducao",
-        "passaporte",
-        "nif",
-        "niss",
-        "reagrupamento_familiar",
-        "visto",
-        "licenca",
+        "renovacao_carta_conducao",
+        "legalizacao_automovel",
+        "processos_fiscais",
         "certidao",
-        "procuracao",
         "outro"
       ]
     },
