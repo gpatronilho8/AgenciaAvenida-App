@@ -1,402 +1,601 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
+import { supabase } from '@/api/supabase.js';
 import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Search, FileText, Trash2, Edit, Upload } from 'lucide-react';
-import ProcessoPreview from '@/components/processos/ProcessoPreview';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Plus, Pencil, Search, Trash2, Printer, X, FileText, CheckCircle2, Circle, Check, ChevronsUpDown, Paperclip, ExternalLink, UploadCloud } from 'lucide-react';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
-const TIPOS = {
-  irs: 'IRS', carta_conducao: 'Carta de Condução', passaporte: 'Passaporte',
-  nif: 'NIF', niss: 'NISS', reagrupamento_familiar: 'Reagrupamento Familiar',
-  visto: 'Visto', licenca: 'Licença', certidao: 'Certidão', procuracao: 'Procuração', outro: 'Outro'
+const tipoProcessoLabel = {
+  renovacao_conducao: 'Renovação Carta Condução',
+  renovacao_cacador: 'Renovação Carta Caçador',
+  irs: 'IRS',
+  legalizacao_automovel: 'Legalização Automóvel',
+  certidao: 'Certidão',
+  contrato_arrendamento: 'Contrato Arrendamento',
+  outro: 'Outro Serviço'
 };
 
-const ESTADOS = {
-  pendente: { label: 'Pendente', cls: 'bg-yellow-100 text-yellow-700' },
-  em_curso: { label: 'Em Curso', cls: 'bg-blue-100 text-blue-700' },
-  aguarda_documentos: { label: 'Aguarda Docs', cls: 'bg-orange-100 text-orange-700' },
-  submetido: { label: 'Submetido', cls: 'bg-purple-100 text-purple-700' },
-  concluido: { label: 'Concluído', cls: 'bg-green-100 text-green-700' },
-  cancelado: { label: 'Cancelado', cls: 'bg-gray-100 text-gray-600' },
+const estadoLabel = {
+  pendente_inicio: 'Pendente Início',
+  em_curso: 'Em Curso',
+  pendente_cliente: 'Pendente Cliente',
+  aguarda_documentos: 'Aguarda Documentos',
+  pendente_entidade_externa: 'Pendente Entidade Externa',
+  pendente_agencia: 'Pendente Agência Avenida',
+  concluido: 'Concluído',
+  cancelado: 'Cancelado'
 };
 
-const IRS_ESTADO_OPTS = [
-  { value: '', label: '— Selecionar —' },
-  { value: 'recebida_documentacao', label: 'Recebida Documentação' },
-  { value: 'submetido_at_prova', label: 'Submetido AT — Prova de Entrega' },
-  { value: 'comprovativo_enviado_cliente', label: 'Comprovativo Enviado ao Cliente' },
-  { value: 'submetida_substituicao_at', label: 'Submetida Substituição AT' },
+const estadoColor = { 
+  pendente_inicio: 'bg-gray-100 text-gray-700 border border-gray-200', 
+  pendente_cliente: 'bg-gray-100 text-gray-700 border border-gray-200', 
+  aguarda_documentos: 'bg-gray-100 text-gray-700 border border-gray-200', 
+  pendente_entidade_externa: 'bg-gray-100 text-gray-700 border border-gray-200', 
+  cancelado: 'bg-gray-100 text-gray-700 border border-gray-200',
+  em_curso: 'bg-blue-100 text-blue-700 border border-blue-200', 
+  pendente_agencia: 'bg-red-100 text-red-700 border border-red-200', 
+  concluido: 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+};
+
+// Prioridades reduzidas apenas a Normal e Urgente
+const prioridadeColor = { 
+  normal: 'bg-blue-50 text-blue-600', 
+  urgente: 'bg-red-100 text-red-700 border border-red-200 shadow-sm' 
+};
+
+const empty = { 
+  tipo: 'renovacao_conducao', 
+  pessoa_id: '', 
+  descricao: '', 
+  estado: 'pendente_inicio', 
+  prioridade: 'normal', 
+  custo_servico: 0, 
+  pago: false, 
+  irs_campos: {},
+  documentos: [],
+  notas: ''
+};
+
+const emptyClient = { nome: '', nif: '', telefone: '', email: '', tipo: ['cliente'] };
+
+const IRS_ANEXOS = [
+  { id: 'anexo_a', label: 'Anexo A (Trabalho Dependente)' },
+  { id: 'anexo_b', label: 'Anexo B (Trabalho Independente)' },
+  { id: 'anexo_f', label: 'Anexo F (Rendas)' },
+  { id: 'anexo_g', label: 'Anexo G (Mais-Valias)' },
+  { id: 'anexo_h', label: 'Anexo H (Benefícios Fiscais)' },
+  { id: 'incapacidade', label: 'Incapacidade' },
+  { id: 'solteiro_1', label: 'Solteiro 1 Titular' },
+  { id: 'solteiro_2', label: 'Solteiro 2 Titulares' },
+  { id: 'casado', label: 'Casado' },
+  { id: 'irs_jovem', label: 'IRS Jovem' },
 ];
-const IRS_CAMPOS_LABELS = [
-  ['estado_civil_solteiro', 'Estado civil — Solteiro'],
-  ['estado_civil_casado', 'Estado civil — Casado'],
-  ['estado_civil_separado', 'Estado civil — Separado'],
-  ['rendimentos_prediais', 'Rendimentos Prediais'],
-  ['incapacidade', 'Incapacidade'],
-  ['irs_jovem', 'IRS Jovem'],
-  ['declaracao_substituicao', 'Declaração de Substituição'],
-  ['rendimentos_estrangeiro', 'Rendimentos no Estrangeiro'],
-];
 
-const empty = {
-  tipo: 'outro', tipo_personalizado: '', pessoa_id: '', atribuido_a: '', descricao: '', custo_servico: 0,
-  pago: false, data_pagamento: '', metodo_pagamento: '', estado: 'pendente',
-  data_inicio: new Date().toISOString().split('T')[0], data_conclusao: '',
-  data_prazo: '', notas: '', prioridade: 'normal',
-  irs_estado: '', irs_campos: {},
+const normalizeJsonb = (data, fallback = {}) => {
+  if (!data) return fallback;
+  if (typeof data === 'object') return data;
+  if (typeof data === 'string') {
+    try { return JSON.parse(data); } catch (e) { return fallback; }
+  }
+  return fallback;
 };
+
+function ProcessoPreview({ processo, pessoa, onClose, onEdit, onQuickAction }) {
+  const irs = normalizeJsonb(processo.irs_campos);
+  const docs = normalizeJsonb(processo.documentos, []);
+  const isIRS = processo.tipo === 'irs';
+  const isOutro = processo.tipo === 'outro';
+  const tituloProcesso = isOutro && processo.descricao ? processo.descricao : (tipoProcessoLabel[processo.tipo] || processo.tipo);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b print:hidden">
+          <h2 className="font-bold text-lg">Detalhes do Processo</h2>
+          <div className="flex gap-2">
+            <button onClick={() => window.print()} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground border rounded-md px-2 py-1">
+              <Printer className="w-4 h-4" /> Imprimir
+            </button>
+            <button onClick={() => { onClose(); onEdit(processo); }} className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 border border-primary rounded-md px-2 py-1">
+              <Pencil className="w-4 h-4" /> Editar
+            </button>
+            <button onClick={onClose} className="p-1 hover:bg-muted rounded"><X className="w-5 h-5 text-muted-foreground" /></button>
+          </div>
+        </div>
+        <div className="px-6 py-5 space-y-4 print:py-8 max-h-[80vh] overflow-y-auto">
+          <div>
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${estadoColor[processo.estado] || 'bg-gray-100 text-gray-700'}`}>
+                {estadoLabel[processo.estado] || processo.estado}
+              </span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${prioridadeColor[processo.prioridade]}`}>
+                {processo.prioridade}
+              </span>
+            </div>
+            <h3 className="text-xl font-bold">{tituloProcesso}</h3>
+            {!isOutro && processo.descricao && <p className="text-muted-foreground text-sm mt-1">{processo.descricao}</p>}
+          </div>
+
+          <div className="bg-muted/30 p-3 rounded-lg border text-sm space-y-2">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground font-medium">Cliente:</span>
+              <span className="font-semibold">{pessoa?.nome || 'Desconhecido'}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground font-medium">Pagamento:</span>
+              {processo.pago ? (
+                <span className="flex items-center gap-1 text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded"><CheckCircle2 className="w-3.5 h-3.5"/> PAGO</span>
+              ) : (
+                <span className="flex items-center gap-1 text-xs text-red-500 font-bold bg-red-50 px-2 py-1 rounded"><Circle className="w-3.5 h-3.5"/> POR PAGAR</span>
+              )}
+            </div>
+            <div className="flex justify-between mt-2 pt-2 border-t border-border/50">
+              <span className="text-muted-foreground font-medium">Custo do Serviço:</span>
+              <span className="font-semibold text-lg">{Number(processo.custo_servico || 0).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}</span>
+            </div>
+          </div>
+
+          {isIRS && Object.keys(irs).length > 0 && (
+            <div className="border-t pt-3">
+              <p className="font-semibold text-sm mb-2 flex items-center gap-2"><FileText className="w-4 h-4"/> Atributos IRS Selecionados</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {IRS_ANEXOS.map(anexo => irs[anexo.id] && (
+                  <div key={anexo.id} className="text-sm flex items-center gap-2 text-foreground">
+                    <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" /> <span className="truncate">{anexo.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {docs.length > 0 && (
+            <div className="border-t pt-3">
+              <p className="font-semibold text-sm mb-2 flex items-center gap-2"><Paperclip className="w-4 h-4"/> Documentos Anexos</p>
+              <div className="space-y-1.5">
+                {docs.map((doc, idx) => (
+                  <div key={idx} className="flex items-center justify-between bg-muted/20 p-2.5 rounded-lg border border-border/50 text-sm hover:bg-muted/40 transition-colors">
+                    <span className="font-medium truncate pr-2">{doc.nome}</span>
+                    {doc.url && (
+                      <a href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-blue-500 hover:text-blue-700 font-medium flex-shrink-0 bg-blue-50 px-2 py-1 rounded">
+                        <ExternalLink className="w-3.5 h-3.5" /> Abrir Documento
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {processo.notas && (
+            <div className="border-t pt-3">
+              <p className="font-semibold text-sm mb-1 text-muted-foreground">Notas Internas</p>
+              <p className="text-sm text-foreground whitespace-pre-wrap">{processo.notas}</p>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2 mt-6 pt-4 border-t print:hidden">
+            {!processo.pago && (
+              <Button variant="outline" className="flex-1 min-w-[140px] gap-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200" onClick={() => onQuickAction('pagar', processo)}>
+                <CheckCircle2 className="w-4 h-4" /> Marcar como Pago
+              </Button>
+            )}
+            {processo.estado !== 'concluido' && (
+              <Button variant="outline" className="flex-1 min-w-[140px] gap-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200" onClick={() => onQuickAction('concluir', processo)}>
+                <CheckCircle2 className="w-4 h-4" /> Concluir Processo
+              </Button>
+            )}
+          </div>
+          
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Processos() {
   const qc = useQueryClient();
-  const [search, setSearch] = useState('');
-  const [filterEstado, setFilterEstado] = useState('all');
-  const [filterTipo, setFilterTipo] = useState('all');
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty);
   const [editing, setEditing] = useState(null);
-  const [uploading, setUploading] = useState(false);
+  const [search, setSearch] = useState('');
   const [preview, setPreview] = useState(null);
+  
+  const [openCombo, setOpenCombo] = useState(false);
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [newClientForm, setNewClientForm] = useState(emptyClient);
 
-  const { data: processos = [] } = useQuery({ queryKey: ['processos'], queryFn: () => agenciaAvenida.entities.Processo.list() });
-  const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
-  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => agenciaAvenida.entities.User.list() });
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  const { data: processos = [], isLoading: loadProc } = useQuery({ queryKey: ['processos'], queryFn: () => agenciaAvenida.entities.Processo.list() });
+  const { data: pessoas = [], isLoading: loadPes } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
 
   const save = useMutation({
-    mutationFn: async (d) => {
-      if (editing) {
-        const updated = await agenciaAvenida.entities.Processo.update(editing, d);
-        const pessoa = pessoas.find(p => p.id === d.pessoa_id);
-        await agenciaAvenida.entities.Notificacao.create({
-          titulo: `Processo atualizado: ${d.tipo === 'outro' && d.tipo_personalizado ? d.tipo_personalizado : (TIPOS[d.tipo] || d.tipo)}`,
-          mensagem: `Estado: ${ESTADOS[d.estado]?.label || d.estado} · ${pessoa?.nome || ''}`,
-          tipo: 'processo_atualizado',
-          referencia_id: editing,
-          lida: false,
-        });
-        return updated;
-      } else {
-        const created = await agenciaAvenida.entities.Processo.create(d);
-        const pessoa = pessoas.find(p => p.id === d.pessoa_id);
-        await agenciaAvenida.entities.Notificacao.create({
-          titulo: `Novo processo: ${d.tipo === 'outro' && d.tipo_personalizado ? d.tipo_personalizado : (TIPOS[d.tipo] || d.tipo)}`,
-          mensagem: `Atribuído a ${pessoa?.nome || '—'} · ${d.prioridade === 'urgente' ? 'URGENTE' : 'Normal'}`,
-          tipo: 'processo_novo',
-          referencia_id: created?.id,
-          lida: false,
-        });
-        return created;
-      }
+    mutationFn: (data) => {
+      const dataToSave = { ...data };
+      if (dataToSave.tipo !== 'outro') dataToSave.descricao = '';
+      return editing ? agenciaAvenida.entities.Processo.update(editing, dataToSave) : agenciaAvenida.entities.Processo.create(dataToSave);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['processos'] }); setOpen(false); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['processos'] }); setOpen(false); toast.success('Processo guardado com sucesso!'); },
   });
 
-  const remove = useMutation({
+  const quickUpdate = useMutation({
+    mutationFn: ({ id, payload }) => agenciaAvenida.entities.Processo.update(id, payload),
+    onSuccess: () => { 
+      qc.invalidateQueries({ queryKey: ['processos'] }); 
+      setPreview(null); 
+      toast.success('Atualizado com sucesso!'); 
+    },
+  });
+
+  const del = useMutation({
     mutationFn: (id) => agenciaAvenida.entities.Processo.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['processos'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['processos'] }); toast.success('Processo eliminado!'); },
   });
 
-  const pessoaNome = (id) => pessoas.find(p => p.id === id)?.nome || '—';
-  const staffNome = (id) => { if (!id) return null; const u = users.find(u => u.id === id); return u ? (u.full_name || u.email) : null; };
-
-  const filtered = processos.filter(p => {
-    const matchSearch = !search || pessoaNome(p.pessoa_id).toLowerCase().includes(search.toLowerCase()) || p.descricao?.toLowerCase().includes(search.toLowerCase()) || TIPOS[p.tipo]?.toLowerCase().includes(search.toLowerCase());
-    let matchEstado = true;
-    if (filterEstado === 'all') matchEstado = true;
-    else if (filterEstado === '__em_aberto__') matchEstado = ['pendente', 'em_curso', 'aguarda_documentos'].includes(p.estado);
-    else if (filterEstado === '__urgente__') matchEstado = p.prioridade === 'urgente' && p.estado !== 'concluido';
-    else if (filterEstado === '__nao_pago__') matchEstado = !p.pago && p.custo_servico > 0;
-    else matchEstado = p.estado === filterEstado;
-    const matchTipo = filterTipo === 'all' || p.tipo === filterTipo;
-    return matchSearch && matchEstado && matchTipo;
-  }).sort((a, b) => {
-    if (a.prioridade === 'urgente' && b.prioridade !== 'urgente') return -1;
-    if (b.prioridade === 'urgente' && a.prioridade !== 'urgente') return 1;
-    return new Date(b.created_date || 0) - new Date(a.created_date || 0);
+  const saveClient = useMutation({
+    mutationFn: (data) => agenciaAvenida.entities.Pessoa.create(data),
+    onSuccess: (createdClient) => { 
+      qc.invalidateQueries({ queryKey: ['pessoas'] }); 
+      setShowNewClient(false); 
+      upd('pessoa_id', createdClient.id);
+      toast.success('Cliente criado e selecionado!'); 
+    },
   });
 
-  const stats = {
-    total: processos.length,
-    pendente: processos.filter(p => p.estado === 'pendente' || p.estado === 'em_curso' || p.estado === 'aguarda_documentos').length,
-    concluido: processos.filter(p => p.estado === 'concluido').length,
-    urgente: processos.filter(p => p.prioridade === 'urgente' && p.estado !== 'concluido').length,
-    nao_pago: processos.filter(p => !p.pago && p.custo_servico > 0).length,
+  const openNew = () => { setForm(empty); setEditing(null); setOpen(true); };
+  const openEdit = (p) => { 
+    setForm({ ...p, irs_campos: normalizeJsonb(p.irs_campos, {}), documentos: normalizeJsonb(p.documentos, []) }); 
+    setEditing(p.id); 
+    setOpen(true); 
+  };
+  
+  const upd = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const toggleIrsCampo = (campoId) => {
+    setForm(prev => {
+      const atuais = normalizeJsonb(prev.irs_campos, {});
+      return { ...prev, irs_campos: { ...atuais, [campoId]: !atuais[campoId] } };
+    });
   };
 
-  const openEdit = (p) => { setPreview(null); setForm({ ...empty, ...p, documentos: p.documentos || [] }); setEditing(p.id); setOpen(true); };
-  const openNew = () => { setForm({ ...empty, documentos: [] }); setEditing(null); setOpen(true); };
-
-  const handleUploadDoc = async (e) => {
+  // Processo Automático de Upload e Adição à Lista
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setUploading(true);
-    const { file_url } = await agenciaAvenida.integrations.Core.UploadFile({ file });
-    const doc = { nome: file.name, url: file_url };
-    setForm(f => ({ ...f, documentos: [...(f.documentos || []), doc] }));
-    setUploading(false);
+
+    setUploadingDoc(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error } = await supabase.storage.from('documentos').upload(filePath, file);
+      if (error) throw error;
+
+      const { data } = supabase.storage.from('documentos').getPublicUrl(filePath);
+
+      // Adiciona o ficheiro imediatamente à lista de documentos do formulário
+      const documentToAdd = { nome: file.name, url: data.publicUrl };
+      const atuais = normalizeJsonb(form.documentos, []);
+      upd('documentos', [...atuais, documentToAdd]);
+      
+      toast.success('Ficheiro anexado com sucesso!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao enviar ficheiro. Verificou as permissões do Storage no Supabase?');
+    } finally {
+      setUploadingDoc(false);
+      e.target.value = null; 
+    }
   };
 
-  const removeDoc = (idx) => setForm(f => ({ ...f, documentos: f.documentos.filter((_, i) => i !== idx) }));
+  const removeDocumento = (indexToRemove) => {
+    const atuais = normalizeJsonb(form.documentos, []);
+    upd('documentos', atuais.filter((_, idx) => idx !== indexToRemove));
+  };
 
-  const tipoLabel = (p) => p.tipo === 'outro' && p.tipo_personalizado ? p.tipo_personalizado : (TIPOS[p.tipo] || p.tipo);
+  const filtered = processos.filter(p => {
+    const pessoa = pessoas.find(pes => pes.id === p.pessoa_id);
+    const textSearch = search.toLowerCase();
+    const tipoLabel = tipoProcessoLabel[p.tipo]?.toLowerCase() || p.tipo?.toLowerCase();
+    return !search || p.descricao?.toLowerCase().includes(textSearch) || tipoLabel.includes(textSearch) || pessoa?.nome?.toLowerCase().includes(textSearch);
+  });
 
   return (
     <div>
-      <PageHeader title="Processos" subtitle="Gestão de serviços e documentação"
-        action={<Button onClick={openNew}><Plus className="w-4 h-4 mr-1" />Novo Processo</Button>}
-      />
+      <PageHeader title="Processos & Serviços" subtitle="Gestão de IRS, Certidões, Apoios e outros serviços" action={
+        <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />Novo Processo</Button>
+      } />
 
-      {/* Stats — clicáveis para filtrar */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
-        {[
-          { label: 'Total', value: stats.total, color: 'text-foreground', filterKey: null },
-          { label: 'Em Aberto', value: stats.pendente, color: 'text-blue-600', filterKey: 'em_aberto' },
-          { label: 'Concluídos', value: stats.concluido, color: 'text-green-600', filterKey: 'concluido' },
-          { label: 'Urgentes', value: stats.urgente, color: 'text-red-600', filterKey: 'urgente' },
-          { label: 'Por Cobrar', value: stats.nao_pago, color: 'text-orange-600', filterKey: 'nao_pago' },
-        ].map(s => (
-          <div
-            key={s.label}
-            onClick={() => {
-              if (!s.filterKey) { setFilterEstado('all'); return; }
-              if (s.filterKey === 'urgente') setFilterEstado(v => v === '__urgente__' ? 'all' : '__urgente__');
-              else if (s.filterKey === 'em_aberto') setFilterEstado(v => v === '__em_aberto__' ? 'all' : '__em_aberto__');
-              else if (s.filterKey === 'nao_pago') setFilterEstado(v => v === '__nao_pago__' ? 'all' : '__nao_pago__');
-              else setFilterEstado(v => v === s.filterKey ? 'all' : s.filterKey);
-            }}
-            className={`bg-card border rounded-xl p-4 cursor-pointer transition-all hover:shadow-md ${
-              (s.filterKey === 'em_aberto' && filterEstado === '__em_aberto__') ||
-              (s.filterKey === 'urgente' && filterEstado === '__urgente__') ||
-              (s.filterKey === 'nao_pago' && filterEstado === '__nao_pago__') ||
-              (s.filterKey === filterEstado)
-                ? 'border-primary ring-1 ring-primary' : 'border-border'
-            }`}
-          >
-            <p className="text-xs text-muted-foreground">{s.label}</p>
-            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div className="flex gap-3 mb-6 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Pesquisar processo ou pessoa..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
+      <div className="flex gap-3 mb-6">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input className="pl-9" placeholder="Pesquisar por cliente, tipo ou descrição..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Select value={filterEstado} onValueChange={setFilterEstado}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="Estado" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os estados</SelectItem>
-            {Object.entries(ESTADOS).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={filterTipo} onValueChange={setFilterTipo}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Tipo" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os tipos</SelectItem>
-            {Object.entries(TIPOS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-          </SelectContent>
-        </Select>
       </div>
 
-      {/* List */}
-      <div className="space-y-3">
-        {filtered.length === 0 && (
-          <div className="text-center py-16 text-muted-foreground bg-card border border-border rounded-xl">
-            <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p>Nenhum processo encontrado</p>
-          </div>
-        )}
+      {(loadProc || loadPes) && <div className="text-center py-16 text-muted-foreground">A carregar processos...</div>}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filtered.map(p => {
-          const estado = ESTADOS[p.estado] || { label: p.estado, cls: 'bg-gray-100 text-gray-700' };
+          const pessoa = pessoas.find(pes => pes.id === p.pessoa_id);
+          const isOutro = p.tipo === 'outro';
+          const isUrgente = p.prioridade === 'urgente';
+          const tituloProcesso = isOutro && p.descricao ? p.descricao : (tipoProcessoLabel[p.tipo] || p.tipo);
+
           return (
-            <div key={p.id} className={`bg-card border rounded-xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer ${p.prioridade === 'urgente' ? 'border-red-200' : 'border-border'}`}
-              onClick={() => setPreview(p)}>
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="font-semibold text-base">{tipoLabel(p)}</span>
-                    {p.prioridade === 'urgente' && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">URGENTE</span>}
-                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${estado.cls}`}>{estado.label}</span>
-                    {p.pago ? (
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Pago</span>
-                    ) : p.custo_servico > 0 ? (
-                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Por cobrar</span>
-                    ) : null}
+            <div 
+              key={p.id} 
+              className={`rounded-xl border p-5 shadow-sm hover:shadow-md transition-all cursor-pointer relative group flex flex-col h-full ${
+                isUrgente ? 'border-red-400 bg-red-50/30' : 'bg-card border-border'
+              }`}
+              onClick={() => setPreview(p)}
+            >
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex flex-col pr-2">
+                  <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                    <span className={`w-fit text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${estadoColor[p.estado] || 'bg-gray-100 text-gray-700'}`}>
+                      {estadoLabel[p.estado] || p.estado}
+                    </span>
+                    <span className={`w-fit text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${prioridadeColor[p.prioridade]}`}>
+                      {p.prioridade}
+                    </span>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-medium text-foreground">{pessoaNome(p.pessoa_id)}</span>
-                    {p.descricao && <> · {p.descricao}</>}
-                    {staffNome(p.atribuido_a) && <span className="ml-1">· 👤 {staffNome(p.atribuido_a)}</span>}
-                  </p>
-                  <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground flex-wrap">
-                    {p.data_inicio && <span>Início: {p.data_inicio}</span>}
-                    {p.data_prazo && <span className={new Date(p.data_prazo) < new Date() && p.estado !== 'concluido' ? 'text-red-500 font-medium' : ''}>Prazo: {p.data_prazo}</span>}
-                    {p.custo_servico > 0 && <span className="font-medium text-foreground">€{p.custo_servico.toFixed(2)}</span>}
-                    {p.documentos?.length > 0 && <span>{p.documentos.length} doc(s)</span>}
-                  </div>
-                  {p.notas && <p className="text-xs text-muted-foreground mt-1 italic">{p.notas}</p>}
+                  <h3 className="font-bold text-lg text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                    {tituloProcesso}
+                  </h3>
                 </div>
                 <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                  <Button size="icon" variant="ghost" onClick={() => openEdit(p)}><Edit className="w-4 h-4" /></Button>
-                  <Button size="icon" variant="ghost" onClick={() => remove.mutate(p.id)} className="hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
+                  <button onClick={() => openEdit(p)} className="p-1.5 hover:bg-muted rounded transition-colors bg-white/50" title="Editar"><Pencil className="w-3.5 h-3.5 text-muted-foreground" /></button>
+                  <button onClick={() => del.mutate(p.id)} className="p-1.5 hover:bg-red-50 rounded transition-colors bg-white/50" title="Apagar"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                </div>
+              </div>
+              
+              {!isOutro && p.descricao && <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{p.descricao}</p>}
+              
+              <div className="mt-auto space-y-1.5 pt-4 border-t border-border/50 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Cliente:</span>
+                  <span className="font-medium truncate max-w-[150px]">{pessoa?.nome || '—'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Pagamento:</span>
+                  {p.pago ? (
+                     <span className="text-emerald-600 font-bold flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5"/> Pago</span>
+                  ) : (
+                     <span className="text-red-500 font-bold flex items-center gap-1"><Circle className="w-3.5 h-3.5"/> Pendente</span>
+                  )}
                 </div>
               </div>
             </div>
-          );
+          )
         })}
+        {filtered.length === 0 && !loadProc && (
+          <div className="col-span-full text-center py-16 text-muted-foreground">Nenhum processo encontrado</div>
+        )}
       </div>
 
-      {preview && (
-        <ProcessoPreview
-          processo={preview}
-          pessoaNome={pessoaNome(preview.pessoa_id)}
-          staffNome={preview.atribuido_a ? (users.find(u => u.id === preview.atribuido_a)?.full_name || users.find(u => u.id === preview.atribuido_a)?.email) : null}
-          onClose={() => setPreview(null)}
-          onEdit={() => openEdit(preview)}
-        />
-      )}
+      {preview && <ProcessoPreview 
+        processo={preview} 
+        pessoa={pessoas.find(pes => pes.id === preview.pessoa_id)} 
+        onClose={() => setPreview(null)} 
+        onEdit={(p) => { setPreview(null); openEdit(p); }} 
+        onQuickAction={(action, proc) => {
+          if (action === 'pagar') quickUpdate.mutate({ id: proc.id, payload: { pago: true } });
+          if (action === 'concluir') quickUpdate.mutate({ id: proc.id, payload: { estado: 'concluido' } });
+        }}
+      />}
 
-      {/* Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{editing ? 'Editar Processo' : 'Novo Processo'}</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Tipo *</Label>
-                <Select value={form.tipo} onValueChange={v => setForm(f => ({ ...f, tipo: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{Object.entries(TIPOS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div><Label>Prioridade</Label>
-                <Select value={form.prioridade} onValueChange={v => setForm(f => ({ ...f, prioridade: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="normal">Normal</SelectItem><SelectItem value="urgente">Urgente</SelectItem></SelectContent>
-                </Select>
-              </div>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editing ? 'Editar Processo' : 'Novo Processo'}</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+            
+            <div className="sm:col-span-2 flex flex-col gap-1.5">
+              <Label>Cliente *</Label>
+              <Popover open={openCombo} onOpenChange={setOpenCombo}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={openCombo} className="w-full justify-between font-normal bg-background">
+                    {form.pessoa_id ? pessoas.find((p) => p.id === form.pessoa_id)?.nome : "Selecione ou pesquise um cliente..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+                  <Command>
+                    <CommandInput placeholder="Pesquisar por nome ou NIF..." />
+                    <CommandEmpty className="py-4 text-center text-sm text-muted-foreground">Cliente não encontrado.</CommandEmpty>
+                    <CommandGroup className="max-h-48 overflow-y-auto">
+                      {pessoas.map((pes) => (
+                        <CommandItem key={pes.id} value={`${pes.nome} ${pes.nif || ''}`} onSelect={() => { upd('pessoa_id', pes.id); setOpenCombo(false); }}>
+                          <Check className={cn("mr-2 h-4 w-4", form.pessoa_id === pes.id ? "opacity-100" : "opacity-0")} />
+                          {pes.nome} {pes.nif && <span className="text-muted-foreground ml-1">(NIF: {pes.nif})</span>}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                    <div className="p-2 border-t border-border">
+                      <Button variant="secondary" className="w-full justify-start text-primary font-medium" onClick={() => { setOpenCombo(false); setNewClientForm(emptyClient); setShowNewClient(true); }}>
+                        <Plus className="mr-2 h-4 w-4" /> Criar Novo Cliente
+                      </Button>
+                    </div>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
-            {form.tipo === 'outro' && (
-              <div><Label>Designação personalizada</Label><Input value={form.tipo_personalizado} onChange={e => setForm(f => ({ ...f, tipo_personalizado: e.target.value }))} placeholder="Ex: Registo de marca" /></div>
-            )}
-            <div><Label>Pessoa *</Label>
-              <Select value={form.pessoa_id} onValueChange={v => setForm(f => ({ ...f, pessoa_id: v }))}>
-                <SelectTrigger><SelectValue placeholder="Selecionar pessoa" /></SelectTrigger>
-                <SelectContent>{pessoas.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div><Label>Descrição / Observação</Label><Input value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} /></div>
-            <div><Label>Atribuído a (staff)</Label>
-              <Select value={form.atribuido_a || ''} onValueChange={v => setForm(f => ({ ...f, atribuido_a: v }))}>
-                <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+
+            <div>
+              <Label>Tipo de Processo *</Label>
+              <Select value={form.tipo || ''} onValueChange={v => upd('tipo', v)}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">Nenhum</SelectItem>
-                  {users.map(u => <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>)}
+                  {Object.entries(tipoProcessoLabel).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-            <div><Label>Estado</Label>
-              <Select value={form.estado} onValueChange={v => setForm(f => ({ ...f, estado: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{Object.entries(ESTADOS).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}</SelectContent>
+
+            <div>
+              <Label>Estado *</Label>
+              <Select value={form.estado || ''} onValueChange={v => upd('estado', v)}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(estadoLabel).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Data de Início</Label><Input type="date" value={form.data_inicio} onChange={e => setForm(f => ({ ...f, data_inicio: e.target.value }))} /></div>
-              <div><Label>Prazo</Label><Input type="date" value={form.data_prazo} onChange={e => setForm(f => ({ ...f, data_prazo: e.target.value }))} /></div>
-            </div>
-            {form.estado === 'concluido' && (
-              <div><Label>Data de Conclusão</Label><Input type="date" value={form.data_conclusao} onChange={e => setForm(f => ({ ...f, data_conclusao: e.target.value }))} /></div>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Custo do Serviço (€)</Label><Input type="number" value={form.custo_servico} onChange={e => setForm(f => ({ ...f, custo_servico: parseFloat(e.target.value) || 0 }))} /></div>
-              <div className="flex flex-col gap-1.5">
-                <Label>Pago?</Label>
-                <div className="flex items-center gap-2 h-9">
-                  <input type="checkbox" id="pago" checked={form.pago} onChange={e => setForm(f => ({ ...f, pago: e.target.checked }))} />
-                  <label htmlFor="pago" className="text-sm">Sim, já foi pago</label>
-                </div>
-              </div>
-            </div>
-            {form.pago && (
-              <div className="grid grid-cols-2 gap-3">
-                <div><Label>Data Pagamento</Label><Input type="date" value={form.data_pagamento} onChange={e => setForm(f => ({ ...f, data_pagamento: e.target.value }))} /></div>
-                <div><Label>Método</Label>
-                  <Select value={form.metodo_pagamento || ''} onValueChange={v => setForm(f => ({ ...f, metodo_pagamento: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Método" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="transferencia">Transferência</SelectItem>
-                      <SelectItem value="mb">MB</SelectItem>
-                      <SelectItem value="mbway">MBWay</SelectItem>
-                      <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-            <div><Label>Notas</Label><Input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} /></div>
 
-            {/* Painel IRS */}
+            {form.tipo === 'outro' && (
+              <div className="sm:col-span-2">
+                <Label>Nome / Descrição do Serviço *</Label>
+                <Input className="mt-1" value={form.descricao || ''} onChange={e => upd('descricao', e.target.value)} />
+              </div>
+            )}
+
             {form.tipo === 'irs' && (
-              <div className="border border-blue-200 bg-blue-50 rounded-xl p-4 space-y-3">
-                <p className="text-sm font-semibold text-blue-700">Dados IRS</p>
-                <div>
-                  <Label>Estado IRS</Label>
-                  <Select value={form.irs_estado || ''} onValueChange={v => setForm(f => ({ ...f, irs_estado: v }))}>
-                    <SelectTrigger className="mt-1 bg-white"><SelectValue placeholder="Selecionar estado" /></SelectTrigger>
-                    <SelectContent>
-                      {IRS_ESTADO_OPTS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="mb-2 block">Atributos</Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {IRS_CAMPOS_LABELS.map(([k, label]) => (
-                      <label key={k} className="flex items-center gap-2 text-sm cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="rounded"
-                          checked={!!(form.irs_campos || {})[k]}
-                          onChange={e => setForm(f => ({ ...f, irs_campos: { ...(f.irs_campos || {}), [k]: e.target.checked } }))}
-                        />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
+              <div className="sm:col-span-2 bg-blue-50/50 p-4 rounded-lg border border-blue-100 mt-2">
+                <Label className="text-base font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                  <FileText className="w-5 h-5"/> Atributos IRS
+                </Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {IRS_ANEXOS.map((anexo) => (
+                    <div key={anexo.id} className="flex items-center space-x-2">
+                      <Checkbox id={`irs-${anexo.id}`} checked={normalizeJsonb(form.irs_campos, {})[anexo.id] === true} onCheckedChange={() => toggleIrsCampo(anexo.id)} />
+                      <label htmlFor={`irs-${anexo.id}`} className="text-sm font-medium leading-none cursor-pointer">{anexo.label}</label>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
 
-            {/* Documents */}
             <div>
-              <Label>Documentos</Label>
-              <div className="mt-2 space-y-1">
-                {(form.documentos || []).map((doc, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-sm bg-muted rounded px-3 py-1.5">
-                    <a href={doc.url} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate">{doc.nome}</a>
-                    <button onClick={() => removeDoc(idx)} className="text-muted-foreground hover:text-destructive ml-2">✕</button>
-                  </div>
-                ))}
-                <label className="flex items-center gap-2 cursor-pointer text-sm text-primary hover:underline mt-1">
-                  <Upload className="w-4 h-4" />
-                  {uploading ? 'A carregar...' : 'Adicionar documento'}
-                  <input type="file" className="hidden" onChange={handleUploadDoc} disabled={uploading} />
-                </label>
+              <Label>Prioridade</Label>
+              <Select value={form.prioridade || ''} onValueChange={v => upd('prioridade', v)}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="urgente">Urgente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Custo do Serviço (€)</Label>
+              <Input type="number" min="0" step="0.01" className="mt-1" value={form.custo_servico || 0} onChange={e => upd('custo_servico', parseFloat(e.target.value))} />
+            </div>
+
+            <div className="sm:col-span-2 bg-muted/30 p-4 rounded-lg border flex items-center justify-between">
+              <div>
+                <Label className="text-base font-semibold">Estado do Pagamento</Label>
+                <p className="text-sm text-muted-foreground">Marque se o cliente já efetuou o pagamento do serviço.</p>
+              </div>
+              <Checkbox checked={form.pago} onCheckedChange={(c) => upd('pago', c)} className="w-6 h-6 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500" />
+            </div>
+
+            <div className="sm:col-span-2">
+              <Label>Notas Internas</Label>
+              <textarea className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-y" value={form.notas || ''} onChange={e => upd('notas', e.target.value)} />
+            </div>
+
+            {/* SECÇÃO DOS UPLOADS AUTOMÁTICOS */}
+            <div className="sm:col-span-2 border-t pt-4 mt-2">
+              <Label className="text-base font-semibold mb-3 flex items-center gap-2">
+                <Paperclip className="w-4 h-4"/> Documentos Anexos
+              </Label>
+              
+              <div className="space-y-2 mb-4">
+                {normalizeJsonb(form.documentos, []).length === 0 ? (
+                  <p className="text-sm text-muted-foreground bg-muted/20 p-3 rounded text-center border border-dashed">
+                    Nenhum ficheiro anexado a este processo.
+                  </p>
+                ) : (
+                  normalizeJsonb(form.documentos, []).map((doc, idx) => (
+                    <div key={idx} className="flex items-center justify-between bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-100">
+                      <div className="min-w-0 pr-4 flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                        <span className="text-sm font-semibold truncate text-emerald-800">{doc.nome}</span>
+                      </div>
+                      <button type="button" onClick={() => removeDocumento(idx)} className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 rounded-md transition-colors flex-shrink-0">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="bg-card p-3 rounded-lg border shadow-sm border-dashed hover:border-primary/50 transition-colors">
+                <div className="w-full relative flex items-center justify-center">
+                  <Label className="text-sm font-medium text-muted-foreground flex items-center justify-center w-full cursor-pointer py-3 rounded-md transition-colors hover:text-primary">
+                    <UploadCloud className="w-5 h-5 mr-2" />
+                    {uploadingDoc ? <span className="animate-pulse text-blue-500 font-bold">A carregar para o sistema...</span> : 'Clique para escolher um ficheiro do PC'}
+                    <Input 
+                      type="file" 
+                      accept=".pdf,image/*"
+                      onChange={handleFileUpload}
+                      disabled={uploadingDoc}
+                      className="hidden"
+                    />
+                  </Label>
+                </div>
               </div>
             </div>
+            
           </div>
-          <div className="flex justify-end gap-2 mt-4">
+          <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => save.mutate(form)} disabled={save.isPending}>{save.isPending ? 'A guardar...' : 'Guardar'}</Button>
+            <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.pessoa_id}>
+              {save.isPending ? 'A guardar...' : 'Guardar Processo'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* JANELA SECUNDÁRIA: Criação Rápida de Cliente */}
+      <Dialog open={showNewClient} onOpenChange={setShowNewClient}>
+        <DialogContent className="max-w-sm z-[60]">
+          <DialogHeader>
+            <DialogTitle>Novo Cliente Rápido</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 mt-2">
+            <div>
+              <Label>Nome *</Label>
+              <Input value={newClientForm.nome} onChange={e => setNewClientForm({...newClientForm, nome: e.target.value})} autoFocus />
+            </div>
+            <div>
+              <Label>NIF</Label>
+              <Input value={newClientForm.nif} onChange={e => setNewClientForm({...newClientForm, nif: e.target.value})} />
+            </div>
+            <div>
+              <Label>Telemóvel</Label>
+              <Input value={newClientForm.telefone} onChange={e => setNewClientForm({...newClientForm, telefone: e.target.value})} />
+            </div>
+            <div>
+              <Label>Email</Label>
+              <Input value={newClientForm.email} onChange={e => setNewClientForm({...newClientForm, email: e.target.value})} />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setShowNewClient(false)}>Cancelar</Button>
+            <Button onClick={() => saveClient.mutate(newClientForm)} disabled={saveClient.isPending || !newClientForm.nome}>
+              {saveClient.isPending ? 'A criar...' : 'Criar e Selecionar'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
