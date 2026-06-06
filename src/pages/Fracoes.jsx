@@ -5,23 +5,53 @@ import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Pencil, Home, Search, X, Printer } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Plus, Pencil, Home, Search, X, Printer, Check, ChevronsUpDown, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCondominio } from '@/lib/CondominioContext';
+import { cn } from '@/lib/utils';
 
 const empty = {
-  condominio_id: '', codigo: '', descricao: '', piso: '', permilagem: '', area_m2: '',
-  proprietario_id: '', proprietario2_id: '', inquilino_id: '', inquilino2_id: '',
-  recibo_incluir: ['proprietario'], responsavel_pagamento: 'proprietario', quota_mensal: 0
+  condominio_id: '', codigo_fracao: '', descricao_piso_lado: '', permilagem: '',
+  titulares: [], quota_mensal: 0
 };
 
-const tipoLabel = { condomino: 'Condómino', fornecedor: 'Fornecedor', cliente: 'Cliente', advogado: 'Advogado' };
+const emptyClient = { nome: '', nif: '', telefone: '', email: '', tipo: ['condomino'] };
 
-function FracaoPreview({ fracao, condominios, pessoas, onClose }) {
+const normalizeArray = (data) => {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (typeof data === 'string') {
+    try { return JSON.parse(data); } catch(e) { return data.split(',').map(s => s.trim()).filter(Boolean); }
+  }
+  return [];
+};
+
+// Algoritmo que descobre a próxima letra de fração válida em Portugal (exclui K, W, Y)
+const getNextLetter = (existingCodes) => {
+  const alphabet = "ABCDEFGHIJLMNOPQRSTUVXZ";
+  const base = alphabet.length;
+  const set = new Set(existingCodes.map(c => c?.trim().toUpperCase()));
+  
+  let i = 0;
+  while (i < 1000) { // Limite de segurança
+    let res = '';
+    let n = i;
+    while (n >= 0) {
+      res = alphabet[n % base] + res;
+      n = Math.floor(n / base) - 1;
+    }
+    if (!set.has(res)) return res;
+    i++;
+  }
+  return '';
+};
+
+function FracaoPreview({ fracao, condominios, pessoas, onClose, onShowPessoa }) {
   const cond = condominios.find(c => c.id === fracao.condominio_id);
-  const getPessoa = (id) => pessoas.find(p => p.id === id);
+  const titularesArray = normalizeArray(fracao.titulares);
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -29,50 +59,58 @@ function FracaoPreview({ fracao, condominios, pessoas, onClose }) {
         <div className="flex items-center justify-between px-6 py-4 border-b print:hidden">
           <h2 className="font-bold text-lg">Ficha de Fração</h2>
           <div className="flex gap-2">
-            <button onClick={() => window.print()} className="flex items-center gap-1 text-sm text-primary hover:underline">
+            <button onClick={() => window.print()} className="flex items-center gap-1 text-sm text-primary hover:underline border border-transparent hover:border-primary/20 px-2 py-1 rounded">
               <Printer className="w-4 h-4" /> Imprimir
             </button>
-            <button onClick={onClose}><X className="w-5 h-5 text-muted-foreground" /></button>
+            <button onClick={onClose} className="p-1 hover:bg-muted rounded"><X className="w-5 h-5 text-muted-foreground" /></button>
           </div>
         </div>
         <div className="px-6 py-5 space-y-3 print:py-8">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Home className="w-6 h-6 text-primary" />
+          <div className="flex items-center gap-4 mb-5">
+            <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Home className="w-7 h-7 text-primary" />
             </div>
             <div>
-              <h3 className="text-xl font-bold">{fracao.codigo}</h3>
-              <p className="text-muted-foreground">{fracao.descricao}</p>
+              <h3 className="text-2xl font-bold text-foreground leading-tight">{fracao.codigo_fracao}</h3>
+              <p className="text-primary font-medium text-sm mt-0.5">{cond?.nome || 'Condomínio Desconhecido'}</p>
             </div>
           </div>
+
           {[
-            ['Condomínio', cond?.nome],
-            ['Piso', fracao.piso],
+            ['Piso / Lado - Descrição', fracao.descricao_piso_lado],
             ['Permilagem', fracao.permilagem ? `${fracao.permilagem}‰` : null],
-            ['Área', fracao.area_m2 ? `${fracao.area_m2} m²` : null],
             ['Quota Mensal', fracao.quota_mensal ? `€${parseFloat(fracao.quota_mensal).toFixed(2)}` : null],
-            ['Responsável', fracao.responsavel_pagamento === 'proprietario' ? 'Proprietário' : 'Inquilino'],
           ].map(([label, val]) => val ? (
-            <div key={label} className="flex gap-3 text-sm">
-              <span className="w-32 font-medium text-muted-foreground flex-shrink-0">{label}</span>
-              <span>{val}</span>
+            <div key={label} className="flex gap-3 text-sm items-center">
+              <span className="w-40 font-medium text-muted-foreground flex-shrink-0">{label}</span>
+              <span className="text-foreground">{val}</span>
             </div>
           ) : null)}
 
-          {/* Titulares */}
-          <div className="border-t pt-3 mt-2">
-            <p className="text-sm font-semibold mb-2">Titulares</p>
-            {['proprietario_id', 'proprietario2_id', 'inquilino_id', 'inquilino2_id'].map(key => {
-              const pessoa = getPessoa(fracao[key]);
-              if (!pessoa) return null;
-              const labels = { proprietario_id: 'Proprietário 1', proprietario2_id: 'Proprietário 2', inquilino_id: 'Inquilino 1', inquilino2_id: 'Inquilino 2' };
-              return (
-                <div key={key} className="flex gap-3 text-sm mb-1">
-                  <span className="w-32 font-medium text-muted-foreground flex-shrink-0">{labels[key]}</span>
-                  <span>{pessoa.nome}</span>
-                </div>
-              );
-            })}
+          <div className="border-t pt-4 mt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Users className="w-4 h-4 text-muted-foreground" />
+              <p className="text-sm font-bold text-foreground">Titulares da Fração</p>
+            </div>
+            {titularesArray.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                {titularesArray.map(tId => {
+                  const p = pessoas.find(x => x.id === tId);
+                  if (!p) return null;
+                  return (
+                    <button 
+                      key={tId} 
+                      onClick={() => onShowPessoa(p)}
+                      className="text-left text-sm text-primary font-semibold hover:underline bg-primary/5 hover:bg-primary/10 px-3 py-2 rounded-lg transition-colors"
+                    >
+                      {p.nome}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">Nenhum titular associado.</p>
+            )}
           </div>
         </div>
       </div>
@@ -87,7 +125,14 @@ export default function Fracoes() {
   const [editing, setEditing] = useState(null);
   const { selectedCondominioId } = useCondominio();
   const [search, setSearch] = useState('');
+  
   const [preview, setPreview] = useState(null);
+  const [showPessoa, setShowPessoa] = useState(null);
+  
+  const [openCondCombo, setOpenCondCombo] = useState(false);
+  const [openTitularCombo, setOpenTitularCombo] = useState(false);
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [newClientForm, setNewClientForm] = useState(emptyClient);
 
   const { data: fracoes = [], isLoading } = useQuery({ queryKey: ['fracoes'], queryFn: () => agenciaAvenida.entities.Fracao.list() });
   const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
@@ -95,41 +140,48 @@ export default function Fracoes() {
 
   const save = useMutation({
     mutationFn: (data) => editing ? agenciaAvenida.entities.Fracao.update(editing, data) : agenciaAvenida.entities.Fracao.create(data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['fracoes'] }); setOpen(false); toast.success('Fração guardada'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['fracoes'] }); setOpen(false); toast.success('Fração guardada com sucesso!'); },
   });
 
-  const openNew = () => { setForm({ ...empty, condominio_id: selectedCondominioId !== 'all' ? selectedCondominioId : '' }); setEditing(null); setOpen(true); };
-  const openEdit = (f) => { setForm({ ...empty, ...f, recibo_incluir: f.recibo_incluir || ['proprietario'] }); setEditing(f.id); setOpen(true); };
+  const saveClient = useMutation({
+    mutationFn: (data) => agenciaAvenida.entities.Pessoa.create(data),
+    onSuccess: (created) => {
+      qc.invalidateQueries({ queryKey: ['pessoas'] });
+      setShowNewClient(false);
+      setForm(p => ({ ...p, titulares: [...normalizeArray(p.titulares), created.id] }));
+      toast.success('Titular criado e associado!');
+    },
+  });
+
+  const openNew = () => { 
+    const cid = selectedCondominioId !== 'all' ? selectedCondominioId : '';
+    let suggestedCode = '';
+    if (cid) {
+       const existing = fracoes.filter(f => f.condominio_id === cid).map(f => f.codigo_fracao);
+       suggestedCode = getNextLetter(existing);
+    }
+    setForm({ ...empty, condominio_id: cid, codigo_fracao: suggestedCode }); 
+    setEditing(null); 
+    setOpen(true); 
+  };
+  
+  const openEdit = (f) => { setForm({ ...empty, ...f, titulares: normalizeArray(f.titulares) }); setEditing(f.id); setOpen(true); };
+  
   const upd = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
-  const toggleRecibo = (val) => {
-    setForm(f => {
-      const list = f.recibo_incluir || [];
-      return { ...f, recibo_incluir: list.includes(val) ? list.filter(x => x !== val) : [...list, val] };
-    });
+  const removeTitular = (idToRemove) => {
+    setForm(p => ({ ...p, titulares: normalizeArray(p.titulares).filter(id => id !== idToRemove) }));
   };
 
   const getCondName = (id) => condominios.find(c => c.id === id)?.nome || '-';
-  const getPessoaName = (id) => pessoas.find(p => p.id === id)?.nome || '-';
 
   const filtered = fracoes.filter(f => {
-    const matchSearch = !search || f.codigo?.toLowerCase().includes(search.toLowerCase()) || f.descricao?.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = !search || f.codigo_fracao?.toLowerCase().includes(search.toLowerCase()) || f.descricao_piso_lado?.toLowerCase().includes(search.toLowerCase());
     const matchCond = selectedCondominioId === 'all' || f.condominio_id === selectedCondominioId;
     return matchSearch && matchCond;
   });
 
-  const pessoaSelect = (key, label) => (
-    <div>
-      <Label>{label}</Label>
-      <Select value={form[key] || ''} onValueChange={v => upd(key, v)}>
-        <SelectTrigger className="mt-1"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value={null}>— Nenhum —</SelectItem>
-          {pessoas.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
-        </SelectContent>
-      </Select>
-    </div>
-  );
+  const titularesList = normalizeArray(form.titulares);
 
   return (
     <div>
@@ -140,7 +192,7 @@ export default function Fracoes() {
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Pesquisar fração..." value={search} onChange={e => setSearch(e.target.value)} />
+          <Input className="pl-9" placeholder="Pesquisar por código ou descrição..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
       </div>
 
@@ -150,80 +202,101 @@ export default function Fracoes() {
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
             <tr>
-              {['Código', 'Condomínio', 'Piso', 'Permilagem', 'Proprietário 1', 'Inquilino 1', 'Quota', 'Ações'].map(h => (
+              {['Letra', 'Condomínio', 'Piso / Lado', 'Permilagem', 'Titulares', 'Quota', 'Ações'].map(h => (
                 <th key={h} className="px-4 py-3 text-left font-medium text-muted-foreground">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {filtered.map(f => (
-              <tr key={f.id} className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setPreview(f)}>
-                <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-primary/10 rounded"><Home className="w-3 h-3 text-primary" /></div>
-                    <span className="font-medium">{f.codigo}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">{getCondName(f.condominio_id)}</td>
-                <td className="px-4 py-3 text-muted-foreground">{f.piso || '-'}</td>
-                <td className="px-4 py-3 text-muted-foreground">{f.permilagem || '-'}‰</td>
-                <td className="px-4 py-3">
-                  {f.proprietario_id ? (
-                    <button
-                      onClick={e => { e.stopPropagation(); const p = pessoas.find(p => p.id === f.proprietario_id); if (p) setPreview({ _tipo: 'pessoa', ...p }); }}
-                      className="text-primary hover:underline"
-                    >
-                      {getPessoaName(f.proprietario_id)}
-                    </button>
-                  ) : '-'}
-                </td>
-                <td className="px-4 py-3">
-                  {f.inquilino_id ? (
-                    <button
-                      onClick={e => { e.stopPropagation(); const p = pessoas.find(p => p.id === f.inquilino_id); if (p) setPreview({ _tipo: 'pessoa', ...p }); }}
-                      className="text-primary hover:underline"
-                    >
-                      {getPessoaName(f.inquilino_id)}
-                    </button>
-                  ) : '-'}
-                </td>
-                <td className="px-4 py-3 font-medium">€{(f.quota_mensal || 0).toFixed(2)}</td>
-                <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => openEdit(f)} className="p-1.5 hover:bg-muted rounded transition-colors">
-                    <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {filtered.map(f => {
+               const fTitulares = normalizeArray(f.titulares);
+               return (
+                 <tr key={f.id} className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setPreview(f)}>
+                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                     <div className="flex items-center gap-2">
+                       <div className="p-1.5 bg-primary/10 rounded"><Home className="w-3 h-3 text-primary" /></div>
+                       <span className="font-bold text-foreground">{f.codigo_fracao}</span>
+                     </div>
+                   </td>
+                   <td className="px-4 py-3 text-muted-foreground">{getCondName(f.condominio_id)}</td>
+                   <td className="px-4 py-3 text-muted-foreground truncate max-w-[150px]" title={f.descricao_piso_lado}>{f.descricao_piso_lado || '-'}</td>
+                   <td className="px-4 py-3 text-muted-foreground">{f.permilagem ? `${f.permilagem}‰` : '-'}</td>
+                   <td className="px-4 py-3">
+                     <div className="flex flex-wrap gap-x-2 gap-y-1">
+                       {fTitulares.length > 0 ? fTitulares.map(tId => {
+                         const p = pessoas.find(x => x.id === tId);
+                         if (!p) return null;
+                         return (
+                           <button 
+                             key={tId} 
+                             onClick={(e) => { e.stopPropagation(); setShowPessoa(p); }} 
+                             className="text-primary hover:underline text-xs font-semibold whitespace-nowrap bg-primary/5 px-2 py-0.5 rounded"
+                           >
+                             {p.nome}
+                           </button>
+                         )
+                       }) : <span className="text-muted-foreground text-xs italic">Sem titulares</span>}
+                     </div>
+                   </td>
+                   <td className="px-4 py-3 font-semibold">€{(f.quota_mensal || 0).toFixed(2)}</td>
+                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                     <button onClick={() => openEdit(f)} className="p-1.5 hover:bg-muted rounded transition-colors" title="Editar">
+                       <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                     </button>
+                   </td>
+                 </tr>
+               )
+            })}
             {filtered.length === 0 && !isLoading && (
-              <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">Nenhuma Fração Encontrada</td></tr>
+              <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">Nenhuma Fração Encontrada</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Preview */}
-      {preview && preview._tipo === 'pessoa' ? (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setPreview(null)}>
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="font-bold text-lg">Ficha de Entidade</h2>
-              <div className="flex gap-2">
-                <button onClick={() => window.print()} className="text-sm text-primary hover:underline flex items-center gap-1"><Printer className="w-4 h-4"/>Imprimir</button>
-                <button onClick={() => setPreview(null)}><X className="w-5 h-5 text-muted-foreground"/></button>
+      {preview && (
+        <FracaoPreview 
+          fracao={preview} 
+          condominios={condominios} 
+          pessoas={pessoas} 
+          onClose={() => setPreview(null)} 
+          onShowPessoa={(p) => setShowPessoa(p)}
+        />
+      )}
+
+      <Dialog open={showPessoa !== null} onOpenChange={(open) => !open && setShowPessoa(null)}>
+        {showPessoa && (
+          <DialogContent className="max-w-sm z-[60]">
+            <DialogHeader>
+              <DialogTitle>Dados de Contacto</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-2">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">Nome</p>
+                <p className="font-bold text-foreground text-lg">{showPessoa.nome}</p>
               </div>
-            </div>
-            <div className="space-y-2 text-sm">
-              <p className="font-bold text-xl">{preview.nome}</p>
-              {[['NIF', preview.nif], ['Email', preview.email], ['Telefone', preview.telefone], ['Morada', preview.morada], ['IBAN', preview.iban]].map(([l, v]) =>
-                v ? <div key={l} className="flex gap-3"><span className="w-24 font-medium text-muted-foreground">{l}</span><span>{v}</span></div> : null
+              {showPessoa.telefone && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">Telefone</p>
+                  <p className="text-foreground">{showPessoa.telefone}</p>
+                </div>
+              )}
+              {showPessoa.email && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">Email</p>
+                  <p className="text-foreground">{showPessoa.email}</p>
+                </div>
+              )}
+              {showPessoa.nif && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">NIF</p>
+                  <p className="text-foreground">{showPessoa.nif}</p>
+                </div>
               )}
             </div>
-          </div>
-        </div>
-      ) : preview ? (
-        <FracaoPreview fracao={preview} condominios={condominios} pessoas={pessoas} onClose={() => setPreview(null)} />
-      ) : null}
+          </DialogContent>
+        )}
+      </Dialog>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -231,67 +304,152 @@ export default function Fracoes() {
             <DialogTitle>{editing ? 'Editar Fração' : 'Nova Fração'}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+            
             <div className="sm:col-span-2">
               <Label>Condomínio *</Label>
-              <Select value={form.condominio_id} onValueChange={v => upd('condominio_id', v)}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecionar condomínio" /></SelectTrigger>
-                <SelectContent>{condominios.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
-              </Select>
+              <Popover open={openCondCombo} onOpenChange={setOpenCondCombo}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={openCondCombo} className="w-full justify-between font-normal bg-background mt-1">
+                    {form.condominio_id ? condominios.find(c => c.id === form.condominio_id)?.nome : "Pesquise e selecione..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+                  <Command>
+                    <CommandInput placeholder="Pesquisar condomínio..." />
+                    <CommandEmpty>Condomínio não encontrado.</CommandEmpty>
+                    <CommandGroup className="max-h-48 overflow-y-auto">
+                      {condominios.map((c) => (
+                        <CommandItem key={c.id} value={`${c.nome} ${c.codigo || ''}`} onSelect={() => { 
+                          const updates = { condominio_id: c.id };
+                          // Se for uma fração nova, gera automaticamente a sugestão da letra
+                          if (!editing) {
+                             const existing = fracoes.filter(f => f.condominio_id === c.id).map(f => f.codigo_fracao);
+                             updates.codigo_fracao = getNextLetter(existing);
+                          }
+                          setForm(prev => ({ ...prev, ...updates }));
+                          setOpenCondCombo(false); 
+                        }}>
+                          <Check className={cn("mr-2 h-4 w-4", form.condominio_id === c.id ? "opacity-100" : "opacity-0")} />
+                          {c.codigo && <span className="font-bold mr-1 opacity-70">({c.codigo})</span>} {c.nome}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
-            {[['codigo', 'Código *'], ['descricao', 'Descrição'], ['piso', 'Piso']].map(([k, l]) => (
-              <div key={k}><Label>{l}</Label><Input className="mt-1" value={form[k] || ''} onChange={e => upd(k, e.target.value)} /></div>
-            ))}
-            {[['permilagem', 'Permilagem (‰)'], ['area_m2', 'Área (m²)']].map(([k, l]) => (
-              <div key={k}><Label>{l}</Label><Input className="mt-1" type="number" value={form[k] || ''} onChange={e => upd(k, parseFloat(e.target.value) || 0)} /></div>
-            ))}
+
             <div>
-              <Label>Quota Mensal (€)</Label>
-              <Input className="mt-1 bg-muted cursor-not-allowed" type="number" value={form.quota_mensal || 0} readOnly disabled title="Defina a quota no ecrã de Quotas" />
-              <p className="text-xs text-muted-foreground mt-1">Gerida no ecrã de Quotas</p>
+              <Label>Letra da Fração *</Label>
+              <Input className="mt-1 font-bold text-foreground" value={form.codigo_fracao || ''} onChange={e => upd('codigo_fracao', e.target.value)} />
             </div>
 
-            {/* Titulares */}
-            <div className="sm:col-span-2 border-t pt-3">
-              <p className="font-medium text-sm mb-3">Titulares</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {pessoaSelect('proprietario_id', 'Proprietário 1')}
-                {pessoaSelect('proprietario2_id', 'Proprietário 2')}
-                {pessoaSelect('inquilino_id', 'Inquilino 1')}
-                {pessoaSelect('inquilino2_id', 'Inquilino 2')}
+            <div>
+              <Label>Piso / Lado - Descrição</Label>
+              <Input className="mt-1" placeholder="Ex: 1EQ, RCFT, 3DT, LJA" value={form.descricao_piso_lado || ''} onChange={e => upd('descricao_piso_lado', e.target.value)} />
+            </div>
+
+            <div>
+              <Label>Permilagem (‰)</Label>
+              <Input className="mt-1" type="number" step="0.01" value={form.permilagem || ''} onChange={e => upd('permilagem', parseFloat(e.target.value) || '')} />
+            </div>
+
+            <div>
+              <Label>Quota Mensal Base (€)</Label>
+              <Input className="mt-1 bg-muted cursor-not-allowed font-semibold text-muted-foreground" type="number" value={form.quota_mensal || 0} readOnly disabled title="Definida pelo Mapa de Quotas" />
+              <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider">Automático via Quotas</p>
+            </div>
+
+            <div className="sm:col-span-2 border-t border-border mt-2 pt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="w-4 h-4 text-muted-foreground" />
+                <Label className="text-base">Titulares da Fração</Label>
               </div>
-            </div>
+              <p className="text-xs text-muted-foreground mb-3">Os titulares listados aqui serão automaticamente incluídos na faturação/recibos.</p>
+              
+              <div className="space-y-2 mb-3">
+                {titularesList.map(tId => {
+                  const p = pessoas.find(x => x.id === tId);
+                  return (
+                    <div key={tId} className="flex items-center justify-between p-2.5 border border-border rounded-lg bg-card shadow-sm">
+                      <span className="text-sm font-semibold text-foreground">{p?.nome || 'Entidade Desconhecida'}</span>
+                      <button type="button" onClick={() => removeTitular(tId)} className="p-1 text-muted-foreground hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="Remover titular">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
 
-            {/* Incluir no recibo */}
-            <div className="sm:col-span-2">
-              <Label className="mb-2 block">Incluir no recibo</Label>
-              <div className="flex flex-wrap gap-2">
-                {[['proprietario', 'Proprietário 1'], ['proprietario2', 'Proprietário 2'], ['inquilino', 'Inquilino 1'], ['inquilino2', 'Inquilino 2']].map(([val, lbl]) => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => toggleRecibo(val)}
-                    className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${(form.recibo_incluir || []).includes(val) ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}
-                  >
-                    {lbl}
+              <Popover open={openTitularCombo} onOpenChange={setOpenTitularCombo}>
+                <PopoverTrigger asChild>
+                  <button type="button" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1 transition-all">
+                    {titularesList.length > 0 ? '+ Adicionar outro titular' : '+ Adicionar primeiro titular'}
                   </button>
-                ))}
-              </div>
+                </PopoverTrigger>
+                <PopoverContent className="p-0 w-80" align="start">
+                  <Command>
+                    <CommandInput placeholder="Pesquisar entidade..." />
+                    <CommandEmpty>Entidade não encontrada.</CommandEmpty>
+                    <CommandGroup className="max-h-48 overflow-y-auto">
+                      {pessoas.filter(p => !titularesList.includes(p.id)).map((pes) => (
+                        <CommandItem key={pes.id} value={`${pes.nome} ${pes.nif || ''}`} onSelect={() => { 
+                          setForm(prev => ({ ...prev, titulares: [...titularesList, pes.id] }));
+                          setOpenTitularCombo(false); 
+                        }}>
+                          {pes.nome}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                    <div className="p-2 border-t border-border bg-muted/30">
+                      <Button variant="secondary" className="w-full justify-start text-primary font-medium" onClick={() => { setOpenTitularCombo(false); setNewClientForm(emptyClient); setShowNewClient(true); }}>
+                        <Plus className="mr-2 h-4 w-4" /> Criar Rápido
+                      </Button>
+                    </div>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
+          </div>
+          <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-border">
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.condominio_id || !form.codigo_fracao}>
+              {save.isPending ? 'A guardar...' : 'Guardar Fração'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showNewClient} onOpenChange={setShowNewClient}>
+        <DialogContent className="max-w-sm z-[60]">
+          <DialogHeader>
+            <DialogTitle>Novo Titular</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 mt-2">
             <div>
-              <Label>Responsável pelo Pagamento</Label>
-              <Select value={form.responsavel_pagamento} onValueChange={v => upd('responsavel_pagamento', v)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="proprietario">Proprietário</SelectItem>
-                  <SelectItem value="inquilino">Inquilino</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Nome *</Label>
+              <Input value={newClientForm.nome} onChange={e => setNewClientForm({...newClientForm, nome: e.target.value})} autoFocus />
+            </div>
+            <div>
+              <Label>NIF</Label>
+              <Input value={newClientForm.nif} onChange={e => setNewClientForm({...newClientForm, nif: e.target.value})} />
+            </div>
+            <div>
+              <Label>Telemóvel</Label>
+              <Input value={newClientForm.telefone} onChange={e => setNewClientForm({...newClientForm, telefone: e.target.value})} />
+            </div>
+            <div>
+              <Label>Email</Label>
+              <Input value={newClientForm.email} onChange={e => setNewClientForm({...newClientForm, email: e.target.value})} />
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => save.mutate(form)} disabled={save.isPending}>{save.isPending ? 'A guardar...' : 'Guardar'}</Button>
+            <Button variant="outline" onClick={() => setShowNewClient(false)}>Cancelar</Button>
+            <Button onClick={() => saveClient.mutate(newClientForm)} disabled={saveClient.isPending || !newClientForm.nome}>
+              {saveClient.isPending ? 'A criar...' : 'Criar e Adicionar'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
