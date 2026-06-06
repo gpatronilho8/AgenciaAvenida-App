@@ -33,7 +33,7 @@ const normalizeTipoPessoa = (tipoData) => {
       else if (clean) finalArray.push(clean);
     } else if (item) finalArray.push(item);
   });
-  return [...new Set(finalArray)].filter(Boolean);
+  return [...new Set(finalArray)].map(t => t.toLowerCase());
 };
 
 const empty = {
@@ -71,7 +71,7 @@ function CondominioPreview({ cond, pessoas, onClose, onEdit }) {
               <button onClick={onClose} className="p-1 hover:bg-muted rounded"><X className="w-5 h-5 text-muted-foreground" /></button>
             </div>
           </div>
-          <div className="px-6 py-5 space-y-3 print:py-8 max-h-[80vh] overflow-y-auto">
+          <div className="px-6 py-5 space-y-3 print:py-8 max-h-[80vh] overflow-y-auto no-scrollbar">
             
             <div className="flex items-start gap-4 mb-5">
               <div className="p-3 bg-primary/10 rounded-xl mt-1"><Building2 className="w-6 h-6 text-primary" /></div>
@@ -138,7 +138,7 @@ function CondominioPreview({ cond, pessoas, onClose, onEdit }) {
 
       {showPessoa && (
         <Dialog open onOpenChange={() => setShowPessoa(null)}>
-          <DialogContent className="max-w-sm z-[60]">
+          <DialogContent className="max-w-sm z-[60] no-scrollbar">
             <DialogHeader>
               <DialogTitle>Dados de Contacto</DialogTitle>
             </DialogHeader>
@@ -191,6 +191,7 @@ export default function Condominios() {
   const { data: pessoas = [], isLoading: loadPes } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
 
   const bancosList = pessoas.filter(p => normalizeTipoPessoa(p.tipo).includes('banco'));
+  const condominosList = pessoas.filter(p => normalizeTipoPessoa(p.tipo).includes('condomino'));
 
   const save = useMutation({
     mutationFn: (data) => {
@@ -250,6 +251,11 @@ export default function Condominios() {
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
+  // Ordenação inteligente dos condomínios pelo código (C01, C02, etc.)
+  const sortedCondominios = [...condominios].sort((a, b) => 
+    (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true, sensitivity: 'base' })
+  );
+
   return (
     <div>
       <PageHeader title="Condomínios" subtitle="Condomínios geridos pela Agência Avenida" action={
@@ -259,7 +265,7 @@ export default function Condominios() {
       {(loadCond || loadPes) && <div className="text-center py-16 text-muted-foreground">A carregar condomínios...</div>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-        {condominios.map(c => (
+        {sortedCondominios.map(c => (
           <div
             key={c.id}
             className="bg-card rounded-xl border border-border p-5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer"
@@ -297,15 +303,15 @@ export default function Condominios() {
             </div>
           </div>
         ))}
-        {!loadCond && condominios.length === 0 && (
-           <div className="col-span-full text-center py-12 text-muted-foreground">Nenhum Condomínio Registado</div>
+        {!loadCond && sortedCondominios.length === 0 && (
+           <div className="col-span-full text-center py-12 text-muted-foreground">Nenhum condomínio registado.</div>
         )}
       </div>
 
       {preview && <CondominioPreview cond={preview} pessoas={pessoas} onClose={() => setPreview(null)} onEdit={(c) => { setPreview(null); openEdit(c); }} />}
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar Condomínio' : 'Novo Condomínio'}</DialogTitle>
           </DialogHeader>
@@ -350,8 +356,8 @@ export default function Condominios() {
                   <Command>
                     <CommandInput placeholder="Pesquisar entidade..." />
                     <CommandEmpty>Pessoa não encontrada.</CommandEmpty>
-                    <CommandGroup className="max-h-48 overflow-y-auto">
-                      {pessoas.map((pes) => (
+                    <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
+                      {condominosList.map((pes) => (
                         <CommandItem key={pes.id} value={`${pes.nome} ${pes.nif || ''}`} onSelect={() => { f('pessoa_id', pes.id); setOpenCombo(false); }}>
                           <Check className={cn("mr-2 h-4 w-4", form.pessoa_id === pes.id ? "opacity-100" : "opacity-0")} />
                           {pes.nome}
@@ -393,7 +399,7 @@ export default function Condominios() {
                   {bancosList.map(b => (
                     <SelectItem key={b.id} value={b.id}>{b.nome}</SelectItem>
                   ))}
-                  {bancosList.length === 0 && <p className="text-sm p-2 text-muted-foreground text-center">Nenhum Banco Registado</p>}
+                  {bancosList.length === 0 && <p className="text-sm p-2 text-muted-foreground text-center">Nenhum banco registado nas Entidades.</p>}
                 </SelectContent>
               </Select>
             </div>
@@ -432,7 +438,7 @@ export default function Condominios() {
       </Dialog>
 
       <Dialog open={showNewClient} onOpenChange={setShowNewClient}>
-        <DialogContent className="max-w-sm z-[60]">
+        <DialogContent className="max-w-sm z-[60] no-scrollbar">
           <DialogHeader>
             <DialogTitle>Nova Entidade Rápida</DialogTitle>
           </DialogHeader>

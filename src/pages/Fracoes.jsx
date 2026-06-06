@@ -13,12 +13,15 @@ import { toast } from 'sonner';
 import { useCondominio } from '@/lib/CondominioContext';
 import { cn } from '@/lib/utils';
 
-const empty = {
-  condominio_id: '', codigo_fracao: '', descricao_piso_lado: '', permilagem: '',
-  titulares: [], quota_mensal: 0
+// Filtro rigoroso para extrair tipos e normalizar
+const normalizeTipo = (tipoData) => {
+  if (!tipoData) return [];
+  let parsed = Array.isArray(tipoData) ? tipoData : [];
+  if (typeof tipoData === 'string') {
+    try { parsed = JSON.parse(tipoData); } catch { parsed = tipoData.split(',').map(s => s.trim()); }
+  }
+  return parsed.map(t => t.toString().trim().toLowerCase());
 };
-
-const emptyClient = { nome: '', nif: '', telefone: '', email: '', tipo: ['condomino'] };
 
 const normalizeArray = (data) => {
   if (!data) return [];
@@ -29,6 +32,13 @@ const normalizeArray = (data) => {
   return [];
 };
 
+const empty = {
+  condominio_id: '', codigo_fracao: '', descricao_piso_lado: '', permilagem: '',
+  titulares: [], quota_mensal: 0
+};
+
+const emptyClient = { nome: '', nif: '', telefone: '', email: '', tipo: ['condomino'] };
+
 // Algoritmo que descobre a próxima letra de fração válida em Portugal (exclui K, W, Y)
 const getNextLetter = (existingCodes) => {
   const alphabet = "ABCDEFGHIJLMNOPQRSTUVXZ";
@@ -36,7 +46,7 @@ const getNextLetter = (existingCodes) => {
   const set = new Set(existingCodes.map(c => c?.trim().toUpperCase()));
   
   let i = 0;
-  while (i < 1000) { // Limite de segurança
+  while (i < 1000) {
     let res = '';
     let n = i;
     while (n >= 0) {
@@ -65,7 +75,7 @@ function FracaoPreview({ fracao, condominios, pessoas, onClose, onShowPessoa }) 
             <button onClick={onClose} className="p-1 hover:bg-muted rounded"><X className="w-5 h-5 text-muted-foreground" /></button>
           </div>
         </div>
-        <div className="px-6 py-5 space-y-3 print:py-8">
+        <div className="px-6 py-5 space-y-3 print:py-8 max-h-[80vh] overflow-y-auto no-scrollbar">
           <div className="flex items-center gap-4 mb-5">
             <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
               <Home className="w-7 h-7 text-primary" />
@@ -138,6 +148,9 @@ export default function Fracoes() {
   const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
   const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
 
+  // FILTRO: Apenas entidades que tenham a classe 'condomino'
+  const condominosList = pessoas.filter(p => normalizeTipo(p.tipo).includes('condomino'));
+
   const save = useMutation({
     mutationFn: (data) => editing ? agenciaAvenida.entities.Fracao.update(editing, data) : agenciaAvenida.entities.Fracao.create(data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['fracoes'] }); setOpen(false); toast.success('Fração guardada com sucesso!'); },
@@ -181,12 +194,21 @@ export default function Fracoes() {
     return matchSearch && matchCond;
   });
 
+  const totalPermilagem = filtered.reduce((acc, f) => acc + (parseFloat(f.permilagem) || 0), 0);
   const titularesList = normalizeArray(form.titulares);
 
   return (
     <div>
       <PageHeader title="Frações" subtitle="Gestão de apartamentos e unidades" action={
-        <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />Nova Fração</Button>
+        <div className="flex items-center gap-4">
+           {selectedCondominioId !== 'all' && (
+             <div className="bg-muted/50 px-4 py-2 rounded-lg border border-border">
+               <span className="text-xs font-semibold text-muted-foreground uppercase">Total Permilagem: </span>
+               <span className="font-bold text-foreground">{totalPermilagem.toFixed(2)}‰</span>
+             </div>
+           )}
+           <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />Nova Fração</Button>
+        </div>
       } />
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -266,7 +288,7 @@ export default function Fracoes() {
 
       <Dialog open={showPessoa !== null} onOpenChange={(open) => !open && setShowPessoa(null)}>
         {showPessoa && (
-          <DialogContent className="max-w-sm z-[60]">
+          <DialogContent className="max-w-sm z-[60] no-scrollbar">
             <DialogHeader>
               <DialogTitle>Dados de Contacto</DialogTitle>
             </DialogHeader>
@@ -299,7 +321,7 @@ export default function Fracoes() {
       </Dialog>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar Fração' : 'Nova Fração'}</DialogTitle>
           </DialogHeader>
@@ -318,11 +340,10 @@ export default function Fracoes() {
                   <Command>
                     <CommandInput placeholder="Pesquisar condomínio..." />
                     <CommandEmpty>Condomínio não encontrado.</CommandEmpty>
-                    <CommandGroup className="max-h-48 overflow-y-auto">
+                    <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
                       {condominios.map((c) => (
                         <CommandItem key={c.id} value={`${c.nome} ${c.codigo || ''}`} onSelect={() => { 
                           const updates = { condominio_id: c.id };
-                          // Se for uma fração nova, gera automaticamente a sugestão da letra
                           if (!editing) {
                              const existing = fracoes.filter(f => f.condominio_id === c.id).map(f => f.codigo_fracao);
                              updates.codigo_fracao = getNextLetter(existing);
@@ -392,8 +413,8 @@ export default function Fracoes() {
                   <Command>
                     <CommandInput placeholder="Pesquisar entidade..." />
                     <CommandEmpty>Entidade não encontrada.</CommandEmpty>
-                    <CommandGroup className="max-h-48 overflow-y-auto">
-                      {pessoas.filter(p => !titularesList.includes(p.id)).map((pes) => (
+                    <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
+                      {condominosList.filter(p => !titularesList.includes(p.id)).map((pes) => (
                         <CommandItem key={pes.id} value={`${pes.nome} ${pes.nif || ''}`} onSelect={() => { 
                           setForm(prev => ({ ...prev, titulares: [...titularesList, pes.id] }));
                           setOpenTitularCombo(false); 
@@ -423,7 +444,7 @@ export default function Fracoes() {
       </Dialog>
 
       <Dialog open={showNewClient} onOpenChange={setShowNewClient}>
-        <DialogContent className="max-w-sm z-[60]">
+        <DialogContent className="max-w-sm z-[60] no-scrollbar">
           <DialogHeader>
             <DialogTitle>Novo Titular</DialogTitle>
           </DialogHeader>
