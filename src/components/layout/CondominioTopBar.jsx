@@ -23,13 +23,18 @@ export default function CondominioTopBar({ module }) {
     agenciaAvenida.auth.me().then(setUser).catch(() => {});
   }, []);
 
-  const selected = condominios.find(c => c.id === selectedCondominioId);
+  // FILTRO E ORDENAÇÃO: Apenas ativos e ordenados por CXX
+  const activeCondominios = condominios
+    .filter(c => c.ativo !== false)
+    .sort((a, b) => (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true, sensitivity: 'base' }));
+
+  const selected = activeCondominios.find(c => c.id === selectedCondominioId);
   
   const label = selected 
     ? (selected.codigo ? `(${selected.codigo}) ${selected.nome}` : selected.nome) 
     : 'Todos os Condomínios';
 
-  const filtered = condominios.filter(c => {
+  const filtered = activeCondominios.filter(c => {
     if (!search) return true;
     const term = search.toLowerCase();
     return c.nome?.toLowerCase().includes(term) || c.codigo?.toLowerCase().includes(term);
@@ -41,7 +46,6 @@ export default function CondominioTopBar({ module }) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // ADICIONADO: '/condominios/lista' para que o seletor desapareça na página da lista geral
   const paginasGlobais = ['/pessoas', '/configuracoes', '/condominios/lista'];
   const mostrarSeletor = module === 'condominios' && !paginasGlobais.includes(location.pathname);
 
@@ -68,7 +72,7 @@ export default function CondominioTopBar({ module }) {
                       autoFocus
                       value={search}
                       onChange={e => setSearch(e.target.value)}
-                      placeholder="Pesquisar por nome ou ID..."
+                      placeholder="Pesquisar por nome ou CXX..."
                       className="w-full pl-7 pr-3 py-1.5 text-sm bg-muted rounded-lg outline-none"
                     />
                   </div>
@@ -98,7 +102,7 @@ export default function CondominioTopBar({ module }) {
                   </button>
                 ))}
                 {filtered.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-3">Sem Resultados</p>
+                  <p className="text-xs text-muted-foreground text-center py-3">Sem resultados</p>
                 )}
               </div>
             )}
