@@ -131,7 +131,7 @@ export default function NotificationBell() {
               {notificacoes.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                   <Bell className="w-10 h-10 opacity-20 mb-3" />
-                  <p className="text-sm">Sem notificações</p>
+                  <p className="text-sm">Sem Notificações</p>
                 </div>
               )}
               {notificacoes.map(n => {

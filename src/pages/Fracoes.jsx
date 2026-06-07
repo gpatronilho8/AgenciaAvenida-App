@@ -224,7 +224,7 @@ export default function Fracoes() {
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
             <tr>
-              {['Letra', 'Condomínio', 'Piso / Lado', 'Permilagem', 'Titulares', 'Quota', 'Ações'].map(h => (
+              {['Fração', 'Condomínio', 'Piso / Lado', 'Permilagem', 'Titulares', 'Quota', 'Ações'].map(h => (
                 <th key={h} className="px-4 py-3 text-left font-medium text-muted-foreground">{h}</th>
               ))}
             </tr>

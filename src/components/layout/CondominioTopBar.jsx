@@ -72,7 +72,7 @@ export default function CondominioTopBar({ module }) {
                       autoFocus
                       value={search}
                       onChange={e => setSearch(e.target.value)}
-                      placeholder="Pesquisar por nome ou CXX..."
+                      placeholder="Pesquisar por nome ou ID..."
                       className="w-full pl-7 pr-3 py-1.5 text-sm bg-muted rounded-lg outline-none"
                     />
                   </div>

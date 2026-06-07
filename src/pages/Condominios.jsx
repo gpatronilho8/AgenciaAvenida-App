@@ -9,37 +9,48 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
-import { Building2, Plus, Pencil, Banknote, Landmark, Printer, X, Eye, EyeOff, Check, ChevronsUpDown } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Building2, Plus, Pencil, Banknote, Landmark, Printer, X, Eye, EyeOff, Check, ChevronsUpDown, Archive, Filter, Zap, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCondominio } from '@/lib/CondominioContext';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
+const POTENCIAS = ["1,15 kVA", "2,30 kVA", "3,45 kVA", "4,60 kVA", "5,75 kVA", "6,90 kVA", "10,35 kVA", "13,80 kVA", "17,25 kVA", "20,70 kVA", "27,60 kVA", "34,50 kVA", "41,40 kVA"];
+
+// Blinda a extração de dados
 const normalizeTipoPessoa = (tipoData) => {
   if (!tipoData) return [];
   let parsedArray = [];
   if (Array.isArray(tipoData)) parsedArray = tipoData;
   else if (typeof tipoData === 'string') {
     try { const parsed = JSON.parse(tipoData); parsedArray = Array.isArray(parsed) ? parsed : [tipoData]; }
-    catch (e) { parsedArray = tipoData.startsWith('{') && tipoData.endsWith('}') ? tipoData.slice(1, -1).split(',') : (tipoData.includes(',') ? tipoData.split(',') : [tipoData]); }
+    catch (e) {
+      const cleanStr = tipoData.trim().replace(/^\{|\}$/g, '');
+      parsedArray = cleanStr.includes(',') ? cleanStr.split(',') : [cleanStr];
+    }
   }
   let finalArray = [];
   parsedArray.forEach(item => {
+    if (item === null || item === undefined) return;
     if (typeof item === 'string') {
       let clean = item.trim().replace(/^"|"$/g, '');
       if (clean.startsWith('[') && clean.endsWith(']')) { try { const innerParsed = JSON.parse(clean); if (Array.isArray(innerParsed)) { finalArray.push(...innerParsed); return; } } catch (e) { } }
       clean = clean.replace(/"/g, '').trim();
       if (clean.includes(',')) finalArray.push(...clean.split(',').map(s => s.trim()));
       else if (clean) finalArray.push(clean);
-    } else if (item) finalArray.push(item);
+    } else finalArray.push(String(item));
   });
-  return [...new Set(finalArray)].map(t => t.toLowerCase());
+  return [...new Set(finalArray)].map(t => String(t).toLowerCase());
 };
 
 const empty = {
   codigo_num: '', nome: '', nif: '', morada: '', codigo_postal: '', localidade: '',
   pessoa_id: '', email: '', iban: '', banco: '',
-  saldo_banco: 0, saldo_caixa: 0, dados_acesso_bancario: ''
+  saldo_banco: 0, saldo_caixa: 0, dados_acesso_bancario: '',
+  ativo: true,
+  goldenergy_status: false, goldenergy_id: '', goldenergy_fe: false, goldenergy_dd: false, goldenergy_potencia: ''
 };
 
 const emptyClient = { nome: '', nif: '', telefone: '', email: '', tipo: ['condomino'] };
@@ -58,7 +69,7 @@ function CondominioPreview({ cond, pessoas, onClose, onEdit }) {
   return (
     <>
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-        <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full" onClick={e => e.stopPropagation()}>
+        <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-between px-6 py-4 border-b print:hidden">
             <h2 className="font-bold text-lg">Detalhe do Condomínio</h2>
             <div className="flex gap-2">
@@ -76,51 +87,71 @@ function CondominioPreview({ cond, pessoas, onClose, onEdit }) {
             <div className="flex items-start gap-4 mb-5">
               <div className="p-3 bg-primary/10 rounded-xl mt-1"><Building2 className="w-6 h-6 text-primary" /></div>
               <div className="flex flex-col">
-                <span className="font-extrabold text-sm text-primary tracking-wider">{cond.codigo}</span>
+                <span className="font-extrabold text-sm text-primary tracking-wider flex items-center gap-2">
+                  {cond.codigo}
+                  {Boolean(cond.goldenergy_status) && <Zap className="w-3.5 h-3.5 text-yellow-500" title="Contrato Goldenergy Ativo" />}
+                </span>
                 <h3 className="text-xl font-bold leading-tight mt-0.5">{cond.nome}</h3>
                 {cond.nif && <p className="text-sm text-muted-foreground mt-1">NIF: {cond.nif}</p>}
               </div>
             </div>
 
-            {[
-              ['Contacto Principal', pessoaObj?.nome, pessoaObj], 
-              ['Email', cond.email], 
-              ['Morada', cond.morada], 
-              ['Código Postal', cond.codigo_postal], 
-              ['Localidade', cond.localidade], 
-              ['Banco', bancoObj?.nome, bancoObj], 
-              ['IBAN', cond.iban]
-            ].map(([label, displayVal, clickObj]) =>
-              displayVal ? (
-                <div key={label} className="flex gap-3 text-sm items-center">
-                  <span className="w-32 font-medium text-muted-foreground flex-shrink-0">{label}</span>
-                  {clickObj ? (
-                    <button 
-                      onClick={() => setShowPessoa(clickObj)} 
-                      className="text-foreground hover:underline text-left break-words"
-                    >
-                      {displayVal}
-                    </button>
-                  ) : (
-                    <span className="text-foreground break-words">{displayVal}</span>
-                  )}
-                </div>
-              ) : null
+            {/* NOVA GESTÃO DE ESPAÇO: Títulos por cima e campos longos ocupam 2 colunas */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+              {[
+                { label: 'Contacto Principal', val: pessoaObj?.nome, click: pessoaObj, full: false },
+                { label: 'Email', val: cond.email, click: null, full: false },
+                { label: 'Morada', val: cond.morada, click: null, full: true },
+                { label: 'Código Postal', val: cond.codigo_postal, click: null, full: false },
+                { label: 'Localidade', val: cond.localidade, click: null, full: false },
+                { label: 'Banco', val: bancoObj?.nome, click: bancoObj, full: false },
+                { label: 'IBAN', val: cond.iban, click: null, full: true }
+              ].map((item) =>
+                item.val ? (
+                  <div key={item.label} className={`flex flex-col gap-1 text-sm ${item.full ? 'sm:col-span-2' : ''}`}>
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{item.label}</span>
+                    {item.click ? (
+                      <button 
+                        onClick={() => setShowPessoa(item.click)} 
+                        className="text-foreground hover:underline text-left break-words font-medium"
+                      >
+                        {item.val}
+                      </button>
+                    ) : (
+                      <span className={`text-foreground font-medium ${item.label === 'Email' || item.label === 'IBAN' ? 'break-all' : 'break-words'}`}>
+                        {item.val}
+                      </span>
+                    )}
+                  </div>
+                ) : null
+              )}
+            </div>
+
+            {Boolean(cond.goldenergy_status) && (
+               <div className="border-t pt-4 mt-4">
+                  <p className="font-semibold text-muted-foreground mb-3 flex items-center gap-1.5"><Zap className="w-4 h-4 text-yellow-500"/> Contrato Goldenergy</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm bg-muted/30 p-4 rounded-lg border border-border/50">
+                     <div><span className="text-muted-foreground block text-xs mb-0.5">Nº Conta</span> <span className="font-medium break-all">{cond.goldenergy_id || '-'}</span></div>
+                     <div><span className="text-muted-foreground block text-xs mb-0.5">Potência</span> <span className="font-medium">{cond.goldenergy_potencia || '-'}</span></div>
+                     <div><span className="text-muted-foreground block text-xs mb-0.5">Fatura Elet.</span> <span className="font-medium">{Boolean(cond.goldenergy_fe) ? 'Sim' : 'Não'}</span></div>
+                     <div><span className="text-muted-foreground block text-xs mb-0.5">Débito Dir.</span> <span className="font-medium">{Boolean(cond.goldenergy_dd) ? 'Sim' : 'Não'}</span></div>
+                  </div>
+               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4 border-t pt-3 mt-3">
+            <div className="grid grid-cols-2 gap-4 border-t pt-4 mt-4">
               <div className="text-sm">
                 <p className="font-medium text-muted-foreground flex items-center gap-1"><Landmark className="w-3 h-3" />Saldo Banco</p>
-                <p className="font-bold text-blue-600">€{(cond.saldo_banco || 0).toFixed(2)}</p>
+                <p className="font-bold text-blue-600 text-lg">€{Number(cond.saldo_banco || 0).toFixed(2)}</p>
               </div>
               <div className="text-sm">
                 <p className="font-medium text-muted-foreground flex items-center gap-1"><Banknote className="w-3 h-3" />Saldo Caixa</p>
-                <p className="font-bold text-emerald-600">€{(cond.saldo_caixa || 0).toFixed(2)}</p>
+                <p className="font-bold text-emerald-600 text-lg">€{Number(cond.saldo_caixa || 0).toFixed(2)}</p>
               </div>
             </div>
 
             {cond.dados_acesso_bancario && (
-              <div className="text-sm border-t pt-3 mt-3">
+              <div className="text-sm border-t pt-4 mt-4">
                 <p className="font-medium text-muted-foreground mb-2">Dados de Acesso Bancário</p>
                 <div className="flex items-center gap-2 bg-muted/30 p-2 rounded border border-border/50">
                   <span className="text-foreground font-mono bg-background px-3 py-2 rounded border w-full text-sm whitespace-pre-wrap flex-1 min-h-[40px] flex items-center">
@@ -182,10 +213,16 @@ export default function Condominios() {
   const [form, setForm] = useState(empty);
   const [editing, setEditing] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [inactivateModal, setInactivateModal] = useState(null);
 
   const [openCombo, setOpenCombo] = useState(false);
   const [showNewClient, setShowNewClient] = useState(false);
   const [newClientForm, setNewClientForm] = useState(emptyClient);
+
+  // Search e Filtros Goldenergy
+  const [search, setSearch] = useState('');
+  const defaultGE = { status: 'all', fe: 'all', dd: 'all', potencia: 'all' };
+  const [geFilters, setGeFilters] = useState(defaultGE);
 
   const { data: condominios = [], isLoading: loadCond } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
   const { data: pessoas = [], isLoading: loadPes } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
@@ -206,6 +243,16 @@ export default function Condominios() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['condominios'] }); setOpen(false); toast.success('Condomínio guardado'); },
   });
 
+  const inactivate = useMutation({
+    mutationFn: (id) => agenciaAvenida.entities.Condominio.update(id, { ativo: false }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['condominios'] });
+      setInactivateModal(null);
+      setOpen(false); // Fecha o formulário de edição após inativar
+      toast.success('Condomínio arquivado e inativado.');
+    }
+  });
+
   const saveClient = useMutation({
     mutationFn: (data) => agenciaAvenida.entities.Pessoa.create(data),
     onSuccess: (created) => {
@@ -217,9 +264,11 @@ export default function Condominios() {
   });
 
   const openNew = () => {
+    // CORREÇÃO: Não filtramos por ativo/inativo para descobrir o próximo número livre
     const existingNumbers = condominios
-      .map(c => c.codigo)
-      .filter(c => c && c.startsWith('C'))
+      .filter(c => c)
+      .map(c => String(c.codigo || ''))
+      .filter(c => c.startsWith('C'))
       .map(c => parseInt(c.replace('C', ''), 10))
       .filter(n => !isNaN(n));
 
@@ -241,20 +290,49 @@ export default function Condominios() {
 
   const openEdit = (c) => {
     let codigo_num = '';
-    if (c.codigo && c.codigo.startsWith('C')) {
-      codigo_num = c.codigo.replace('C', '');
+    const codStr = String(c.codigo || '');
+    if (codStr.startsWith('C')) {
+      codigo_num = codStr.replace('C', '');
     }
-    setForm({ ...c, codigo_num });
+    setForm({ ...empty, ...c, codigo_num });
     setEditing(c.id);
     setOpen(true);
   };
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
-  // Ordenação inteligente dos condomínios pelo código (C01, C02, etc.)
-  const sortedCondominios = [...condominios].sort((a, b) => 
-    (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true, sensitivity: 'base' })
+  // Ordenação Segura APENAS DOS ATIVOS para a listagem
+  const activeCondominios = condominios.filter(c => c && c.ativo !== false && c.ativo !== 'false');
+  const sortedCondominios = [...activeCondominios].sort((a, b) => 
+    String(a.codigo || '').localeCompare(String(b.codigo || ''), undefined, { numeric: true, sensitivity: 'base' })
   );
+
+  // Filtros Seguros 
+  const filtered = sortedCondominios.filter(c => {
+    const searchLower = search.toLowerCase();
+    
+    const nomeStr = String(c.nome || '').toLowerCase();
+    const nifStr = String(c.nif || '').toLowerCase();
+    const codigoStr = String(c.codigo || '').toLowerCase();
+
+    const matchSearch = !search || 
+      nomeStr.includes(searchLower) || 
+      nifStr.includes(searchLower) || 
+      codigoStr.includes(searchLower);
+    
+    const statusVal = c.goldenergy_status === true || c.goldenergy_status === 'true';
+    const matchStatus = geFilters.status === 'all' || (geFilters.status === 'yes' ? statusVal : !statusVal);
+    
+    const feVal = c.goldenergy_fe === true || c.goldenergy_fe === 'true';
+    const matchFe = geFilters.fe === 'all' || (geFilters.fe === 'yes' ? feVal : !feVal);
+    
+    const ddVal = c.goldenergy_dd === true || c.goldenergy_dd === 'true';
+    const matchDd = geFilters.dd === 'all' || (geFilters.dd === 'yes' ? ddVal : !ddVal);
+    
+    const matchPot = geFilters.potencia === 'all' || c.goldenergy_potencia === geFilters.potencia;
+    
+    return matchSearch && matchStatus && matchFe && matchDd && matchPot;
+  });
 
   return (
     <div>
@@ -262,10 +340,80 @@ export default function Condominios() {
         <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />Novo Condomínio</Button>
       } />
 
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input className="pl-9" placeholder="Pesquisar por nome, NIF ou ID..." value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+             <Button variant="secondary" className="gap-2 bg-muted text-muted-foreground">
+                <Filter className="w-4 h-4" /> Filtros Goldenergy
+             </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-4 z-50 shadow-xl border-border">
+             <div className="space-y-4">
+               <h4 className="font-semibold text-sm flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-500" /> Filtros Goldenergy</h4>
+               
+               <div className="space-y-1.5">
+                 <Label className="text-xs text-muted-foreground">Tem Contrato?</Label>
+                 <Select value={geFilters.status} onValueChange={v => setGeFilters({...geFilters, status: v})}>
+                   <SelectTrigger><SelectValue/></SelectTrigger>
+                   <SelectContent className="no-scrollbar">
+                     <SelectItem value="all">Todos</SelectItem>
+                     <SelectItem value="yes">Sim</SelectItem>
+                     <SelectItem value="no">Não</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+
+               <div className="space-y-1.5">
+                 <Label className="text-xs text-muted-foreground">Fatura Eletrónica?</Label>
+                 <Select value={geFilters.fe} onValueChange={v => setGeFilters({...geFilters, fe: v})}>
+                   <SelectTrigger><SelectValue/></SelectTrigger>
+                   <SelectContent className="no-scrollbar">
+                     <SelectItem value="all">Todos</SelectItem>
+                     <SelectItem value="yes">Sim</SelectItem>
+                     <SelectItem value="no">Não</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+
+               <div className="space-y-1.5">
+                 <Label className="text-xs text-muted-foreground">Débito Direto?</Label>
+                 <Select value={geFilters.dd} onValueChange={v => setGeFilters({...geFilters, dd: v})}>
+                   <SelectTrigger><SelectValue/></SelectTrigger>
+                   <SelectContent className="no-scrollbar">
+                     <SelectItem value="all">Todos</SelectItem>
+                     <SelectItem value="yes">Sim</SelectItem>
+                     <SelectItem value="no">Não</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+
+               <div className="space-y-1.5">
+                 <Label className="text-xs text-muted-foreground">Potência Contratada</Label>
+                 <Select value={geFilters.potencia} onValueChange={v => setGeFilters({...geFilters, potencia: v})}>
+                   <SelectTrigger><SelectValue/></SelectTrigger>
+                   <SelectContent className="no-scrollbar">
+                     <SelectItem value="all">Todas as Potências</SelectItem>
+                     {POTENCIAS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                   </SelectContent>
+                 </Select>
+               </div>
+
+               <div className="pt-3 mt-1 border-t border-border flex justify-end">
+                  <Button variant="ghost" size="sm" onClick={() => setGeFilters(defaultGE)}>Limpar Filtros</Button>
+               </div>
+             </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+
       {(loadCond || loadPes) && <div className="text-center py-16 text-muted-foreground">A carregar condomínios...</div>}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-        {sortedCondominios.map(c => (
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
+        {filtered.map(c => (
           <div
             key={c.id}
             className="bg-card rounded-xl border border-border p-5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer"
@@ -273,12 +421,13 @@ export default function Condominios() {
           >
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-primary/10 rounded-xl">
+                <div className="p-2.5 bg-primary/10 rounded-xl relative">
                   <Building2 className="w-5 h-5 text-primary" />
+                  {Boolean(c.goldenergy_status) && <div className="absolute -top-1.5 -right-1.5 bg-background rounded-full p-0.5 shadow-sm"><Zap className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" /></div>}
                 </div>
                 <span className="font-extrabold text-xl text-primary">{c.codigo}</span>
               </div>
-              <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+              <div className="flex gap-1 items-center" onClick={e => e.stopPropagation()}>
                 <button onClick={() => { setSelectedCondominioId(c.id); navigate('/condominios/dashboard'); }} className="p-2 hover:bg-muted rounded-lg transition-colors" title="Abrir dashboard">
                   <Building2 className="w-4 h-4 text-primary" />
                 </button>
@@ -294,21 +443,40 @@ export default function Condominios() {
             <div className="mt-4 pt-4 border-t border-border grid grid-cols-2 gap-3">
               <div>
                 <p className="text-xs text-muted-foreground flex items-center gap-1"><Landmark className="w-3 h-3" />Banco</p>
-                <p className="font-semibold text-foreground">€{(c.saldo_banco || 0).toFixed(2)}</p>
+                <p className="font-semibold text-foreground">€{Number(c.saldo_banco || 0).toFixed(2)}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground flex items-center gap-1"><Banknote className="w-3 h-3" />Caixa</p>
-                <p className="font-semibold text-foreground">€{(c.saldo_caixa || 0).toFixed(2)}</p>
+                <p className="font-semibold text-foreground">€{Number(c.saldo_caixa || 0).toFixed(2)}</p>
               </div>
             </div>
           </div>
         ))}
-        {!loadCond && sortedCondominios.length === 0 && (
-           <div className="col-span-full text-center py-12 text-muted-foreground">Nenhum condomínio registado.</div>
+        {!loadCond && filtered.length === 0 && (
+           <div className="col-span-full text-center py-12 text-muted-foreground">Nenhum Condomínio Encontrado</div>
         )}
       </div>
 
       {preview && <CondominioPreview cond={preview} pessoas={pessoas} onClose={() => setPreview(null)} onEdit={(c) => { setPreview(null); openEdit(c); }} />}
+
+      <Dialog open={!!inactivateModal} onOpenChange={(open) => !open && setInactivateModal(null)}>
+        {inactivateModal && (
+          <DialogContent className="max-w-md no-scrollbar z-[60]">
+             <DialogHeader>
+               <DialogTitle className="text-red-500 flex items-center gap-2"><Archive className="w-5 h-5"/> Inativar Condomínio</DialogTitle>
+             </DialogHeader>
+             <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+               Tem certeza que pretende inativar este condomínio? Ao inativar, este condomínio será arquivado mas os dados não serão eliminados afim de cumprir com o RGPD. Após inativado, apenas poderá ser reativado ou eliminado de forma permanente via acesso direto à base de dados.
+             </p>
+             <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-border">
+                <Button variant="outline" onClick={() => setInactivateModal(null)}>Cancelar</Button>
+                <Button variant="destructive" onClick={() => inactivate.mutate(inactivateModal.id)} disabled={inactivate.isPending}>
+                   {inactivate.isPending ? 'A inativar...' : 'Sim, inativar'}
+                </Button>
+             </div>
+          </DialogContent>
+        )}
+      </Dialog>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
@@ -386,8 +554,47 @@ export default function Condominios() {
               <Label>Localidade</Label>
               <Input className="mt-1" value={form.localidade || ''} onChange={e => f('localidade', e.target.value)} />
             </div>
+
+            {/* SEÇÃO GOLDENERGY */}
+            <div className="sm:col-span-2 border-t border-border mt-2 pt-5 pb-1">
+               <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-foreground flex items-center gap-1.5"><Zap className="w-4 h-4 text-yellow-500" /> Contrato Goldenergy</h4>
+                    <p className="text-xs text-muted-foreground mt-1">Ative se este condomínio possui fornecimento elétrico Goldenergy.</p>
+                  </div>
+                  <Switch checked={Boolean(form.goldenergy_status)} onCheckedChange={v => f('goldenergy_status', v)} />
+               </div>
+               
+               {Boolean(form.goldenergy_status) && (
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 bg-muted/30 p-4 rounded-xl border border-border/60">
+                    <div>
+                      <Label>Nº Conta Goldenergy</Label>
+                      <Input className="mt-1 bg-background" value={form.goldenergy_id || ''} onChange={e => f('goldenergy_id', e.target.value)} />
+                    </div>
+                    <div>
+                      <Label>Potência Contratada</Label>
+                      <Select value={form.goldenergy_potencia || ''} onValueChange={v => f('goldenergy_potencia', v)}>
+                        <SelectTrigger className="mt-1 bg-background"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                        <SelectContent className="no-scrollbar">
+                          {POTENCIAS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="sm:col-span-2 flex items-center gap-6 mt-1">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="fe" checked={Boolean(form.goldenergy_fe)} onCheckedChange={v => f('goldenergy_fe', v)} />
+                        <label htmlFor="fe" className="text-sm font-medium leading-none cursor-pointer">Fatura Eletrónica</label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="dd" checked={Boolean(form.goldenergy_dd)} onCheckedChange={v => f('goldenergy_dd', v)} />
+                        <label htmlFor="dd" className="text-sm font-medium leading-none cursor-pointer">Débito Direto</label>
+                      </div>
+                    </div>
+                 </div>
+               )}
+            </div>
             
-            <div className="sm:col-span-2 border-t mt-2 pt-4">
+            <div className="sm:col-span-2 border-t border-border mt-1 pt-4">
               <h4 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wider">Dados Bancários</h4>
             </div>
 
@@ -428,12 +635,29 @@ export default function Condominios() {
               />
             </div>
           </div>
-          <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.nome || !form.codigo_num}>
-              {save.isPending ? 'A guardar...' : 'Guardar Condomínio'}
-            </Button>
+          
+          <div className="flex justify-between items-center mt-4 pt-4 border-t border-border">
+            <div>
+              {editing && (
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200"
+                  onClick={() => setInactivateModal(form)}
+                >
+                  <Archive className="w-4 h-4 mr-2" />
+                  Inativar Condomínio
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+              <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.nome || !form.codigo_num}>
+                {save.isPending ? 'A guardar...' : 'Guardar Condomínio'}
+              </Button>
+            </div>
           </div>
+
         </DialogContent>
       </Dialog>
 
