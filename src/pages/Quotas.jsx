@@ -54,20 +54,20 @@ const getOwners = (f) => {
   return [];
 };
 
-const emptyConfig = { condominio_id: '', tipo: 'mensal', valor_mensal: 0, valor_total: 0, mes_inicio: new Date().getMonth() + 1, ano_inicio: new Date().getFullYear() };
+const emptyConfig = { condominio_id: '', tipo: 'mensal', valor_mensal: 0, valor_total: 0, repeticoes: 1, modo_divisao: 'fixo', descricao: '', mes_inicio: new Date().getMonth() + 1, ano_inicio: new Date().getFullYear() };
 const emptyQuota = { condominio_id: '', fracao_id: '', tipo: 'mensal', descricao: '', valor: 0, mes: new Date().getMonth() + 1, ano: new Date().getFullYear() };
 
 export default function Quotas() {
   const qc = useQueryClient();
   const { selectedCondominioId } = useCondominio();
-  
+
   const [search, setSearch] = useState('');
   const [openConfig, setOpenConfig] = useState(false);
   const [openNova, setOpenNova] = useState(false);
   const [openPagamento, setOpenPagamento] = useState(false);
   const [openRecibo, setOpenRecibo] = useState(null);
   const [openDelete, setOpenDelete] = useState(null);
-  
+
   const [configForm, setConfigForm] = useState(emptyConfig);
   const [quotaForm, setQuotaForm] = useState(emptyQuota);
   const [comboCondominioOpen, setComboCondominioOpen] = useState(false);
@@ -75,7 +75,7 @@ export default function Quotas() {
   const [comboCondominoOpen, setComboCondominoOpen] = useState(false);
 
   // Estados Locais para a Interface Visual de Pagamentos
-  const [pagamentoFiltro, setPagamentoFiltro] = useState('fracao'); 
+  const [pagamentoFiltro, setPagamentoFiltro] = useState('fracao');
   const [pagamentoAlvoId, setPagamentoAlvoId] = useState('');
   const [tipoLiquidacao, setTipoLiquidacao] = useState('total'); // 'total', 'parcial'
   const [quotasSelecionadas, setQuotasSelecionadas] = useState([]);
@@ -164,8 +164,8 @@ export default function Quotas() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Quotas e Faturação" 
+      <PageHeader
+        title="Quotas e Faturação"
         subtitle="Gestão de quotas mensais, extraordinárias e processamento de pagamentos."
         action={
           <div className="flex gap-2">
@@ -179,7 +179,7 @@ export default function Quotas() {
               <Settings className="w-4 h-4" /> Configurar Quotas
             </Button>
           </div>
-        } 
+        }
       />
 
       {/* LISTAGEM GERAL DE QUOTAS */}
@@ -207,12 +207,12 @@ export default function Quotas() {
               {isLoading ? (
                 <tr><td colSpan="6" className="text-center py-8 text-muted-foreground">A carregar quotas...</td></tr>
               ) : quotasFiltradas.length === 0 ? (
-                <tr><td colSpan="6" className="text-center py-8 text-muted-foreground">Nenhuma quota encontrada.</td></tr>
+                <tr><td colSpan="6" className="text-center py-8 text-muted-foreground">Nenhuma Quota Encontrada</td></tr>
               ) : (
                 quotasFiltradas.map(q => {
                   const fracao = fracoes.find(f => f.id === q.fracao_id);
                   const descFinal = q.tipo === 'mensal' ? 'Quota + FCR' : q.descricao;
-                  
+
                   return (
                     <tr key={q.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 font-semibold text-primary">{fracao?.codigo_fracao || '-'}</td>
@@ -220,9 +220,8 @@ export default function Quotas() {
                       <td className="px-4 py-3 text-muted-foreground">{q.data_vencimento || '-'}</td>
                       <td className="px-4 py-3 font-bold text-foreground">€{(q.valor || 0).toFixed(2)}</td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${
-                          q.estado === 'pago' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${q.estado === 'pago' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}>
                           {q.estado === 'pago' ? 'Pago' : 'Pendente'}
                         </span>
                       </td>
@@ -268,12 +267,12 @@ export default function Quotas() {
 
       {/* MODAL DE CONFIGURAÇÃO DE QUOTAS */}
       <Dialog open={openConfig} onOpenChange={setOpenConfig}>
-        <DialogContent className="w-[92vw] sm:max-w-md max-h-[85vh] overflow-y-auto no-scrollbar rounded-xl p-5">
+        <DialogContent className="w-[92vw] sm:max-w-xl max-h-[85vh] overflow-y-auto no-scrollbar rounded-xl p-5">
           <DialogHeader>
             <DialogTitle>Configuração de Quotas</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            
+
             <div className="flex flex-col gap-1.5">
               <Label>Condomínio *</Label>
               <Popover open={comboCondominioOpen} onOpenChange={setComboCondominioOpen}>
@@ -304,61 +303,100 @@ export default function Quotas() {
             <div>
               <Label>Tipo de Configuração</Label>
               <Select value={configForm.tipo} onValueChange={v => updConfig('tipo', v)}>
-                <SelectTrigger className="mt-1"><SelectValue/></SelectTrigger>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent className="z-[100]">
                   <SelectItem value="mensal">Mensal (Valor Fixo)</SelectItem>
-                  <SelectItem value="permilagem">Por Permilagem (Orçamento)</SelectItem>
+                  <SelectItem value="permilagem">Mensal (Permilagem)</SelectItem>
+                  <SelectItem value="extraordinaria">Extraordinária</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {configForm.tipo === 'mensal' ? (
-               <div className="space-y-4 border-t pt-3 mt-1">
-                 <div>
-                   <Label>Valor da Quota Mensal (Quota + FCR incluído) (€)</Label>
-                   <Input className="mt-1" type="number" value={configForm.valor_mensal || ''} onChange={e => updConfig('valor_mensal', e.target.value)} placeholder="0.00" />
-                 </div>
-                 <div className="grid grid-cols-2 gap-4">
+            {/* CAMPOS APENAS PARA QUOTA EXTRAORDINÁRIA */}
+            {configForm.tipo === 'extraordinaria' && (
+              <div className="space-y-4 border-t pt-3 mt-1">
+                <div>
+                  <Label>Descrição da Quota Extraordinária *</Label>
+                  <Input className="mt-1" value={configForm.descricao || ''} onChange={e => updConfig('descricao', e.target.value)} placeholder="Ex: Obras Telhado 2026..." />
+                </div>
+
+                <div>
+                  <Label>Valor Total Global (€) *</Label>
+                  <Input className="mt-1" type="number" value={configForm.valor_total || ''} onChange={e => updConfig('valor_total', parseFloat(e.target.value) || 0)} placeholder="0.00" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Modo de Divisão</Label>
+                    <Select value={configForm.modo_divisao || 'fixo'} onValueChange={v => updConfig('modo_divisao', v)}>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                      <SelectContent className="z-[100]">
+                        <SelectItem value="fixo">Divisão Fixo Igual</SelectItem>
+                        <SelectItem value="permilagem">Por Permilagem</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Duração (Meses)</Label>
+                    <Input className="mt-1" type="number" min={1} value={configForm.repeticoes || ''} onChange={e => updConfig('repeticoes', parseInt(e.target.value) || '')} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Mês de Início</Label>
                     <Select value={String(configForm.mes_inicio)} onValueChange={v => updConfig('mes_inicio', parseInt(v))}>
-                      <SelectTrigger className="mt-1"><SelectValue/></SelectTrigger>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                       <SelectContent className="z-[100] no-scrollbar max-h-36">
-                        {Array.from({length:12}).map((_, i) => <SelectItem key={i+1} value={String(i+1)}>{i+1}</SelectItem>)}
+                        {Array.from({ length: 12 }).map((_, i) => <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
                     <Label>Ano de Início</Label>
                     <Select value={String(configForm.ano_inicio)} onValueChange={v => updConfig('ano_inicio', parseInt(v))}>
-                      <SelectTrigger className="mt-1"><SelectValue/></SelectTrigger>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                       <SelectContent className="z-[100]">
                         {[2025, 2026, 2027, 2028].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
-                 </div>
-               </div>
-            ) : (
+                </div>
+
+                <div className="bg-blue-50/60 border border-blue-100 p-3 rounded-xl text-[11px] text-blue-800 space-y-1">
+                  <p className="font-bold flex items-center gap-1 text-blue-900">💡 Como funciona esta configuração?</p>
+                  <p className="leading-relaxed">
+                    O sistema vai fracionar o capital de <strong>€{(parseFloat(configForm.valor_total) || 0).toFixed(2)}</strong> ao longo de <strong>{configForm.repeticoes || 1} meses</strong>.
+                    {configForm.modo_divisao === 'fixo'
+                      ? " Cada fração ativa pagará um valor idêntico por mês, calculado dividindo o total pelo número de frações e meses. "
+                      : " A fatia mensal cobrada a cada fração dependerá diretamente do valor da sua permilagem individual. "}
+                    O vencimento será imputado de forma automática no último dia útil de cada mês de referência.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* CAMPOS APENAS PARA QUOTA MENSAL */}
+            {configForm.tipo === 'mensal' && (
               <div className="space-y-4 border-t pt-3 mt-1">
                 <div>
-                   <Label>Valor Total do Orçamento Anual (€)</Label>
-                   <Input className="mt-1" type="number" value={configForm.valor_total || ''} onChange={e => updConfig('valor_total', e.target.value)} placeholder="0.00" />
+                  <Label>Valor da Quota Mensal (Quota + FCR) (€)</Label>
+                  <Input className="mt-1" type="number" value={configForm.valor_mensal || ''} onChange={e => updConfig('valor_mensal', parseFloat(e.target.value) || 0)} placeholder="0.00" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Mês de Início</Label>
                     <Select value={String(configForm.mes_inicio)} onValueChange={v => updConfig('mes_inicio', parseInt(v))}>
-                      <SelectTrigger className="mt-1"><SelectValue/></SelectTrigger>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                       <SelectContent className="z-[100] no-scrollbar max-h-36">
-                        {Array.from({length:12}).map((_, i) => <SelectItem key={i+1} value={String(i+1)}>{i+1}</SelectItem>)}
+                        {Array.from({ length: 12 }).map((_, i) => <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
                     <Label>Ano de Início</Label>
                     <Select value={String(configForm.ano_inicio)} onValueChange={v => updConfig('ano_inicio', parseInt(v))}>
-                      <SelectTrigger className="mt-1"><SelectValue/></SelectTrigger>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                       <SelectContent className="z-[100]">
                         {[2025, 2026, 2027, 2028].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
                       </SelectContent>
@@ -368,28 +406,79 @@ export default function Quotas() {
               </div>
             )}
 
+            {/* CAMPOS APENAS PARA PERMILAGEM */}
+            {configForm.tipo === 'permilagem' && (
+              <div className="space-y-4 border-t pt-3 mt-1">
+                <div>
+                  <Label>Valor Total do Orçamento Anual (€)</Label>
+                  <Input className="mt-1" type="number" value={configForm.valor_total || ''} onChange={e => updConfig('valor_total', parseFloat(e.target.value) || 0)} placeholder="0.00" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Mês de Início</Label>
+                    <Select value={String(configForm.mes_inicio)} onValueChange={v => updConfig('mes_inicio', parseInt(v))}>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                      <SelectContent className="z-[100] no-scrollbar max-h-36">
+                        {Array.from({ length: 12 }).map((_, i) => <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Ano de Início</Label>
+                    <Select value={String(configForm.ano_inicio)} onValueChange={v => updConfig('ano_inicio', parseInt(v))}>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                      <SelectContent className="z-[100]">
+                        {[2025, 2026, 2027, 2028].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* BOTÃO GERAR COM ESTADO DE ERRO */}
             <div className="pt-2">
-              <Button type="button" variant="secondary" className="w-full gap-2 border border-primary/20 text-primary hover:bg-primary/5" onClick={handleGerarQuotasMes}>
-                <Zap className="w-4 h-4 fill-primary" /> Gerar Quotas do Mês Corrente
-              </Button>
+              {(() => {
+                const isConfigValid = configForm.condominio_id && (
+                  (configForm.tipo === 'mensal' && configForm.valor_mensal > 0) ||
+                  (configForm.tipo === 'permilagem' && configForm.valor_total > 0) ||
+                  (configForm.tipo === 'extraordinaria' && configForm.valor_total > 0 && configForm.descricao?.trim().length > 0 && configForm.repeticoes > 0)
+                );
+
+                return (
+                  <Button
+                    type="button"
+                    disabled={!isConfigValid}
+                    variant="secondary"
+                    className={cn("w-full gap-2 border transition-colors", isConfigValid ? "border-primary/20 text-primary hover:bg-primary/5" : "border-red-200 bg-red-50 text-red-500 hover:bg-red-50 cursor-not-allowed")}
+                    onClick={handleGerarQuotasMes}
+                  >
+                    {isConfigValid ? (
+                      <><Zap className="w-4 h-4 fill-primary" /> Gerar Quotas do Mês Corrente</>
+                    ) : (
+                      <><AlertCircle className="w-4 h-4" /> Preencha Todos os Campos</>
+                    )}
+                  </Button>
+                );
+              })()}
             </div>
 
           </div>
           <DialogFooter className="mt-4 pt-4 border-t border-border gap-2 sm:gap-0">
-             <Button variant="outline" onClick={() => setOpenConfig(false)}>Cancelar</Button>
-             <Button onClick={() => setOpenConfig(false)}>Guardar Configuração</Button>
+            <Button variant="outline" onClick={() => setOpenConfig(false)}>Cancelar</Button>
+            <Button onClick={() => setOpenConfig(false)}>Guardar Configuração</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* MODAL NOVA QUOTA / LINHA MANUAL */}
       <Dialog open={openNova} onOpenChange={setOpenNova}>
-        <DialogContent className="w-[92vw] sm:max-w-md max-h-[85vh] overflow-y-auto no-scrollbar rounded-xl p-5">
+        <DialogContent className="w-[92vw] sm:max-w-xl max-h-[85vh] overflow-y-auto no-scrollbar rounded-xl p-5">
           <DialogHeader>
             <DialogTitle>Lançar Linha Manual</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            
+
             <div className="flex flex-col gap-1.5">
               <Label>Condomínio *</Label>
               <Popover open={comboCondominioNovaOpen} onOpenChange={setComboCondominioNovaOpen}>
@@ -402,7 +491,7 @@ export default function Quotas() {
                 <PopoverContent className="p-0 w-[--radix-popover-trigger-width] z-[100]" align="start">
                   <Command>
                     <CommandInput placeholder="Pesquisar condomínio..." />
-                    <CommandEmpty>Condomínio não encontrado.</CommandEmpty>
+                    <CommandEmpty>Condomínio Não Encontrado</CommandEmpty>
                     <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
                       {condominiosAtivos.map(c => (
                         <CommandItem key={c.id} value={`${c.nome} ${c.codigo || ''}`} onSelect={() => { updQuota('condominio_id', c.id); updQuota('fracao_id', ''); setComboCondominioNovaOpen(false); }}>
@@ -421,7 +510,7 @@ export default function Quotas() {
               <Label>Fração *</Label>
               <Select disabled={!quotaForm.condominio_id || fracoesCondominio.length === 0} value={quotaForm.fracao_id} onValueChange={v => updQuota('fracao_id', v)}>
                 <SelectTrigger className="mt-1">
-                   <SelectValue placeholder={!quotaForm.condominio_id ? "Selecione o condomínio" : (fracoesCondominio.length === 0 ? "Não Existem Frações" : "Selecione a fração")} />
+                  <SelectValue placeholder={!quotaForm.condominio_id ? "Selecione o condomínio" : (fracoesCondominio.length === 0 ? "Não Existem Frações" : "Selecione a fração")} />
                 </SelectTrigger>
                 <SelectContent className="z-[100] no-scrollbar max-h-40">
                   {fracoesCondominio.map(f => (
@@ -434,19 +523,19 @@ export default function Quotas() {
             <div>
               <Label>Tipo</Label>
               <Select value={quotaForm.tipo} onValueChange={v => updQuota('tipo', v)}>
-                <SelectTrigger className="mt-1"><SelectValue/></SelectTrigger>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent className="z-[100]">
-                  <SelectItem value="mensal">Mensal</SelectItem>
+                  <SelectItem value="mensal">Mensal Pontual</SelectItem>
                   <SelectItem value="linha_faturacao">Linha de Faturação (Taxas / Coimas)</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed bg-muted/40 p-2 rounded border border-border/40">As quotas extraordinárias devem ser configuradas no menu de configuração de quotas.</p>
+              <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed bg-muted/40 p-2 rounded border border-border/40">Para alterar a configuração da quota mensal para todos os condóminos ou para lançar quotas extraordinárias, utilize o menu de configuração de quotas.</p>
             </div>
 
             {quotaForm.tipo === 'linha_faturacao' ? (
               <div>
-                <Label>Descrição da Taxa/Coima</Label>
-                <Input className="mt-1" value={quotaForm.descricao} onChange={e => updQuota('descricao', e.target.value)} placeholder="Ex: Multa por atraso..." />
+                <Label>Descrição da Linha</Label>
+                <Input className="mt-1" value={quotaForm.descricao} onChange={e => updQuota('descricao', e.target.value)} placeholder="Ex: Taxa de Atraso..." />
               </div>
             ) : (
               <div>
@@ -461,40 +550,40 @@ export default function Quotas() {
                 <Input className="mt-1" type="number" value={quotaForm.valor || ''} onChange={e => updQuota('valor', parseFloat(e.target.value))} placeholder="0.00" />
               </div>
               <div>
-                 <Label>Mês Referência</Label>
-                 <Select value={String(quotaForm.mes)} onValueChange={v => updQuota('mes', parseInt(v))}>
-                   <SelectTrigger className="mt-1"><SelectValue/></SelectTrigger>
-                   <SelectContent className="z-[100] no-scrollbar max-h-36">
-                     {Array.from({length:12}).map((_, i) => <SelectItem key={i+1} value={String(i+1)}>{i+1}</SelectItem>)}
-                   </SelectContent>
-                 </Select>
+                <Label>Mês Referência</Label>
+                <Select value={String(quotaForm.mes)} onValueChange={v => updQuota('mes', parseInt(v))}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent className="z-[100] no-scrollbar max-h-36">
+                    {Array.from({ length: 12 }).map((_, i) => <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
-                 <Label>Ano Referência</Label>
-                 <Select value={String(quotaForm.ano)} onValueChange={v => updQuota('ano', parseInt(v))}>
-                   <SelectTrigger className="mt-1"><SelectValue/></SelectTrigger>
-                   <SelectContent className="z-[100]">
-                     {[2025, 2026, 2027, 2028].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                   </SelectContent>
-                 </Select>
+                <Label>Ano Referência</Label>
+                <Select value={String(quotaForm.ano)} onValueChange={v => updQuota('ano', parseInt(v))}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent className="z-[100]">
+                    {[2025, 2026, 2027, 2028].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
           </div>
           <DialogFooter className="mt-5 pt-4 border-t border-border gap-2 sm:gap-0">
-             <Button variant="outline" onClick={() => setOpenNova(false)}>Cancelar</Button>
-             <Button disabled={!quotaForm.condominio_id || !quotaForm.fracao_id || !quotaForm.valor} onClick={() => setOpenNova(false)}>Lançar Linha</Button>
+            <Button variant="outline" onClick={() => setOpenNova(false)}>Cancelar</Button>
+            <Button disabled={!quotaForm.condominio_id || !quotaForm.fracao_id || !quotaForm.valor} onClick={() => setOpenNova(false)}>Lançar Linha</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* MODAL EFETUAR PAGAMENTO */}
-      <Dialog open={openPagamento} onOpenChange={(val) => { if(!val) handleClosePagamento(); else setOpenPagamento(true); }}>
+      <Dialog open={openPagamento} onOpenChange={(val) => { if (!val) handleClosePagamento(); else setOpenPagamento(true); }}>
         <DialogContent className="w-[94vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto no-scrollbar rounded-xl p-6">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Banknote className="w-5 h-5 text-emerald-600" /> Registar Liquidação & Emissão de Recibo</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><Banknote className="w-5 h-5 text-emerald-600" /> Registar Pagamento & Emissão de Recibo</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-5 mt-3">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-muted/40 p-4 rounded-xl border border-border/60">
               <div>
@@ -502,8 +591,8 @@ export default function Quotas() {
                 <Select value={pagamentoFiltro} onValueChange={v => { setPagamentoFiltro(v); setPagamentoAlvoId(''); setQuotasSelecionadas([]); setTipoLiquidacao('total'); }}>
                   <SelectTrigger className="mt-1 bg-background"><SelectValue /></SelectTrigger>
                   <SelectContent className="z-[100]">
-                    <SelectItem value="fracao">Fração Física</SelectItem>
-                    <SelectItem value="condomino">Condómino (Pessoa)</SelectItem>
+                    <SelectItem value="fracao">Fração</SelectItem>
+                    <SelectItem value="condomino">Titular da Fração</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -511,9 +600,9 @@ export default function Quotas() {
               <div className="sm:col-span-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Selecionar Item Correspondente</Label>
                 {pagamentoFiltro === 'fracao' ? (
-                  <Select value={pagamentoAlvoId} onValueChange={setPagamentoAlvoId}>
+                  <Select disabled={selectedCondominioId === 'all'} value={pagamentoAlvoId} onValueChange={setPagamentoAlvoId}>
                     <SelectTrigger className="mt-1 bg-background">
-                      <SelectValue placeholder={fracoesDoCondominioAtual.length === 0 ? "Sem frações disponíveis" : "Escolha a fração..."} />
+                      <SelectValue placeholder={selectedCondominioId === 'all' ? "Deve especificar um condomínio" : (fracoesDoCondominioAtual.length === 0 ? "Sem frações disponíveis" : "Escolha a fração...")} />
                     </SelectTrigger>
                     <SelectContent className="z-[100] no-scrollbar max-h-40">
                       {fracoesDoCondominioAtual.map(f => (
@@ -525,7 +614,7 @@ export default function Quotas() {
                   <Popover open={comboCondominoOpen} onOpenChange={setComboCondominoOpen}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" role="combobox" className="w-full justify-between mt-1 bg-background">
-                        {pagamentoAlvoId ? pessoas.find(p => p.id === pagamentoAlvoId)?.nome : "Pesquisar condómino..."}
+                        {pagamentoAlvoId ? pessoas.find(p => p.id === pagamentoAlvoId)?.nome : "Pesquisar titular..."}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
@@ -552,9 +641,8 @@ export default function Quotas() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5 text-amber-500" /> Quotas Pendentes Detetadas
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-500" /> Quotas Pendentes
                   </h4>
-                  <span className="text-xs font-semibold text-primary">Apenas Pendentes</span>
                 </div>
 
                 <div className="border border-border rounded-lg overflow-hidden bg-background">
@@ -568,18 +656,31 @@ export default function Quotas() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {pendentesReais.map(q => (
-                        <tr key={q.id} className={cn("hover:bg-muted/10 transition-colors cursor-pointer", quotasSelecionadas.includes(q.id) && "bg-primary/5")} onClick={() => toggleSelectQuota(q.id)}>
-                          <td className="p-3 text-center" onClick={e => e.stopPropagation()}>
-                            <Checkbox checked={quotasSelecionadas.includes(q.id)} onCheckedChange={() => toggleSelectQuota(q.id)} />
-                          </td>
-                          <td className="p-3 font-medium">{q.descricao || (q.tipo === 'mensal' ? 'Quota + FCR' : 'Quota')}</td>
-                          <td className="p-3 text-muted-foreground text-xs">{String(q.mes).padStart(2,'0')}/{q.ano}</td>
-                          <td className="p-3 text-right font-bold">€{(q.valor||0).toFixed(2)}</td>
-                        </tr>
-                      ))}
+                      {pendentesReais.map(q => {
+                        const nomeFracao = fracoes.find(f => f.id === q.fracao_id)?.codigo_fracao || '-';
+                        const nomeCondominio = condominios.find(c => c.id === q.condominio_id)?.nome || '-';
+
+                        return (
+                          <tr key={q.id} className={cn("hover:bg-muted/10 transition-colors cursor-pointer", quotasSelecionadas.includes(q.id) && "bg-primary/5")} onClick={() => toggleSelectQuota(q.id)}>
+                            <td className="p-3 text-center" onClick={e => e.stopPropagation()}>
+                              <Checkbox checked={quotasSelecionadas.includes(q.id)} onCheckedChange={() => toggleSelectQuota(q.id)} />
+                            </td>
+                            <td className="p-3 font-medium">
+                              {/* Se o filtro for condómino, mostramos a etiqueta com a Fração e Condomínio */}
+                              {pagamentoFiltro === 'condomino' && (
+                                <div className="text-[10px] text-muted-foreground font-bold uppercase mb-0.5 opacity-80">
+                                  {nomeFracao} - {nomeCondominio}
+                                </div>
+                              )}
+                              {q.descricao || (q.tipo === 'mensal' ? 'Quota + FCR' : 'Quota')}
+                            </td>
+                            <td className="p-3 text-muted-foreground text-xs">{String(q.mes).padStart(2, '0')}/{q.ano}</td>
+                            <td className="p-3 text-right font-bold">€{(q.valor || 0).toFixed(2)}</td>
+                          </tr>
+                        );
+                      })}
                       {pendentesReais.length === 0 && (
-                        <tr><td colSpan="4" className="text-center py-6 text-muted-foreground">O alvo selecionado não possui quotas pendentes.</td></tr>
+                        <tr><td colSpan="4" className="text-center py-6 text-muted-foreground">Não Existem Quotas Pendentes</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -592,7 +693,7 @@ export default function Quotas() {
                       <Select value={tipoLiquidacao} onValueChange={setTipoLiquidacao}>
                         <SelectTrigger className="mt-1 bg-background"><SelectValue /></SelectTrigger>
                         <SelectContent className="z-[100]">
-                          <SelectItem value="total">Liquidar Quota na Totalidade (1/1)</SelectItem>
+                          <SelectItem value="total">Liquidar Quota na Totalidade</SelectItem>
                           <SelectItem value="parcial">Pagamento Parcial (Apenas a sua quota-parte: 1/{numTitulares})</SelectItem>
                         </SelectContent>
                       </Select>
@@ -605,7 +706,7 @@ export default function Quotas() {
               </div>
             ) : (
               <div className="py-12 border border-dashed rounded-xl text-center text-sm text-muted-foreground bg-muted/10">
-                Selecione uma Fração Física ou Condómino acima para mapear e carregar as contas correntes em atraso.
+                Selecione uma fração ou condómino acima para carregar a conta-corrente.
               </div>
             )}
 
@@ -617,7 +718,7 @@ export default function Quotas() {
               <div className="flex gap-2 w-full sm:w-auto">
                 <Button variant="outline" className="flex-1 sm:flex-none" onClick={handleClosePagamento}>Cancelar</Button>
                 <Button disabled={true} className="flex-1 sm:flex-none gap-2 bg-muted-foreground text-white cursor-not-allowed">
-                  Em desenvolvimento (Aguarda Módulo Movimentos)
+                  Em Desenvolvimento
                 </Button>
               </div>
             </div>
@@ -629,24 +730,24 @@ export default function Quotas() {
       {/* POPUP RECIBO DE QUOTA ISOLADA */}
       <Dialog open={!!openRecibo} onOpenChange={(open) => !open && setOpenRecibo(null)}>
         <DialogContent className="w-[92vw] sm:max-w-sm max-h-[85vh] overflow-y-auto no-scrollbar rounded-xl p-5">
-          <DialogHeader { ... (openRecibo ? { title: "Emitir Recibo" } : {}) }>
+          <DialogHeader {... (openRecibo ? { title: "Emitir Recibo" } : {})}>
             <DialogTitle>Emitir Recibo</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-             <p className="text-sm text-muted-foreground leading-relaxed">Como pretende disponibilizar o recibo unificado referente a esta quota?</p>
-             <div>
-               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Enviar por Correio Eletrónico</Label>
-               <div className="flex gap-2 mt-1">
-                 <Input defaultValue="condomino@email.com" placeholder="Email do condómino..." />
-                 <Button variant="secondary" size="icon" onClick={() => { setOpenRecibo(null); toast.success('Recibo enviado por e-mail com sucesso!'); }}><Mail className="w-4 h-4"/></Button>
-               </div>
-             </div>
-             <div className="relative flex py-2 items-center">
-                <div className="flex-grow border-t border-border"></div>
-                <span className="flex-shrink-0 mx-3 text-muted-foreground text-[10px] uppercase tracking-wider font-bold">OU</span>
-                <div className="flex-grow border-t border-border"></div>
-             </div>
-             <Button variant="outline" className="w-full gap-2 text-foreground" onClick={() => { setOpenRecibo(null); toast.success('Download do PDF iniciado.'); }}><Download className="w-4 h-4" /> Descarregar Documento PDF</Button>
+            <p className="text-sm text-muted-foreground leading-relaxed">Como pretende disponibilizar o recibo unificado referente a esta quota?</p>
+            <div>
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Enviar por Correio Eletrónico</Label>
+              <div className="flex gap-2 mt-1">
+                <Input defaultValue="condomino@email.com" placeholder="Email do condómino..." />
+                <Button variant="secondary" size="icon" onClick={() => { setOpenRecibo(null); toast.success('Recibo enviado por e-mail com sucesso!'); }}><Mail className="w-4 h-4" /></Button>
+              </div>
+            </div>
+            <div className="relative flex py-2 items-center">
+              <div className="flex-grow border-t border-border"></div>
+              <span className="flex-shrink-0 mx-3 text-muted-foreground text-[10px] uppercase tracking-wider font-bold">OU</span>
+              <div className="flex-grow border-t border-border"></div>
+            </div>
+            <Button variant="outline" className="w-full gap-2 text-foreground" onClick={() => { setOpenRecibo(null); toast.success('Download do PDF iniciado.'); }}><Download className="w-4 h-4" /> Descarregar Documento PDF</Button>
           </div>
         </DialogContent>
       </Dialog>
