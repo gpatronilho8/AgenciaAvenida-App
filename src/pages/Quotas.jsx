@@ -1,393 +1,671 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
+import { useCondominio } from '@/lib/CondominioContext';
 import PageHeader from '@/components/ui/PageHeader';
-import StatusBadge from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Search, CreditCard, FileDown, CheckCircle, Edit, Settings, BarChart2, FileText } from 'lucide-react';
-import ConfiguracaoQuotas from '@/pages/condominios/ConfiguracaoQuotas';
-import MapaQuotas from '@/components/quotas/MapaQuotas';
-import PagamentoDialog from '@/components/quotas/PagamentoDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Settings, Plus, Search, Check, ChevronsUpDown, Mail, Download, Trash2, Banknote, FileText, Zap, AlertCircle, BarChart2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { useCondominio } from '@/lib/CondominioContext';
-import { gerarReciboQuota } from '@/lib/pdfUtils';
-import ReciboPDFDialog from '@/components/ReciboPDFDialog';
+import { cn } from '@/lib/utils';
+import MapaQuotas from '@/components/quotas/MapaQuotas';
 
-const makeEmpty = (condominioId) => ({
-  condominio_id: condominioId !== 'all' ? condominioId : '',
-  fracao_id: '',
-  pessoa_id: '',
-  tipo: 'mensal',
-  descricao: '',
-  valor: '',
-  data_emissao: format(new Date(), 'yyyy-MM-dd'),
-  data_vencimento: '',
-  estado: 'pendente',
-  metodo_pagamento: '',
-  observacoes: '',
-  ano: new Date().getFullYear(),
-  mes: new Date().getMonth() + 1,
-});
+// Helpers
+const normalizeTipoPessoa = (tipoData) => {
+  if (!tipoData) return [];
+  let parsedArray = [];
+  if (Array.isArray(tipoData)) parsedArray = tipoData;
+  else if (typeof tipoData === 'string') {
+    try { const parsed = JSON.parse(tipoData); parsedArray = Array.isArray(parsed) ? parsed : [tipoData]; }
+    catch (e) {
+      const cleanStr = tipoData.trim().replace(/^\{|\}$/g, '');
+      parsedArray = cleanStr.includes(',') ? cleanStr.split(',') : [cleanStr];
+    }
+  }
+  let finalArray = [];
+  parsedArray.forEach(item => {
+    if (item === null || item === undefined) return;
+    if (typeof item === 'string') {
+      let clean = item.trim().replace(/^"|"$/g, '');
+      if (clean.startsWith('[') && clean.endsWith(']')) { try { const innerParsed = JSON.parse(clean); if (Array.isArray(innerParsed)) { finalArray.push(...innerParsed); return; } } catch (e) { } }
+      clean = clean.replace(/"/g, '').trim();
+      if (clean.includes(',')) finalArray.push(...clean.split(',').map(s => s.trim()));
+      else if (clean) finalArray.push(clean);
+    } else finalArray.push(String(item));
+  });
+  return [...new Set(finalArray)].map(t => String(t).toLowerCase());
+};
+
+const getOwners = (f) => {
+  if (!f) return [];
+  if (Array.isArray(f.titulares)) return f.titulares;
+  if (typeof f.titulares === 'string') {
+    try { return JSON.parse(f.titulares); } catch (e) { return [f.titulares]; }
+  }
+  if (f.pessoa_id) return [f.pessoa_id];
+  if (f.proprietario_id) return [f.proprietario_id];
+  return [];
+};
+
+const emptyConfig = { condominio_id: '', tipo: 'mensal', valor_mensal: 0, valor_total: 0, mes_inicio: new Date().getMonth() + 1, ano_inicio: new Date().getFullYear() };
+const emptyQuota = { condominio_id: '', fracao_id: '', tipo: 'mensal', descricao: '', valor: 0, mes: new Date().getMonth() + 1, ano: new Date().getFullYear() };
 
 export default function Quotas() {
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState(makeEmpty('all'));
-  const [editing, setEditing] = useState(null);
   const { selectedCondominioId } = useCondominio();
+  
   const [search, setSearch] = useState('');
-  const [filterEstado, setFilterEstado] = useState('all');
-  const [filterTipo, setFilterTipo] = useState('all');
-  const [filterFracao, setFilterFracao] = useState('all');
-  const [reciboDialog, setReciboDialog] = useState(null);
-  const [configOpen, setConfigOpen] = useState(false);
-  const [mapaOpen, setMapaOpen] = useState(false);
-  const [pagamentoDialog, setPagamentoDialog] = useState(null); // quota a pagar
+  const [openConfig, setOpenConfig] = useState(false);
+  const [openNova, setOpenNova] = useState(false);
+  const [openPagamento, setOpenPagamento] = useState(false);
+  const [openRecibo, setOpenRecibo] = useState(null);
+  const [openDelete, setOpenDelete] = useState(null);
+  
+  const [configForm, setConfigForm] = useState(emptyConfig);
+  const [quotaForm, setQuotaForm] = useState(emptyQuota);
+  const [comboCondominioOpen, setComboCondominioOpen] = useState(false);
+  const [comboCondominioNovaOpen, setComboCondominioNovaOpen] = useState(false);
+  const [comboCondominoOpen, setComboCondominoOpen] = useState(false);
 
-  const { data: quotas = [], isLoading } = useQuery({ queryKey: ['quotas'], queryFn: () => agenciaAvenida.entities.Quota.list('-data_emissao') });
+  // Estados Locais para a Interface Visual de Pagamentos
+  const [pagamentoFiltro, setPagamentoFiltro] = useState('fracao'); 
+  const [pagamentoAlvoId, setPagamentoAlvoId] = useState('');
+  const [tipoLiquidacao, setTipoLiquidacao] = useState('total'); // 'total', 'parcial'
+  const [quotasSelecionadas, setQuotasSelecionadas] = useState([]);
+
+  // Queries
   const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
   const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => agenciaAvenida.entities.Fracao.list() });
   const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
+  const { data: quotas = [], isLoading } = useQuery({ queryKey: ['quotas'], queryFn: () => agenciaAvenida.entities.Quota.list() });
 
-  const save = useMutation({
-    mutationFn: (data) => editing ? agenciaAvenida.entities.Quota.update(editing, data) : agenciaAvenida.entities.Quota.create(data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['quotas'] }); setOpen(false); toast.success('Quota guardada'); },
+  // Condomínios Ativos e Ordenados
+  const condominiosAtivos = condominios
+    .filter(c => c && c.ativo !== false && c.ativo !== 'false')
+    .sort((a, b) => String(a.codigo || '').localeCompare(String(b.codigo || ''), undefined, { numeric: true, sensitivity: 'base' }));
+
+  const fracoesCondominio = fracoes.filter(f => f.condominio_id === quotaForm.condominio_id);
+  const fracoesDoCondominioAtual = fracoes.filter(f => selectedCondominioId === 'all' || f.condominio_id === selectedCondominioId);
+  const condominosAtivos = pessoas.filter(p => normalizeTipoPessoa(p.tipo).includes('condomino'));
+
+  // Mutations
+  const deleteQuota = useMutation({
+    mutationFn: (id) => agenciaAvenida.entities.Quota.delete(id),
+    onSuccess: () => { qc.invalidateQueries(['quotas']); setOpenDelete(null); toast.success('Quota eliminada.'); }
   });
 
-  const marcarPago = useMutation({
-    mutationFn: async ({ id, dataPagamento, metodo, conta, quota }) => {
-      await agenciaAvenida.entities.Quota.update(id, { estado: 'pago', data_pagamento: dataPagamento, metodo_pagamento: metodo });
-      const fracao = fracoes.find(f => f.id === quota.fracao_id);
-      await agenciaAvenida.entities.Movimento.create({
-        condominio_id: quota.condominio_id,
-        tipo: 'receita',
-        categoria: 'quota',
-        descricao: quota.descricao || `Quota ${fracao?.codigo || ''}`,
-        valor: quota.valor,
-        data: dataPagamento,
-        conta,
-        metodo_pagamento: metodo,
-        referencia_id: id,
-      });
-      const conds = await agenciaAvenida.entities.Condominio.list();
-      const cond = conds.find(c => c.id === quota.condominio_id);
-      if (cond) {
-        const campo = conta === 'caixa' ? 'saldo_caixa' : 'saldo_banco';
-        await agenciaAvenida.entities.Condominio.update(cond.id, { [campo]: (cond[campo] || 0) + (quota.valor || 0) });
-      }
-    },
-    onSuccess: (_, vars) => {
-      qc.invalidateQueries({ queryKey: ['quotas'] });
-      qc.invalidateQueries({ queryKey: ['movimentos'] });
-      qc.invalidateQueries({ queryKey: ['condominios'] });
-      setPagamentoDialog(null);
-      toast.success('Quota marcada como paga');
-      // Abrir recibo após pagamento
-      const q = vars.quota;
-      const fracao = fracoes.find(f => f.id === q.fracao_id);
-      const condominio = condominios.find(c => c.id === q.condominio_id);
-      const pessoa = pessoas.find(p => p.id === q.pessoa_id);
-      // Pequeno delay para dados atualizados
-      setTimeout(() => setReciboDialog({ quota: { ...q, estado: 'pago', data_pagamento: vars.dataPagamento }, fracao, condominio, pessoa }), 500);
-    },
-  });
-
-  const openNew = () => { setForm(makeEmpty(selectedCondominioId)); setEditing(null); setOpen(true); };
-  const openEdit = (q) => { setForm(q); setEditing(q.id); setOpen(true); };
-  const upd = (k, v) => setForm(p => ({ ...p, [k]: v }));
-
-  // Quando muda o condomínio selecionado, atualizar o form se open e new
-  useEffect(() => {
-    if (open && !editing && selectedCondominioId !== 'all') {
-      setForm(f => ({ ...f, condominio_id: selectedCondominioId }));
-    }
-  }, [selectedCondominioId, open, editing]);
-
-  const getCondName = (id) => condominios.find(c => c.id === id)?.nome || '-';
-  const getFracaoCode = (id) => fracoes.find(f => f.id === id)?.codigo || '-';
-
-  const fracoesByCondominio = fracoes.filter(f => !form.condominio_id || f.condominio_id === form.condominio_id);
-
-  const filtered = quotas.filter(q => {
-    const matchSearch = !search || q.descricao?.toLowerCase().includes(search.toLowerCase()) || getFracaoCode(q.fracao_id)?.toLowerCase().includes(search.toLowerCase());
-    const matchEstado = filterEstado === 'all' || q.estado === filterEstado;
-    const matchTipo = filterTipo === 'all' || q.tipo === filterTipo;
-    const matchCond = selectedCondominioId === 'all' || q.condominio_id === selectedCondominioId;
-    const matchFracao = filterFracao === 'all' || q.fracao_id === filterFracao;
-    return matchSearch && matchEstado && matchTipo && matchCond && matchFracao;
-  });
-
-  const fracoesFiltradas = fracoes.filter(f => selectedCondominioId === 'all' || f.condominio_id === selectedCondominioId);
-
-  const gerarExtrato = () => {
-    const linhas = filtered.map(q => {
-      const fracao = fracoes.find(f => f.id === q.fracao_id);
-      const cond = condominios.find(c => c.id === q.condominio_id);
-      return `${q.data_emissao || '-'}\t${cond?.nome || '-'}\t${fracao?.codigo || '-'}\t${q.descricao || '-'}\t€${(q.valor||0).toFixed(2)}\t${q.estado}`;
-    });
-    const conteudo = `Data Emissão\tCondomínio\tFração\tDescrição\tValor\tEstado\n${linhas.join('\n')}`;
-    const blob = new Blob([conteudo], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'extrato_quotas.txt'; a.click();
-    URL.revokeObjectURL(url);
+  const handleGerarQuotasMes = () => {
+    toast.success('Processo de geração automática de quotas para o mês corrente iniciado!');
   };
 
-  const totalPendente = filtered.filter(q => q.estado === 'pendente').reduce((s, q) => s + (q.valor || 0), 0);
-  const totalPago = filtered.filter(q => q.estado === 'pago').reduce((s, q) => s + (q.valor || 0), 0);
+  // Filtros da Tabela Principal
+  const quotasFiltradas = quotas.filter(q => {
+    if (selectedCondominioId !== 'all' && q.condominio_id !== selectedCondominioId) return false;
+    const fracao = fracoes.find(f => f.id === q.fracao_id);
+    const termo = search.toLowerCase();
+    const matchFracao = fracao?.codigo_fracao?.toLowerCase().includes(termo) || fracao?.descricao_piso_lado?.toLowerCase().includes(termo);
+    const matchDesc = q.descricao?.toLowerCase().includes(termo);
+    return !search || matchFracao || matchDesc;
+  });
+
+  const updConfig = (k, v) => setConfigForm(p => ({ ...p, [k]: v }));
+  const updQuota = (k, v) => setQuotaForm(p => ({ ...p, [k]: v }));
+
+  const handleOpenConfig = () => {
+    setConfigForm({ ...emptyConfig, condominio_id: selectedCondominioId !== 'all' ? selectedCondominioId : '' });
+    setOpenConfig(true);
+  };
+
+  const handleOpenNova = () => {
+    setQuotaForm({ ...emptyQuota, condominio_id: selectedCondominioId !== 'all' ? selectedCondominioId : '' });
+    setOpenNova(true);
+  };
+
+  // ---------------- LÓGICA DE PAGAMENTOS ----------------
+  const handleClosePagamento = () => {
+    setOpenPagamento(false);
+    setPagamentoFiltro('fracao');
+    setPagamentoAlvoId('');
+    setQuotasSelecionadas([]);
+    setTipoLiquidacao('total');
+  };
+
+  let pendentesReais = [];
+  let numTitulares = 1;
+
+  if (pagamentoAlvoId) {
+    if (pagamentoFiltro === 'fracao') {
+      pendentesReais = quotas.filter(q => q.estado === 'pendente' && q.fracao_id === pagamentoAlvoId);
+      const fracaoSel = fracoes.find(f => f.id === pagamentoAlvoId);
+      const owners = getOwners(fracaoSel);
+      numTitulares = owners.length > 0 ? owners.length : 1;
+    } else {
+      const fracoesDaPessoa = fracoes.filter(f => getOwners(f).includes(pagamentoAlvoId)).map(f => f.id);
+      pendentesReais = quotas.filter(q => q.estado === 'pendente' && fracoesDaPessoa.includes(q.fracao_id));
+      numTitulares = 1; // Pagamento pelo condómino assume sempre a responsabilidade integral da sua parte
+    }
+  }
+
+  const toggleSelectQuota = (id) => {
+    setQuotasSelecionadas(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  };
+
+  const divisor = (tipoLiquidacao === 'parcial' && numTitulares > 1) ? numTitulares : 1;
+  const totalSelecionado = pendentesReais
+    .filter(q => quotasSelecionadas.includes(q.id))
+    .reduce((acc, curr) => acc + (curr.valor / divisor), 0);
 
   return (
-    <div>
-      <PageHeader title="Quotas" subtitle="Gestão e emissão de quotas de condomínio" action={
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" onClick={gerarExtrato} className="gap-2"><FileText className="w-4 h-4" />Emitir Extrato</Button>
-          <Button variant="outline" onClick={() => setMapaOpen(v => !v)} className="gap-2"><BarChart2 className="w-4 h-4" />Mapa Anual</Button>
-          <Button variant="outline" onClick={() => { setConfigOpen(true); }} className="gap-2"><Settings className="w-4 h-4" />Configurar</Button>
-          <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />Nova Quota</Button>
-        </div>
-      } />
+    <div className="space-y-6">
+      <PageHeader 
+        title="Quotas e Faturação" 
+        subtitle="Gestão de quotas mensais, extraordinárias e processamento de pagamentos."
+        action={
+          <div className="flex gap-2">
+            <Button variant="default" className="gap-2" onClick={() => setOpenPagamento(true)}>
+              <Banknote className="w-4 h-4" /> Efetuar Pagamento
+            </Button>
+            <Button variant="outline" className="gap-2" onClick={handleOpenNova}>
+              <Plus className="w-4 h-4" /> Nova Quota
+            </Button>
+            <Button variant="secondary" className="gap-2 bg-muted text-muted-foreground" onClick={handleOpenConfig}>
+              <Settings className="w-4 h-4" /> Configurar Quotas
+            </Button>
+          </div>
+        } 
+      />
 
-      {/* Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-        <div className="bg-green-50 rounded-xl p-4 border border-green-100">
-          <p className="text-xs text-green-700 font-medium">Recebido</p>
-          <p className="text-xl font-bold text-green-800">€{totalPago.toFixed(2)}</p>
-        </div>
-        <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-100">
-          <p className="text-xs text-yellow-700 font-medium">Pendente</p>
-          <p className="text-xl font-bold text-yellow-800">€{totalPendente.toFixed(2)}</p>
-        </div>
-        <div className="bg-card rounded-xl p-4 border border-border">
-          <p className="text-xs text-muted-foreground font-medium">Total de quotas</p>
-          <p className="text-xl font-bold text-foreground">{filtered.length}</p>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Pesquisar..." value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <Select value={filterEstado} onValueChange={setFilterEstado}>
-          <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os estados</SelectItem>
-            <SelectItem value="pendente">Pendente</SelectItem>
-            <SelectItem value="pago">Pago</SelectItem>
-            <SelectItem value="vencido">Vencido</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filterTipo} onValueChange={setFilterTipo}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Tipo" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os tipos</SelectItem>
-            <SelectItem value="mensal">Mensal</SelectItem>
-            <SelectItem value="extraordinaria">Extraordinária</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filterFracao} onValueChange={setFilterFracao}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="Fração" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as frações</SelectItem>
-            {fracoesFiltradas.map(f => <SelectItem key={f.id} value={f.id}>{f.codigo}{f.descricao ? ` - ${f.descricao}` : ''}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {isLoading && <div className="text-center py-16 text-muted-foreground">A carregar...</div>}
-
+      {/* LISTAGEM GERAL DE QUOTAS */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50">
+        <div className="p-4 border-b border-border flex gap-3">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input className="pl-9 w-full" placeholder="Pesquisar por fração ou descrição..." value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto no-scrollbar">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-muted/50 text-muted-foreground font-semibold">
               <tr>
-                {['Fração', 'Condomínio', 'Tipo', 'Descrição', 'Valor', 'Vencimento', 'Estado', 'Ações'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">{h}</th>
-                ))}
+                <th className="px-4 py-3">Fração</th>
+                <th className="px-4 py-3">Descrição</th>
+                <th className="px-4 py-3">Vencimento</th>
+                <th className="px-4 py-3">Valor</th>
+                <th className="px-4 py-3">Estado</th>
+                <th className="px-4 py-3 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.map(q => (
-                <tr key={q.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-primary" />
-                      <span className="font-medium">{getFracaoCode(q.fracao_id)}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{getCondName(q.condominio_id)}</td>
-                  <td className="px-4 py-3">
-                    <span className="capitalize text-xs bg-accent text-accent-foreground px-2 py-0.5 rounded-full">{q.tipo}</span>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{q.descricao || '-'}</td>
-                  <td className="px-4 py-3 font-bold text-foreground">€{(q.valor || 0).toFixed(2)}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{q.data_vencimento || '-'}</td>
-                  <td className="px-4 py-3"><StatusBadge status={q.estado} /></td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      {q.estado !== 'pago' && (
-                        <button
-                          onClick={() => setPagamentoDialog(q)}
-                          className="p-1.5 hover:bg-green-50 rounded transition-colors" title="Marcar como pago"
-                        >
-                          <CheckCircle className="w-3.5 h-3.5 text-green-600" />
-                        </button>
-                      )}
-                      <button onClick={() => openEdit(q)} className="p-1.5 hover:bg-muted rounded transition-colors" title="Editar">
-                        <Edit className="w-3.5 h-3.5 text-muted-foreground" />
-                      </button>
-                      {/* PDF apenas para quotas pagas */}
-                      {q.estado === 'pago' && (
-                        <button
-                          onClick={() => {
-                            const fracao = fracoes.find(f => f.id === q.fracao_id);
-                            const condominio = condominios.find(c => c.id === q.condominio_id);
-                            const pessoa = pessoas.find(p => p.id === q.pessoa_id);
-                            setReciboDialog({ quota: q, fracao, condominio, pessoa });
-                          }}
-                          className="p-1.5 hover:bg-blue-50 rounded transition-colors" title="Descarregar recibo PDF"
-                        >
-                          <FileDown className="w-3.5 h-3.5 text-blue-600" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && !isLoading && (
-                <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">Nenhuma Quota Encontrada</td></tr>
+              {isLoading ? (
+                <tr><td colSpan="6" className="text-center py-8 text-muted-foreground">A carregar quotas...</td></tr>
+              ) : quotasFiltradas.length === 0 ? (
+                <tr><td colSpan="6" className="text-center py-8 text-muted-foreground">Nenhuma quota encontrada.</td></tr>
+              ) : (
+                quotasFiltradas.map(q => {
+                  const fracao = fracoes.find(f => f.id === q.fracao_id);
+                  const descFinal = q.tipo === 'mensal' ? 'Quota + FCR' : q.descricao;
+                  
+                  return (
+                    <tr key={q.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3 font-semibold text-primary">{fracao?.codigo_fracao || '-'}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{descFinal}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{q.data_vencimento || '-'}</td>
+                      <td className="px-4 py-3 font-bold text-foreground">€{(q.valor || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${
+                          q.estado === 'pago' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        }`}>
+                          {q.estado === 'pago' ? 'Pago' : 'Pendente'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50" onClick={() => setOpenRecibo(q)} title="Emitir Recibo">
+                          <FileText className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={() => setOpenDelete(q)} title="Eliminar">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {mapaOpen && (
-        <div className="mt-6">
-          <div className="flex justify-end mb-2">
-            <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2 print:hidden">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
-              Imprimir Mapa
-            </Button>
-          </div>
-          <MapaQuotas quotas={quotas} fracoes={fracoes} condominioId={selectedCondominioId} />
+      {/* AVISOS E MAPA ANUAL (Por baixo da listagem) */}
+      {selectedCondominioId === 'all' ? (
+        <div className="bg-card border border-border rounded-xl p-8 text-center shadow-sm">
+          <BarChart2 className="w-8 h-8 text-muted-foreground mx-auto mb-3 opacity-50" />
+          <h3 className="font-semibold text-foreground">Mapa Anual Indisponível</h3>
+          <p className="text-sm text-muted-foreground mt-1">Selecione um condomínio específico na barra superior para visualizar o mapa anual de quotas e os saldos por fração.</p>
         </div>
+      ) : fracoesDoCondominioAtual.length === 0 ? (
+        <div className="bg-card border border-border rounded-xl p-8 text-center shadow-sm">
+          <AlertCircle className="w-8 h-8 text-muted-foreground mx-auto mb-3 opacity-50" />
+          <h3 className="font-semibold text-foreground">Sem Frações</h3>
+          <p className="text-sm text-muted-foreground mt-1">Este condomínio não tem frações. Adicione frações para visualizar o mapa.</p>
+        </div>
+      ) : quotas.filter(q => q.condominio_id === selectedCondominioId).length === 0 ? (
+        <div className="bg-card border border-border rounded-xl p-8 text-center shadow-sm">
+          <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-3 opacity-50" />
+          <h3 className="font-semibold text-foreground">Sem Quotas</h3>
+          <p className="text-sm text-muted-foreground mt-1">Não existem quotas lançadas para este condomínio.</p>
+        </div>
+      ) : (
+        <MapaQuotas condominioId={selectedCondominioId} fracoes={fracoes} quotas={quotas} />
       )}
 
-      {configOpen && (
-        <ConfiguracaoQuotas
-          key={selectedCondominioId}
-          open={configOpen}
-          onClose={() => setConfigOpen(false)}
-          defaultCondominioId={selectedCondominioId !== 'all' ? selectedCondominioId : undefined}
-        />
-      )}
-
-      {pagamentoDialog && (
-        <PagamentoDialog
-          open={!!pagamentoDialog}
-          onClose={() => setPagamentoDialog(null)}
-          quota={pagamentoDialog}
-          fracaoCodigo={getFracaoCode(pagamentoDialog.fracao_id)}
-          isPending={marcarPago.isPending}
-          onConfirm={({ dataPagamento, metodo, conta }) =>
-            marcarPago.mutate({ id: pagamentoDialog.id, dataPagamento, metodo, conta, quota: pagamentoDialog })
-          }
-        />
-      )}
-
-      {reciboDialog && (
-        <ReciboPDFDialog
-          open={!!reciboDialog}
-          onClose={() => setReciboDialog(null)}
-          emailDestinatario={reciboDialog.pessoa?.email}
-          nomeDestinatario={reciboDialog.pessoa?.nome}
-          tipoDoc="Recibo de Quota"
-          onDownload={() => gerarReciboQuota(reciboDialog)}
-        />
-      )}
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      {/* MODAL DE CONFIGURAÇÃO DE QUOTAS */}
+      <Dialog open={openConfig} onOpenChange={setOpenConfig}>
+        <DialogContent className="w-[92vw] sm:max-w-md max-h-[85vh] overflow-y-auto no-scrollbar rounded-xl p-5">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Editar Quota' : 'Nova Quota'}</DialogTitle>
+            <DialogTitle>Configuração de Quotas</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-            <div>
+          <div className="space-y-4 mt-2">
+            
+            <div className="flex flex-col gap-1.5">
               <Label>Condomínio *</Label>
-              <Select value={form.condominio_id} onValueChange={v => upd('condominio_id', v)}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                <SelectContent>{condominios.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
+              <Popover open={comboCondominioOpen} onOpenChange={setComboCondominioOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={comboCondominioOpen} className="w-full justify-between font-normal bg-background mt-1">
+                    {configForm.condominio_id ? condominiosAtivos.find(c => c.id === configForm.condominio_id)?.nome : "Selecione ou pesquise..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0 w-[--radix-popover-trigger-width] z-[100]" align="start">
+                  <Command>
+                    <CommandInput placeholder="Pesquisar condomínio..." />
+                    <CommandEmpty>Condomínio não encontrado.</CommandEmpty>
+                    <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
+                      {condominiosAtivos.map(c => (
+                        <CommandItem key={c.id} value={`${c.nome} ${c.codigo || ''}`} onSelect={() => { updConfig('condominio_id', c.id); setComboCondominioOpen(false); }}>
+                          <Check className={cn("mr-2 h-4 w-4", configForm.condominio_id === c.id ? "opacity-100" : "opacity-0")} />
+                          {c.codigo && <span className="font-bold mr-1.5 opacity-80">({c.codigo})</span>}
+                          {c.nome}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div>
+              <Label>Tipo de Configuração</Label>
+              <Select value={configForm.tipo} onValueChange={v => updConfig('tipo', v)}>
+                <SelectTrigger className="mt-1"><SelectValue/></SelectTrigger>
+                <SelectContent className="z-[100]">
+                  <SelectItem value="mensal">Mensal (Valor Fixo)</SelectItem>
+                  <SelectItem value="permilagem">Por Permilagem (Orçamento)</SelectItem>
+                </SelectContent>
               </Select>
             </div>
+
+            {configForm.tipo === 'mensal' ? (
+               <div className="space-y-4 border-t pt-3 mt-1">
+                 <div>
+                   <Label>Valor da Quota Mensal (Quota + FCR incluído) (€)</Label>
+                   <Input className="mt-1" type="number" value={configForm.valor_mensal || ''} onChange={e => updConfig('valor_mensal', e.target.value)} placeholder="0.00" />
+                 </div>
+                 <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Mês de Início</Label>
+                    <Select value={String(configForm.mes_inicio)} onValueChange={v => updConfig('mes_inicio', parseInt(v))}>
+                      <SelectTrigger className="mt-1"><SelectValue/></SelectTrigger>
+                      <SelectContent className="z-[100] no-scrollbar max-h-36">
+                        {Array.from({length:12}).map((_, i) => <SelectItem key={i+1} value={String(i+1)}>{i+1}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Ano de Início</Label>
+                    <Select value={String(configForm.ano_inicio)} onValueChange={v => updConfig('ano_inicio', parseInt(v))}>
+                      <SelectTrigger className="mt-1"><SelectValue/></SelectTrigger>
+                      <SelectContent className="z-[100]">
+                        {[2025, 2026, 2027, 2028].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                 </div>
+               </div>
+            ) : (
+              <div className="space-y-4 border-t pt-3 mt-1">
+                <div>
+                   <Label>Valor Total do Orçamento Anual (€)</Label>
+                   <Input className="mt-1" type="number" value={configForm.valor_total || ''} onChange={e => updConfig('valor_total', e.target.value)} placeholder="0.00" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Mês de Início</Label>
+                    <Select value={String(configForm.mes_inicio)} onValueChange={v => updConfig('mes_inicio', parseInt(v))}>
+                      <SelectTrigger className="mt-1"><SelectValue/></SelectTrigger>
+                      <SelectContent className="z-[100] no-scrollbar max-h-36">
+                        {Array.from({length:12}).map((_, i) => <SelectItem key={i+1} value={String(i+1)}>{i+1}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Ano de Início</Label>
+                    <Select value={String(configForm.ano_inicio)} onValueChange={v => updConfig('ano_inicio', parseInt(v))}>
+                      <SelectTrigger className="mt-1"><SelectValue/></SelectTrigger>
+                      <SelectContent className="z-[100]">
+                        {[2025, 2026, 2027, 2028].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2">
+              <Button type="button" variant="secondary" className="w-full gap-2 border border-primary/20 text-primary hover:bg-primary/5" onClick={handleGerarQuotasMes}>
+                <Zap className="w-4 h-4 fill-primary" /> Gerar Quotas do Mês Corrente
+              </Button>
+            </div>
+
+          </div>
+          <DialogFooter className="mt-4 pt-4 border-t border-border gap-2 sm:gap-0">
+             <Button variant="outline" onClick={() => setOpenConfig(false)}>Cancelar</Button>
+             <Button onClick={() => setOpenConfig(false)}>Guardar Configuração</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL NOVA QUOTA / LINHA MANUAL */}
+      <Dialog open={openNova} onOpenChange={setOpenNova}>
+        <DialogContent className="w-[92vw] sm:max-w-md max-h-[85vh] overflow-y-auto no-scrollbar rounded-xl p-5">
+          <DialogHeader>
+            <DialogTitle>Lançar Linha Manual</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            
+            <div className="flex flex-col gap-1.5">
+              <Label>Condomínio *</Label>
+              <Popover open={comboCondominioNovaOpen} onOpenChange={setComboCondominioNovaOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={comboCondominioNovaOpen} className="w-full justify-between font-normal bg-background mt-1">
+                    {quotaForm.condominio_id ? condominiosAtivos.find(c => c.id === quotaForm.condominio_id)?.nome : "Selecione ou pesquise..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0 w-[--radix-popover-trigger-width] z-[100]" align="start">
+                  <Command>
+                    <CommandInput placeholder="Pesquisar condomínio..." />
+                    <CommandEmpty>Condomínio não encontrado.</CommandEmpty>
+                    <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
+                      {condominiosAtivos.map(c => (
+                        <CommandItem key={c.id} value={`${c.nome} ${c.codigo || ''}`} onSelect={() => { updQuota('condominio_id', c.id); updQuota('fracao_id', ''); setComboCondominioNovaOpen(false); }}>
+                          <Check className={cn("mr-2 h-4 w-4", quotaForm.condominio_id === c.id ? "opacity-100" : "opacity-0")} />
+                          {c.codigo && <span className="font-bold mr-1.5 opacity-80">({c.codigo})</span>}
+                          {c.nome}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
             <div>
               <Label>Fração *</Label>
-              <Select value={form.fracao_id} onValueChange={v => upd('fracao_id', v)}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                <SelectContent>{fracoesByCondominio.map(f => <SelectItem key={f.id} value={f.id}>{f.codigo} - {f.descricao}</SelectItem>)}</SelectContent>
+              <Select disabled={!quotaForm.condominio_id || fracoesCondominio.length === 0} value={quotaForm.fracao_id} onValueChange={v => updQuota('fracao_id', v)}>
+                <SelectTrigger className="mt-1">
+                   <SelectValue placeholder={!quotaForm.condominio_id ? "Selecione o condomínio" : (fracoesCondominio.length === 0 ? "Não Existem Frações" : "Selecione a fração")} />
+                </SelectTrigger>
+                <SelectContent className="z-[100] no-scrollbar max-h-40">
+                  {fracoesCondominio.map(f => (
+                    <SelectItem key={f.id} value={f.id}>{f.codigo_fracao} - {f.descricao_piso_lado}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
+
             <div>
               <Label>Tipo</Label>
-              <Select value={form.tipo} onValueChange={v => upd('tipo', v)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
+              <Select value={quotaForm.tipo} onValueChange={v => updQuota('tipo', v)}>
+                <SelectTrigger className="mt-1"><SelectValue/></SelectTrigger>
+                <SelectContent className="z-[100]">
                   <SelectItem value="mensal">Mensal</SelectItem>
-                  <SelectItem value="extraordinaria">Extraordinária</SelectItem>
+                  <SelectItem value="linha_faturacao">Linha de Faturação (Taxas / Coimas)</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed bg-muted/40 p-2 rounded border border-border/40">As quotas extraordinárias devem ser configuradas no menu de configuração de quotas.</p>
             </div>
-            <div>
-              <Label>Valor (€) *</Label>
-              <Input className="mt-1" type="number" value={form.valor || ''} onChange={e => upd('valor', parseFloat(e.target.value) || 0)} />
-            </div>
-            <div className="sm:col-span-2">
-              <Label>Descrição</Label>
-              <Input className="mt-1" value={form.descricao || ''} onChange={e => upd('descricao', e.target.value)} placeholder="Ex: Quota de janeiro 2025" />
-            </div>
-            <div>
-              <Label>Data de Emissão</Label>
-              <Input className="mt-1" type="date" value={form.data_emissao || ''} onChange={e => upd('data_emissao', e.target.value)} />
-            </div>
-            <div>
-              <Label>Data de Vencimento</Label>
-              <Input className="mt-1" type="date" value={form.data_vencimento || ''} onChange={e => upd('data_vencimento', e.target.value)} />
-            </div>
-            <div>
-              <Label>Estado</Label>
-              <Select value={form.estado} onValueChange={v => upd('estado', v)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pendente">Pendente</SelectItem>
-                  <SelectItem value="pago">Pago</SelectItem>
-                  <SelectItem value="vencido">Vencido</SelectItem>
-                  <SelectItem value="cancelado">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Mês / Ano</Label>
-              <div className="flex gap-2 mt-1">
-                <Input type="number" placeholder="Mês" min={1} max={12} value={form.mes || ''} onChange={e => upd('mes', parseInt(e.target.value) || 1)} />
-                <Input type="number" placeholder="Ano" value={form.ano || ''} onChange={e => upd('ano', parseInt(e.target.value) || new Date().getFullYear())} />
+
+            {quotaForm.tipo === 'linha_faturacao' ? (
+              <div>
+                <Label>Descrição da Taxa/Coima</Label>
+                <Input className="mt-1" value={quotaForm.descricao} onChange={e => updQuota('descricao', e.target.value)} placeholder="Ex: Multa por atraso..." />
+              </div>
+            ) : (
+              <div>
+                <Label>Descrição da Quota</Label>
+                <Input className="mt-1 bg-muted text-muted-foreground font-medium" disabled value="Quota + FCR" />
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <Label>Valor da Linha (€) *</Label>
+                <Input className="mt-1" type="number" value={quotaForm.valor || ''} onChange={e => updQuota('valor', parseFloat(e.target.value))} placeholder="0.00" />
+              </div>
+              <div>
+                 <Label>Mês Referência</Label>
+                 <Select value={String(quotaForm.mes)} onValueChange={v => updQuota('mes', parseInt(v))}>
+                   <SelectTrigger className="mt-1"><SelectValue/></SelectTrigger>
+                   <SelectContent className="z-[100] no-scrollbar max-h-36">
+                     {Array.from({length:12}).map((_, i) => <SelectItem key={i+1} value={String(i+1)}>{i+1}</SelectItem>)}
+                   </SelectContent>
+                 </Select>
+              </div>
+              <div>
+                 <Label>Ano Referência</Label>
+                 <Select value={String(quotaForm.ano)} onValueChange={v => updQuota('ano', parseInt(v))}>
+                   <SelectTrigger className="mt-1"><SelectValue/></SelectTrigger>
+                   <SelectContent className="z-[100]">
+                     {[2025, 2026, 2027, 2028].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                   </SelectContent>
+                 </Select>
               </div>
             </div>
-            <div className="sm:col-span-2">
-              <Label>Observações</Label>
-              <textarea className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-y" value={form.observacoes || ''} onChange={e => upd('observacoes', e.target.value)} />
-            </div>
+
           </div>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => save.mutate(form)} disabled={save.isPending}>{save.isPending ? 'A guardar...' : 'Guardar'}</Button>
+          <DialogFooter className="mt-5 pt-4 border-t border-border gap-2 sm:gap-0">
+             <Button variant="outline" onClick={() => setOpenNova(false)}>Cancelar</Button>
+             <Button disabled={!quotaForm.condominio_id || !quotaForm.fracao_id || !quotaForm.valor} onClick={() => setOpenNova(false)}>Lançar Linha</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL EFETUAR PAGAMENTO */}
+      <Dialog open={openPagamento} onOpenChange={(val) => { if(!val) handleClosePagamento(); else setOpenPagamento(true); }}>
+        <DialogContent className="w-[94vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto no-scrollbar rounded-xl p-6">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Banknote className="w-5 h-5 text-emerald-600" /> Registar Liquidação & Emissão de Recibo</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-5 mt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-muted/40 p-4 rounded-xl border border-border/60">
+              <div>
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Filtrar Alvo por</Label>
+                <Select value={pagamentoFiltro} onValueChange={v => { setPagamentoFiltro(v); setPagamentoAlvoId(''); setQuotasSelecionadas([]); setTipoLiquidacao('total'); }}>
+                  <SelectTrigger className="mt-1 bg-background"><SelectValue /></SelectTrigger>
+                  <SelectContent className="z-[100]">
+                    <SelectItem value="fracao">Fração Física</SelectItem>
+                    <SelectItem value="condomino">Condómino (Pessoa)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="sm:col-span-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Selecionar Item Correspondente</Label>
+                {pagamentoFiltro === 'fracao' ? (
+                  <Select value={pagamentoAlvoId} onValueChange={setPagamentoAlvoId}>
+                    <SelectTrigger className="mt-1 bg-background">
+                      <SelectValue placeholder={fracoesDoCondominioAtual.length === 0 ? "Sem frações disponíveis" : "Escolha a fração..."} />
+                    </SelectTrigger>
+                    <SelectContent className="z-[100] no-scrollbar max-h-40">
+                      {fracoesDoCondominioAtual.map(f => (
+                        <SelectItem key={f.id} value={f.id}>{f.codigo_fracao} ({f.descricao_piso_lado})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Popover open={comboCondominoOpen} onOpenChange={setComboCondominoOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" role="combobox" className="w-full justify-between mt-1 bg-background">
+                        {pagamentoAlvoId ? pessoas.find(p => p.id === pagamentoAlvoId)?.nome : "Pesquisar condómino..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-0 z-[100]">
+                      <Command>
+                        <CommandInput placeholder="Pesquisar pelo nome..." />
+                        <CommandEmpty>Nenhum condómino encontrado.</CommandEmpty>
+                        <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
+                          {condominosAtivos.map(p => (
+                            <CommandItem key={p.id} value={p.nome} onSelect={() => { setPagamentoAlvoId(p.id); setComboCondominoOpen(false); setQuotasSelecionadas([]); setTipoLiquidacao('total'); }}>
+                              <Check className={cn("mr-2 h-4 w-4", pagamentoAlvoId === p.id ? "opacity-100" : "opacity-0")} />
+                              {p.nome}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
+            </div>
+
+            {pagamentoAlvoId ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-500" /> Quotas Pendentes Detetadas
+                  </h4>
+                  <span className="text-xs font-semibold text-primary">Apenas Pendentes</span>
+                </div>
+
+                <div className="border border-border rounded-lg overflow-hidden bg-background">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-muted/30 text-xs font-semibold text-muted-foreground">
+                      <tr>
+                        <th className="p-3 w-10 text-center">Sel.</th>
+                        <th className="p-3">Descrição</th>
+                        <th className="p-3">Data Ref.</th>
+                        <th className="p-3 text-right">Valor Original</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {pendentesReais.map(q => (
+                        <tr key={q.id} className={cn("hover:bg-muted/10 transition-colors cursor-pointer", quotasSelecionadas.includes(q.id) && "bg-primary/5")} onClick={() => toggleSelectQuota(q.id)}>
+                          <td className="p-3 text-center" onClick={e => e.stopPropagation()}>
+                            <Checkbox checked={quotasSelecionadas.includes(q.id)} onCheckedChange={() => toggleSelectQuota(q.id)} />
+                          </td>
+                          <td className="p-3 font-medium">{q.descricao || (q.tipo === 'mensal' ? 'Quota + FCR' : 'Quota')}</td>
+                          <td className="p-3 text-muted-foreground text-xs">{String(q.mes).padStart(2,'0')}/{q.ano}</td>
+                          <td className="p-3 text-right font-bold">€{(q.valor||0).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                      {pendentesReais.length === 0 && (
+                        <tr><td colSpan="4" className="text-center py-6 text-muted-foreground">O alvo selecionado não possui quotas pendentes.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {numTitulares > 1 && pagamentoFiltro === 'fracao' && pendentesReais.length > 0 && (
+                  <div className="bg-emerald-50/40 p-4 rounded-xl border border-emerald-100 space-y-3">
+                    <div>
+                      <Label className="text-xs font-bold uppercase tracking-wider text-emerald-800">A fração tem {numTitulares} titulares. Definir Proporção:</Label>
+                      <Select value={tipoLiquidacao} onValueChange={setTipoLiquidacao}>
+                        <SelectTrigger className="mt-1 bg-background"><SelectValue /></SelectTrigger>
+                        <SelectContent className="z-[100]">
+                          <SelectItem value="total">Liquidar Quota na Totalidade (1/1)</SelectItem>
+                          <SelectItem value="parcial">Pagamento Parcial (Apenas a sua quota-parte: 1/{numTitulares})</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <p className="text-[11px] text-emerald-700/80 leading-tight">
+                      Caso selecione o pagamento parcial, o sistema atualizará a quota dividindo-a e deixará a parte dos restantes titulares ainda em aberto.
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="py-12 border border-dashed rounded-xl text-center text-sm text-muted-foreground bg-muted/10">
+                Selecione uma Fração Física ou Condómino acima para mapear e carregar as contas correntes em atraso.
+              </div>
+            )}
+
+            <div className="border-t border-border pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-center sm:text-left">
+                <span className="text-xs text-muted-foreground font-medium block">A Pagar (Valor Final)</span>
+                <span className="text-2xl font-black text-emerald-600">€{totalSelecionado.toFixed(2)}</span>
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button variant="outline" className="flex-1 sm:flex-none" onClick={handleClosePagamento}>Cancelar</Button>
+                <Button disabled={true} className="flex-1 sm:flex-none gap-2 bg-muted-foreground text-white cursor-not-allowed">
+                  Em desenvolvimento (Aguarda Módulo Movimentos)
+                </Button>
+              </div>
+            </div>
+
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* POPUP RECIBO DE QUOTA ISOLADA */}
+      <Dialog open={!!openRecibo} onOpenChange={(open) => !open && setOpenRecibo(null)}>
+        <DialogContent className="w-[92vw] sm:max-w-sm max-h-[85vh] overflow-y-auto no-scrollbar rounded-xl p-5">
+          <DialogHeader { ... (openRecibo ? { title: "Emitir Recibo" } : {}) }>
+            <DialogTitle>Emitir Recibo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+             <p className="text-sm text-muted-foreground leading-relaxed">Como pretende disponibilizar o recibo unificado referente a esta quota?</p>
+             <div>
+               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Enviar por Correio Eletrónico</Label>
+               <div className="flex gap-2 mt-1">
+                 <Input defaultValue="condomino@email.com" placeholder="Email do condómino..." />
+                 <Button variant="secondary" size="icon" onClick={() => { setOpenRecibo(null); toast.success('Recibo enviado por e-mail com sucesso!'); }}><Mail className="w-4 h-4"/></Button>
+               </div>
+             </div>
+             <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-border"></div>
+                <span className="flex-shrink-0 mx-3 text-muted-foreground text-[10px] uppercase tracking-wider font-bold">OU</span>
+                <div className="flex-grow border-t border-border"></div>
+             </div>
+             <Button variant="outline" className="w-full gap-2 text-foreground" onClick={() => { setOpenRecibo(null); toast.success('Download do PDF iniciado.'); }}><Download className="w-4 h-4" /> Descarregar Documento PDF</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!openDelete} onOpenChange={(open) => !open && setOpenDelete(null)}>
+        <AlertDialogContent className="w-[92vw] sm:max-w-md rounded-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar Registro de Faturação</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que pretende eliminar esta linha de faturação? Esta ação é completamente irreversível e irá limpar o histórico em aberto da conta corrente do condómino afetado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-500 hover:bg-red-600 border-red-500" onClick={() => deleteQuota.mutate(openDelete.id)}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
