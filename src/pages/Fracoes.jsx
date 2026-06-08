@@ -146,6 +146,7 @@ export default function Fracoes() {
 
   const { data: fracoes = [], isLoading } = useQuery({ queryKey: ['fracoes'], queryFn: () => agenciaAvenida.entities.Fracao.list() });
   const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
+  const condominiosAtivos = condominios.filter(c => c.ativo !== false && c.ativo !== 'false');
   const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
 
   // FILTRO: Apenas entidades que tenham a classe 'condomino'
@@ -339,9 +340,9 @@ export default function Fracoes() {
                 <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
                   <Command>
                     <CommandInput placeholder="Pesquisar condomínio..." />
-                    <CommandEmpty>Condomínio não encontrado.</CommandEmpty>
+                    <CommandEmpty>Condomínio Não Encontrado</CommandEmpty>
                     <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
-                      {condominios.map((c) => (
+                      {condominiosAtivos.map((c) => (
                         <CommandItem key={c.id} value={`${c.nome} ${c.codigo || ''}`} onSelect={() => { 
                           const updates = { condominio_id: c.id };
                           if (!editing) {
@@ -412,7 +413,7 @@ export default function Fracoes() {
                 <PopoverContent className="p-0 w-80" align="start">
                   <Command>
                     <CommandInput placeholder="Pesquisar entidade..." />
-                    <CommandEmpty>Entidade não encontrada.</CommandEmpty>
+                    <CommandEmpty>Titular Não Encontrado</CommandEmpty>
                     <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
                       {condominosList.filter(p => !titularesList.includes(p.id)).map((pes) => (
                         <CommandItem key={pes.id} value={`${pes.nome} ${pes.nif || ''}`} onSelect={() => { 

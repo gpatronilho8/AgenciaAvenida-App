@@ -223,6 +223,7 @@ export default function Condominios() {
   const [search, setSearch] = useState('');
   const defaultGE = { status: 'all', fe: 'all', dd: 'all', potencia: 'all' };
   const [geFilters, setGeFilters] = useState(defaultGE);
+  const [showGeFilters, setShowGeFilters] = useState(false);
 
   const { data: condominios = [], isLoading: loadCond } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
   const { data: pessoas = [], isLoading: loadPes } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
@@ -345,21 +346,21 @@ export default function Condominios() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input className="pl-9" placeholder="Pesquisar por nome, NIF ou ID..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Popover>
-          <PopoverTrigger asChild>
-             <Button variant="secondary" className="gap-2 bg-muted text-muted-foreground">
-                <Filter className="w-4 h-4" /> Filtros Goldenergy
-             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-80 p-4 z-50 shadow-xl border-border">
-             <div className="space-y-4">
-               <h4 className="font-semibold text-sm flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-500" /> Filtros Goldenergy</h4>
-               
+        <Button variant="secondary" className="gap-2 bg-muted text-muted-foreground" onClick={() => setShowGeFilters(true)}>
+          <Filter className="w-4 h-4" /> Filtros Goldenergy
+        </Button>
+
+        <Dialog open={showGeFilters} onOpenChange={setShowGeFilters}>
+          <DialogContent className="w-[320px] z-[60] no-scrollbar rounded-xl p-5">
+             <DialogHeader>
+               <DialogTitle className="flex items-center gap-2 text-sm"><Zap className="w-4 h-4 text-yellow-500" /> Filtros Goldenergy</DialogTitle>
+             </DialogHeader>
+             <div className="space-y-4 mt-2">
                <div className="space-y-1.5">
                  <Label className="text-xs text-muted-foreground">Tem Contrato?</Label>
                  <Select value={geFilters.status} onValueChange={v => setGeFilters({...geFilters, status: v})}>
                    <SelectTrigger><SelectValue/></SelectTrigger>
-                   <SelectContent className="no-scrollbar">
+                   <SelectContent className="z-[100] no-scrollbar">
                      <SelectItem value="all">Todos</SelectItem>
                      <SelectItem value="yes">Sim</SelectItem>
                      <SelectItem value="no">Não</SelectItem>
@@ -371,7 +372,7 @@ export default function Condominios() {
                  <Label className="text-xs text-muted-foreground">Fatura Eletrónica?</Label>
                  <Select value={geFilters.fe} onValueChange={v => setGeFilters({...geFilters, fe: v})}>
                    <SelectTrigger><SelectValue/></SelectTrigger>
-                   <SelectContent className="no-scrollbar">
+                   <SelectContent className="z-[100] no-scrollbar">
                      <SelectItem value="all">Todos</SelectItem>
                      <SelectItem value="yes">Sim</SelectItem>
                      <SelectItem value="no">Não</SelectItem>
@@ -383,7 +384,7 @@ export default function Condominios() {
                  <Label className="text-xs text-muted-foreground">Débito Direto?</Label>
                  <Select value={geFilters.dd} onValueChange={v => setGeFilters({...geFilters, dd: v})}>
                    <SelectTrigger><SelectValue/></SelectTrigger>
-                   <SelectContent className="no-scrollbar">
+                   <SelectContent className="z-[100] no-scrollbar">
                      <SelectItem value="all">Todos</SelectItem>
                      <SelectItem value="yes">Sim</SelectItem>
                      <SelectItem value="no">Não</SelectItem>
@@ -395,19 +396,20 @@ export default function Condominios() {
                  <Label className="text-xs text-muted-foreground">Potência Contratada</Label>
                  <Select value={geFilters.potencia} onValueChange={v => setGeFilters({...geFilters, potencia: v})}>
                    <SelectTrigger><SelectValue/></SelectTrigger>
-                   <SelectContent className="no-scrollbar">
+                   <SelectContent className="z-[100] no-scrollbar">
                      <SelectItem value="all">Todas as Potências</SelectItem>
                      {POTENCIAS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                    </SelectContent>
                  </Select>
                </div>
 
-               <div className="pt-3 mt-1 border-t border-border flex justify-end">
+               <div className="pt-4 mt-2 border-t border-border flex justify-end gap-2">
                   <Button variant="ghost" size="sm" onClick={() => setGeFilters(defaultGE)}>Limpar Filtros</Button>
+                  <Button size="sm" onClick={() => setShowGeFilters(false)}>Aplicar</Button>
                </div>
              </div>
-          </PopoverContent>
-        </Popover>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {(loadCond || loadPes) && <div className="text-center py-16 text-muted-foreground">A carregar condomínios...</div>}

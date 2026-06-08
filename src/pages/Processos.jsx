@@ -25,6 +25,13 @@ const irsEstadoLabel = { recebida_documentacao: 'Recebida Documentação', subme
 const empty = { tipo: 'renovacao_conducao', pessoa_id: '', descricao: '', estado: 'pendente_inicio', prioridade: 'normal', custo_servico: 0, pago: false, irs_campos: {}, irs_estado: 'recebida_documentacao', documentos: [], notas: '' };
 const emptyClient = { nome: '', nif: '', telefone: '', email: '', tipo: ['cliente'] };
 
+const STAFF_MOCK = [
+  { id: 'usr-goncalo', nome: 'Gonçalo Patronilho' },
+  { id: 'usr-sonia', nome: 'Sónia Isidoro' },
+  { id: 'usr-daniel', nome: 'Daniel Isidoro' }
+];
+const MEU_USER_ID = 'usr-goncalo';
+
 const IRS_ANEXOS = [
   { id: 'anexo_a', label: 'Anexo A (Trabalho Dependente)' }, { id: 'anexo_b', label: 'Anexo B (Trabalho Independente)' }, { id: 'anexo_f', label: 'Anexo F (Rendas)' }, { id: 'anexo_g', label: 'Anexo G (Mais-Valias)' }, { id: 'anexo_h', label: 'Anexo H (Benefícios Fiscais)' }, { id: 'incapacidade', label: 'Incapacidade' }, { id: 'solteiro_1', label: 'Solteiro 1 Titular' }, { id: 'solteiro_2', label: 'Solteiro 2 Titulares' }, { id: 'casado', label: 'Casado' }, { id: 'irs_jovem', label: 'IRS Jovem' }, { id: 'declaracao_substituicao', label: 'Declaração Substituição' },
 ];
@@ -74,43 +81,32 @@ function FichaClienteModal({ pessoa, onClose }) {
   }, [showSenha]);
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-border" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="font-bold text-lg">Ficha de Entidade</h2>
-          <button onClick={onClose} className="p-1 hover:bg-muted rounded"><X className="w-5 h-5 text-muted-foreground" /></button>
+    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4" onClick={(e) => { e.stopPropagation(); onClose(); }}>
+      <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full no-scrollbar" onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b flex justify-between items-center">
+           <h2 className="font-bold text-lg">Dados do Cliente</h2>
+           <button onClick={onClose} className="p-1 hover:bg-muted rounded"><X className="w-5 h-5 text-muted-foreground" /></button>
         </div>
-        <div className="px-6 py-5 space-y-3">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl flex-shrink-0">
-              {pessoa.nome?.charAt(0)?.toUpperCase()}
-            </div>
-            <div>
-              <h3 className="text-xl font-bold line-clamp-1">{pessoa.nome}</h3>
-              <div className="flex flex-wrap gap-1 mt-1">
-                {tiposArray.length > 0 ? tiposArray.map(t => (
-                  <span key={t} className={`text-xs px-2 py-0.5 rounded-full font-medium ${pessoaTipoColor[t] || 'bg-gray-100 text-gray-700'}`}>
-                    {pessoaTipoLabel[t] || t}
-                  </span>
-                )) : <span className="text-xs text-muted-foreground font-medium bg-gray-100 px-2 py-0.5 rounded-full">Sem tipo</span>}
-              </div>
-            </div>
+        <div className="px-6 py-5 space-y-4 mt-2">
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">Nome</p>
+            <p className="font-bold text-foreground text-lg">{pessoa.nome}</p>
           </div>
-
-          {[['NIF', pessoa.nif], ['Email', pessoa.email], ['Telefone', pessoa.telefone], ['Morada', pessoa.morada], ['Código Postal', pessoa.codigo_postal], ['Localidade', pessoa.localidade], ['IBAN', pessoa.iban]].map(([label, val]) =>
-            val ? (
-              <div key={label} className="flex gap-3 text-sm">
-                <span className="w-28 font-medium text-muted-foreground flex-shrink-0">{label}</span>
-                <span className="text-foreground break-all">{val}</span>
-              </div>
-            ) : null
+          {pessoa.telefone && (
+            <div><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">Telefone</p><p className="text-foreground">{pessoa.telefone}</p></div>
           )}
-
+          {pessoa.email && (
+            <div><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">Email</p><p className="text-foreground">{pessoa.email}</p></div>
+          )}
+          {pessoa.nif && (
+            <div><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">NIF</p><p className="text-foreground">{pessoa.nif}</p></div>
+          )}
+          
           {isCliente && pessoa.senha_at && (
-             <div className="flex gap-3 text-sm items-center mt-2 bg-muted/30 p-2 rounded border border-border/50">
-               <span className="w-28 font-medium text-muted-foreground flex-shrink-0">Senha AT</span>
-               <div className="flex items-center gap-2 flex-1">
-                 <span className="text-foreground font-mono bg-background px-2 py-1 rounded border min-w-[100px] text-center">
+             <div className="pt-2 border-t border-border mt-2">
+               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Senha AT</p>
+               <div className="flex items-center gap-2 bg-muted/30 p-1.5 rounded-lg border border-border/50 max-w-fit">
+                 <span className="text-foreground font-mono bg-background px-3 py-1 rounded border text-sm min-w-[100px] text-center flex-1">
                    {showSenha ? pessoa.senha_at : '••••••••••'}
                  </span>
                  <button onClick={() => setShowSenha(!showSenha)} className="text-muted-foreground hover:text-foreground hover:bg-muted transition-colors p-1.5 rounded-md" title="Mostrar por 10s">
@@ -118,13 +114,6 @@ function FichaClienteModal({ pessoa, onClose }) {
                  </button>
                </div>
              </div>
-          )}
-
-          {pessoa.observacoes && (
-            <div className="text-sm border-t pt-3 mt-3">
-              <p className="font-medium text-muted-foreground mb-1">Observações</p>
-              <p className="text-foreground whitespace-pre-wrap">{pessoa.observacoes}</p>
-            </div>
           )}
         </div>
       </div>
@@ -291,6 +280,9 @@ export default function Processos() {
   const { data: processos = [], isLoading: loadProc } = useQuery({ queryKey: ['processos'], queryFn: () => agenciaAvenida.entities.Processo.list() });
   const { data: pessoas = [], isLoading: loadPes } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
 
+  const [filterMe, setFilterMe] = useState(false);
+  const clientesList = pessoas.filter(p => normalizeTipoPessoa(p.tipo).includes('cliente'));
+
   const save = useMutation({
     mutationFn: (data) => {
       const dataToSave = { ...data };
@@ -401,7 +393,11 @@ export default function Processos() {
     const pessoa = pessoas.find(pes => pes.id === p.pessoa_id);
     const textSearch = search.toLowerCase();
     const tipoLabel = tipoProcessoLabel[p.tipo]?.toLowerCase() || p.tipo?.toLowerCase();
-    return !search || p.descricao?.toLowerCase().includes(textSearch) || tipoLabel.includes(textSearch) || pessoa?.nome?.toLowerCase().includes(textSearch);
+    
+    const matchSearch = !search || p.descricao?.toLowerCase().includes(textSearch) || tipoLabel.includes(textSearch) || pessoa?.nome?.toLowerCase().includes(textSearch);
+    const matchMe = !filterMe || p.atribuido_a === MEU_USER_ID;
+
+    return matchSearch && matchMe;
   });
 
   return (
@@ -410,11 +406,18 @@ export default function Processos() {
         <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />Novo Processo</Button>
       } />
 
-      <div className="flex gap-3 mb-6">
-        <div className="relative flex-1 max-w-md">
+<div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input className="pl-9" placeholder="Pesquisar por cliente ou processo..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
+        <Button 
+           variant={filterMe ? "default" : "secondary"}
+           onClick={() => setFilterMe(!filterMe)}
+           className={filterMe ? "bg-primary" : "bg-muted text-muted-foreground"}
+        >
+          Ver Meus Processos
+        </Button>
       </div>
 
       {(loadProc || loadPes) && <div className="text-center py-16 text-muted-foreground">A carregar processos...</div>}
@@ -493,7 +496,7 @@ export default function Processos() {
       />}
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar Processo' : 'Novo Processo'}</DialogTitle>
           </DialogHeader>
@@ -513,7 +516,7 @@ export default function Processos() {
                     <CommandInput placeholder="Pesquisar por nome ou NIF..." />
                     <CommandEmpty className="py-4 text-center text-sm text-muted-foreground">Cliente não encontrado.</CommandEmpty>
                     <CommandGroup className="max-h-48 overflow-y-auto">
-                      {pessoas.map((pes) => (
+                      {clientesList.map((pes) => (
                         <CommandItem key={pes.id} value={`${pes.nome} ${pes.nif || ''}`} onSelect={() => { upd('pessoa_id', pes.id); setOpenCombo(false); }}>
                           <Check className={cn("mr-2 h-4 w-4", form.pessoa_id === pes.id ? "opacity-100" : "opacity-0")} />
                           {pes.nome} {pes.nif && <span className="text-muted-foreground ml-1">(NIF: {pes.nif})</span>}
@@ -603,6 +606,19 @@ export default function Processos() {
             </div>
 
             <div>
+              <Label>Responsável</Label>
+              <Select value={form.atribuido_a || ''} onValueChange={v => upd('atribuido_a', v)}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Sem Atribuição" /></SelectTrigger>
+                <SelectContent className="no-scrollbar">
+                  <SelectItem value="sem_atribuicao" className="italic text-muted-foreground">Sem Atribuição</SelectItem>
+                  {STAFF_MOCK.map(staff => (
+                    <SelectItem key={staff.id} value={staff.id}>{staff.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
               <Label>Custo do Serviço (€)</Label>
               <Input type="number" min="0" step="0.01" className="mt-1" value={form.custo_servico || 0} onChange={e => upd('custo_servico', parseFloat(e.target.value))} />
             </div>
@@ -628,7 +644,7 @@ export default function Processos() {
               <div className="space-y-2 mb-4">
                 {normalizeJsonb(form.documentos, []).length === 0 ? (
                   <p className="text-sm text-muted-foreground bg-muted/20 p-3 rounded text-center border border-dashed">
-                    Nenhum ficheiro anexado a este processo.
+                    Nenhum Ficheiro Anexado
                   </p>
                 ) : (
                   normalizeJsonb(form.documentos, []).map((doc, idx) => (
