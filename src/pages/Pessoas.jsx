@@ -282,7 +282,7 @@ export default function Pessoas() {
       {preview && <PessoaPreview pessoa={preview} onClose={() => setPreview(null)} onEdit={(p) => { setPreview(null); openEdit(p); }} />}
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar Entidade' : 'Nova Entidade'}</DialogTitle>
           </DialogHeader>
