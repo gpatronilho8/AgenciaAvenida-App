@@ -4,7 +4,7 @@ import { supabase } from './supabase.js';
 const tableMap = {
   Condominio: 'condominios',
   Assembleia: 'assembleias',
-  ConfiguracaoQuota: 'configuracoes_quotas',
+  ConfiguracaoQuota: 'configuracao_quotas',
   Despesa: 'despesas',
   DespesaPropriedade: 'despesas_propriedades', 
   Documento: 'documentos',

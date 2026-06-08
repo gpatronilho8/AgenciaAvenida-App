@@ -27,7 +27,7 @@ export default function ConfiguracaoQuotas({ open, onClose }) {
   const configAtual = configs.find(c => c.condominio_id === formCond);
 
   const [config, setConfig] = useState({
-    tipo_calculo: 'fixo', valor_fixo: 0, valor_total_permilagem: 0,
+    tipo: 'fixo', valor_fixo: 0, valor_total_permilagem: 0,
     dia_vencimento: 8, mes_inicio: 1, ano_inicio: new Date().getFullYear(),
   });
 
@@ -60,7 +60,7 @@ export default function ConfiguracaoQuotas({ open, onClose }) {
       );
       if (jaExiste) continue;
 
-      const valor = cfg.tipo_calculo === 'fixo'
+      const valor = cfg.tipo === 'fixo'
         ? (parseFloat(cfg.valor_fixo) || 0)
         : ((parseFloat(f.permilagem) || 0) / 1000) * (parseFloat(cfg.valor_total_permilagem) || 0);
 
@@ -146,7 +146,7 @@ export default function ConfiguracaoQuotas({ open, onClose }) {
           <div className="space-y-4">
             <div>
               <Label>Tipo de cálculo</Label>
-              <Select value={config.tipo_calculo} onValueChange={v => setConfig(c => ({ ...c, tipo_calculo: v }))}>
+              <Select value={config.tipo} onValueChange={v => setConfig(c => ({ ...c, tipo: v }))}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="fixo">Valor fixo por fração</SelectItem>
@@ -154,7 +154,7 @@ export default function ConfiguracaoQuotas({ open, onClose }) {
                 </SelectContent>
               </Select>
             </div>
-            {config.tipo_calculo === 'fixo' ? (
+            {config.tipo === 'fixo' ? (
               <div>
                 <Label>Valor fixo por fração (€)</Label>
                 <Input type="number" className="mt-1" value={config.valor_fixo} onChange={e => setConfig(c => ({ ...c, valor_fixo: parseFloat(e.target.value) || 0 }))} />

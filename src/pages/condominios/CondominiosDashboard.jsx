@@ -177,7 +177,7 @@ export default function CondominiosDashboard() {
         <div className="bg-card rounded-xl border border-border shadow-sm">
           <div className="px-5 py-4 border-b border-border"><h3 className="font-semibold">Ocorrências Recentes</h3></div>
           <div className="divide-y divide-border">
-            {recentOcorrencias.length === 0 && <p className="text-muted-foreground text-sm text-center py-8">Sem ocorrências pendentes</p>}
+            {recentOcorrencias.length === 0 && <p className="text-muted-foreground text-sm text-center py-8">Sem Ocorrências Pendentes</p>}
             {recentOcorrencias.map(o => (
               <div key={o.id} className="px-5 py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setPreviewOcorrencia(o)}>
                 <div>
@@ -192,7 +192,7 @@ export default function CondominiosDashboard() {
         <div className="bg-card rounded-xl border border-border shadow-sm">
           <div className="px-5 py-4 border-b border-border"><h3 className="font-semibold">Quotas Vencidas</h3></div>
           <div className="divide-y divide-border">
-            {recentQuotas.length === 0 && <p className="text-muted-foreground text-sm text-center py-8">Sem quotas vencidas</p>}
+            {recentQuotas.length === 0 && <p className="text-muted-foreground text-sm text-center py-8">Sem Quotas Vencidas</p>}
             {recentQuotas.map(q => (
               <div key={q.id} className="px-5 py-3 flex items-center justify-between gap-3">
                 <div>

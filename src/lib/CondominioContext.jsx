@@ -4,8 +4,10 @@ const CondominioContext = createContext(null);
 
 export function CondominioProvider({ children }) {
   const [selectedCondominioId, setSelectedCondominioId] = useState('all');
+  const [selectedAno, setSelectedAno] = useState(new Date().getFullYear());
+
   return (
-    <CondominioContext.Provider value={{ selectedCondominioId, setSelectedCondominioId }}>
+    <CondominioContext.Provider value={{ selectedCondominioId, setSelectedCondominioId, selectedAno, setSelectedAno }}>
       {children}
     </CondominioContext.Provider>
   );

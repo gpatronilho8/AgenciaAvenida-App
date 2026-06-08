@@ -7,7 +7,7 @@ import { useLocation } from 'react-router-dom';
 import NotificationBell from '@/components/NotificationBell';
 
 export default function CondominioTopBar({ module }) {
-  const { selectedCondominioId, setSelectedCondominioId } = useCondominio();
+  const { selectedCondominioId, setSelectedCondominioId, selectedAno, setSelectedAno } = useCondominio();
   const { data: condominios = [] } = useQuery({
     queryKey: ['condominios'],
     queryFn: () => agenciaAvenida.entities.Condominio.list(),
@@ -106,6 +106,20 @@ export default function CondominioTopBar({ module }) {
                 )}
               </div>
             )}
+          </div>
+
+          {/* NOVO SELETOR DE ANO */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden sm:inline-block ml-2">Ano:</span>
+            <select
+              value={selectedAno}
+              onChange={(e) => setSelectedAno(parseInt(e.target.value))}
+              className="px-3 py-1.5 rounded-lg border border-border bg-card text-sm font-medium outline-none hover:bg-muted transition-all"
+            >
+              {[2025, 2026, 2027, 2028].map(ano => (
+                <option key={ano} value={ano}>{ano}</option>
+              ))}
+            </select>
           </div>
         </>
       )}

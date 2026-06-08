@@ -57,6 +57,18 @@ const getOwners = (f) => {
 const emptyConfig = { condominio_id: '', tipo: 'mensal', valor_mensal: 0, valor_total: 0, repeticoes: 1, modo_divisao: 'fixo', descricao: '', mes_inicio: new Date().getMonth() + 1, ano_inicio: new Date().getFullYear() };
 const emptyQuota = { condominio_id: '', fracao_id: '', tipo: 'mensal', descricao: '', valor: 0, mes: new Date().getMonth() + 1, ano: new Date().getFullYear() };
 
+const gerarReciboTeste = () => {
+  // Código binário de um PDF válido mínimo gerado na hora!
+  const pdfContent = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 4 0 R >> >> /MediaBox [0 0 612 792] /Contents 5 0 R >>\nendobj\n4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n5 0 obj\n<< /Length 44 >>\nstream\nBT\n/F1 24 Tf\n100 700 Td\n(PDF RECIBO TEST OK) Tj\nET\nendstream\nendobj\nxref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000229 00000 n \n0000000317 00000 n \ntrailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n412\n%%EOF";
+  const blob = new Blob([pdfContent], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Recibo_Pagamento_TESTE.pdf';
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
 export default function Quotas() {
   const qc = useQueryClient();
   const { selectedCondominioId } = useCondominio();
@@ -99,6 +111,119 @@ export default function Quotas() {
   const deleteQuota = useMutation({
     mutationFn: (id) => agenciaAvenida.entities.Quota.delete(id),
     onSuccess: () => { qc.invalidateQueries(['quotas']); setOpenDelete(null); toast.success('Quota eliminada.'); }
+  });
+
+  // Mutation para Guardar a Configuração da Quota - Esta é a base para o processo de criação automática de quotas mensais e extraordinárias, dependendo do tipo selecionado e dos parâmetros definidos
+  const saveConfig = useMutation({
+    mutationFn: async (dadosFormulario) => {
+      // Limpar campos irrelevantes antes de enviar para a BD para manter tudo limpo
+      const payload = { ...dadosFormulario };
+      if (payload.tipo === 'mensal') {
+        payload.valor_total = 0; payload.repeticoes = 1; payload.descricao = '';
+      } else if (payload.tipo === 'permilagem') {
+        payload.valor_mensal = 0; payload.repeticoes = 1; payload.descricao = '';
+      } else if (payload.tipo === 'extraordinaria') {
+        payload.valor_mensal = 0;
+      }
+      
+      return await agenciaAvenida.entities.ConfiguracaoQuota.create(payload);
+    },
+    onSuccess: () => {
+      setOpenConfig(false); // Fecha o popup
+      toast.success('Configuração guardada com sucesso!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao guardar configuração: ' + error.message);
+    }
+  });
+
+  // Mutation para Lançar Linha Manual (Taxas / Coimas / Quota Avulsa)
+  const lancarLinha = useMutation({
+    mutationFn: async (dados) => {
+      // Calcular o último dia do mês para o vencimento (O dia 0 do mês seguinte dá o último dia do mês atual)
+      const dataUltimoDia = new Date(dados.ano, dados.mes, 0);
+      const anoVenc = dataUltimoDia.getFullYear();
+      const mesVenc = String(dataUltimoDia.getMonth() + 1).padStart(2, '0');
+      const diaVenc = String(dataUltimoDia.getDate()).padStart(2, '0');
+      
+      const hoje = new Date();
+      const dataEmissao = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+
+      // Estruturar o payload final para a tabela de Quotas
+      const payload = {
+        condominio_id: dados.condominio_id,
+        fracao_id: dados.fracao_id,
+        tipo: dados.tipo,
+        descricao: dados.tipo === 'linha_faturacao' ? dados.descricao : 'Quota + FCR',
+        valor: dados.valor,
+        mes: dados.mes,
+        ano: dados.ano,
+        data_emissao: dataEmissao,
+        data_vencimento: `${anoVenc}-${mesVenc}-${diaVenc}`,
+        estado: 'pendente' // Nasce sempre pendente
+      };
+      
+      return await agenciaAvenida.entities.Quota.create(payload);
+    },
+    onSuccess: () => {
+      setOpenNova(false); // Fecha a modal
+      qc.invalidateQueries({ queryKey: ['quotas'] }); // Atualiza a tabela imediatamente
+      toast.success('Linha faturada com sucesso!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao lançar linha: ' + error.message);
+    }
+  });
+
+  // Mutation para Processar Pagamento
+  const registarPagamento = useMutation({
+    mutationFn: async () => {
+      // 1. Encontrar o condomínio associado às quotas
+      const primeiraQuota = pendentesReais.find(q => q.id === quotasSelecionadas[0]);
+      const idCondominio = primeiraQuota?.condominio_id || selectedCondominioId;
+
+      // 2. Atualizar as quotas para 'pago' (Provisório até fazermos os pagamentos parciais no DB)
+      const updatePromises = quotasSelecionadas.map(id => 
+        agenciaAvenida.entities.Quota.update(id, { estado: 'pago' })
+      );
+      await Promise.all(updatePromises);
+
+      // 3. Criar o Movimento Financeiro (Receita)
+      const hoje = new Date().toISOString().split('T')[0];
+      const novoMovimento = {
+        condominio_id: idCondominio,
+        tipo: 'receita',
+        categoria: 'quota',
+        descricao: `Liquidação de Quotas - ${pagamentoFiltro === 'fracao' ? 'Fração' : 'Condómino'}`,
+        valor: totalSelecionado,
+        data: hoje,
+        estado: 'efetivado', // Regista na conta final
+        conta: 'banco'
+      };
+      await agenciaAvenida.entities.Movimento.create(novoMovimento);
+
+      return true;
+    },
+    onSuccess: () => {
+      // Atualizar a listagem para as quotas ficarem verdes
+      qc.invalidateQueries({ queryKey: ['quotas'] });
+      qc.invalidateQueries({ queryKey: ['movimentos'] }); // Garante que a página movimentos recebe logo a atualização
+      
+      // Feedback Visual
+      toast.success('Pagamento registado com sucesso no Movimento Bancário!');
+      
+      // E-mail Dummy
+      toast.info('A preparar envio de E-mail (Sistema Resend aguarda configuração)...', { duration: 5000 });
+      
+      // PDF Dummy
+      gerarReciboTeste();
+
+      // Fechar e limpar Modal
+      handleClosePagamento();
+    },
+    onError: (error) => {
+      toast.error('Ocorreu um erro no processamento: ' + error.message);
+    }
   });
 
   const handleGerarQuotasMes = () => {
@@ -226,7 +351,7 @@ export default function Quotas() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50" onClick={() => setOpenRecibo(q)} title="Emitir Recibo">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50" onClick={() => setOpenRecibo(q)} title="Consultar Recibo">
                           <FileText className="w-4 h-4" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={() => setOpenDelete(q)} title="Eliminar">
@@ -465,15 +590,23 @@ export default function Quotas() {
 
           </div>
           <DialogFooter className="mt-4 pt-4 border-t border-border gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setOpenConfig(false)}>Cancelar</Button>
-            <Button onClick={() => setOpenConfig(false)}>Guardar Configuração</Button>
+            <Button variant="outline" onClick={() => setOpenConfig(false)} disabled={saveConfig.isPending}>
+              Cancelar
+            </Button>
+            {/* O botão agora chama o saveConfig.mutate passando o form, e bloqueia enquanto grava */}
+            <Button 
+              onClick={() => saveConfig.mutate(configForm)} 
+              disabled={saveConfig.isPending || !configForm.condominio_id}
+            >
+              {saveConfig.isPending ? 'A guardar...' : 'Guardar Configuração'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* MODAL NOVA QUOTA / LINHA MANUAL */}
       <Dialog open={openNova} onOpenChange={setOpenNova}>
-        <DialogContent className="w-[92vw] sm:max-w-xl max-h-[85vh] overflow-y-auto no-scrollbar rounded-xl p-5">
+        <DialogContent className="w-[92vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto no-scrollbar rounded-xl p-5">
           <DialogHeader>
             <DialogTitle>Lançar Linha Manual</DialogTitle>
           </DialogHeader>
@@ -571,8 +704,16 @@ export default function Quotas() {
 
           </div>
           <DialogFooter className="mt-5 pt-4 border-t border-border gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setOpenNova(false)}>Cancelar</Button>
-            <Button disabled={!quotaForm.condominio_id || !quotaForm.fracao_id || !quotaForm.valor} onClick={() => setOpenNova(false)}>Lançar Linha</Button>
+             <Button variant="outline" onClick={() => setOpenNova(false)} disabled={lancarLinha.isPending}>
+               Cancelar
+             </Button>
+             
+             <Button 
+               disabled={!quotaForm.condominio_id || !quotaForm.fracao_id || !quotaForm.valor || lancarLinha.isPending} 
+               onClick={() => lancarLinha.mutate(quotaForm)}
+             >
+               {lancarLinha.isPending ? 'A Lançar...' : 'Lançar Linha'}
+             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -716,9 +857,19 @@ export default function Quotas() {
                 <span className="text-2xl font-black text-emerald-600">€{totalSelecionado.toFixed(2)}</span>
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
-                <Button variant="outline" className="flex-1 sm:flex-none" onClick={handleClosePagamento}>Cancelar</Button>
-                <Button disabled={true} className="flex-1 sm:flex-none gap-2 bg-muted-foreground text-white cursor-not-allowed">
-                  Em Desenvolvimento
+                <Button variant="outline" className="flex-1 sm:flex-none" onClick={handleClosePagamento} disabled={registarPagamento.isPending}>
+                  Cancelar
+                </Button>
+                <Button 
+                  disabled={quotasSelecionadas.length === 0 || registarPagamento.isPending} 
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none gap-2" 
+                  onClick={() => registarPagamento.mutate()}
+                >
+                  {registarPagamento.isPending ? (
+                    'A Processar...'
+                  ) : (
+                    <><Check className="w-4 h-4" /> Confirmar Pagamento & Emitir Recibo</>
+                  )}
                 </Button>
               </div>
             </div>
@@ -730,8 +881,8 @@ export default function Quotas() {
       {/* POPUP RECIBO DE QUOTA ISOLADA */}
       <Dialog open={!!openRecibo} onOpenChange={(open) => !open && setOpenRecibo(null)}>
         <DialogContent className="w-[92vw] sm:max-w-sm max-h-[85vh] overflow-y-auto no-scrollbar rounded-xl p-5">
-          <DialogHeader {... (openRecibo ? { title: "Emitir Recibo" } : {})}>
-            <DialogTitle>Emitir Recibo</DialogTitle>
+          <DialogHeader {... (openRecibo ? { title: "Consultar Recibo" } : {})}>
+            <DialogTitle>Consultar Recibo</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <p className="text-sm text-muted-foreground leading-relaxed">Como pretende disponibilizar o recibo unificado referente a esta quota?</p>
