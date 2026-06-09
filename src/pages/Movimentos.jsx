@@ -7,9 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectLabel, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
-import { Plus, Search, TrendingUp, TrendingDown, Wallet, Pencil, Trash2, Download, Calculator, FileCheck, Check, ChevronsUpDown } from 'lucide-react';
+import { Plus, Search, TrendingUp, TrendingDown, Wallet, Pencil, Trash2, Download, Calculator, FileCheck, Check, ChevronsUpDown, Eye, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { useCondominio } from '@/lib/CondominioContext';
@@ -29,12 +30,11 @@ const categoriasReceita = {
 
 const allCategorias = { ...categoriasDespesa, ...categoriasReceita };
 
-// Ordenação alfabética das categorias com base nos rótulos visuais
 const categoriasDespesaOrdenadas = Object.entries(categoriasDespesa).sort((a, b) => a[1].localeCompare(b[1], 'pt'));
 const categoriasReceitaOrdenadas = Object.entries(categoriasReceita).sort((a, b) => a[1].localeCompare(b[1], 'pt'));
 
 const emptyDespesa = {
-  condominio_id: '', tipo: 'despesa', categoria: 'limpeza', descricao: '',
+  condominio_id: '', tipo: 'despesa', categoria: '', descricao: '',
   valor: '', data: format(new Date(), 'yyyy-MM-dd'), conta: 'banco',
   metodo_pagamento: 'transferencia', fornecedor_id: '', observacoes: ''
 };
@@ -67,16 +67,17 @@ const normalizeTipoPessoa = (tipoData) => {
 export default function Movimentos() {
   const qc = useQueryClient();
   const { selectedCondominioId, selectedAno } = useCondominio();
-  
-  // UI States
+
   const [openDespesa, setOpenDespesa] = useState(false);
   const [openFecho, setOpenFecho] = useState(false);
+  const [openPreview, setOpenPreview] = useState(null);
+  const [openEstorno, setOpenEstorno] = useState(null);
+
   const [comboCondominioOpen, setComboCondominioOpen] = useState(false);
   const [comboFornecedorOpen, setComboFornecedorOpen] = useState(false);
   const [form, setForm] = useState(emptyDespesa);
   const [editing, setEditing] = useState(null);
-  
-  // Filters
+
   const [search, setSearch] = useState('');
   const [filterTipo, setFilterTipo] = useState('all');
   const [filterConta, setFilterConta] = useState('all');
@@ -98,7 +99,6 @@ export default function Movimentos() {
 
   const [dreData, setDreData] = useState({ receitas: {}, despesas: {}, saldoInicial: 0, observacoes: '' });
 
-  // Queries
   const { data: movimentos = [], isLoading } = useQuery({
     queryKey: ['movimentos'],
     queryFn: () => agenciaAvenida.entities.Movimento.list('-data')
@@ -109,7 +109,6 @@ export default function Movimentos() {
   const condominiosAtivos = condominios.filter(c => c && c.ativo !== false && c.ativo !== 'false').sort((a, b) => String(a.codigo || '').localeCompare(String(b.codigo || ''), undefined, { numeric: true, sensitivity: 'base' }));
   const fornecedoresAtivos = pessoas.filter(p => p && normalizeTipoPessoa(p.tipo).includes('fornecedor')).sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt'));
 
-  // Mutações
   const save = useMutation({
     mutationFn: (data) => editing
       ? agenciaAvenida.entities.Movimento.update(editing, data)
@@ -120,7 +119,7 @@ export default function Movimentos() {
         const delta = parseFloat(vars.valor) || 0;
         const saldoField = vars.conta === 'banco' ? 'saldo_banco' : 'saldo_caixa';
         const change = vars.tipo === 'receita' ? delta : -delta;
-        
+
         if (editing) {
           const prev = movimentos.find(m => m.id === editing);
           if (prev) {
@@ -142,21 +141,54 @@ export default function Movimentos() {
     },
   });
 
-  const del = useMutation({
-    mutationFn: async (m) => {
-      await agenciaAvenida.entities.Movimento.delete(m.id);
-      const cond = condominios.find(c => c.id === m.condominio_id);
+  const executarEstorno = useMutation({
+    mutationFn: async (mov) => {
+      await agenciaAvenida.entities.Movimento.delete(mov.id);
+
+      const cond = condominios.find(c => c.id === mov.condominio_id);
       if (cond) {
-        const saldoField = m.conta === 'banco' ? 'saldo_banco' : 'saldo_caixa';
-        const change = m.tipo === 'receita' ? -(m.valor || 0) : (m.valor || 0);
+        const saldoField = mov.conta === 'banco' ? 'saldo_banco' : 'saldo_caixa';
+        const change = mov.tipo === 'receita' ? -(mov.valor || 0) : (mov.valor || 0);
         await agenciaAvenida.entities.Condominio.update(cond.id, { [saldoField]: (cond[saldoField] || 0) + change });
+      }
+
+      if (mov.tipo === 'receita') {
+        const allQuotas = await agenciaAvenida.entities.Quota.list();
+        const quotasAEstornar = allQuotas.filter(q =>
+          q.condominio_id === mov.condominio_id &&
+          (q.estado === 'pago' || q.valor_pago > 0)
+        );
+
+        const promises = quotasAEstornar.map(q => {
+          if (q.tipo === 'linha_faturacao_credito') {
+            return agenciaAvenida.entities.Quota.delete(q.id);
+          }
+
+          let novoEstado = 'pendente';
+          if (q.tipo === 'linha_faturacao_divida') {
+            novoEstado = 'vencida';
+          } else if (q.data_vencimento) {
+            const dataVenc = new Date(q.data_vencimento);
+            const hoje = new Date();
+            hoje.setHours(0, 0, 0, 0);
+            if (dataVenc < hoje) {
+              novoEstado = 'vencida';
+            }
+          }
+          return agenciaAvenida.entities.Quota.update(q.id, { estado: novoEstado, valor_pago: 0 });
+        });
+
+        await Promise.all(promises);
       }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['movimentos'] });
       qc.invalidateQueries({ queryKey: ['condominios'] });
-      toast.success('Movimento eliminado');
+      qc.invalidateQueries({ queryKey: ['quotas'] });
+      setOpenEstorno(null);
+      toast.success('Movimento eliminado e contas restauradas.');
     },
+    onError: (e) => toast.error('Erro no estorno: ' + e.message)
   });
 
   const upd = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -170,7 +202,7 @@ export default function Movimentos() {
     const movsAnteriores = movimentos.filter(m => m.condominio_id === selectedCondominioId && String(m.data) < `${anoFecho}-01-01`);
 
     const saldoTransitado = movsAnteriores.reduce((acc, m) => acc + (m.tipo === 'receita' ? m.valor : -m.valor), 0);
-    
+
     const recs = {}; const desps = {};
     Object.keys(categoriasReceita).forEach(k => recs[k] = 0);
     Object.keys(categoriasDespesa).forEach(k => desps[k] = 0);
@@ -208,10 +240,10 @@ export default function Movimentos() {
   const saldoGlobal = condAtual ? ((condAtual.saldo_banco || 0) + (condAtual.saldo_caixa || 0)) : 0;
 
   return (
-    <div className="space-y-6">
-      <PageHeader 
-        title="Financeiro & Tesouraria" 
-        subtitle="Registo de movimentos, despesas e fecho de contas." 
+    <div className="space-y-6 relative z-10">
+      <PageHeader
+        title="Financeiro & Tesouraria"
+        subtitle="Registo de movimentos, despesas e fecho de contas."
       />
 
       <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-center w-full">
@@ -243,7 +275,7 @@ export default function Movimentos() {
               <p className={`text-3xl font-black ${saldoPeriodo >= 0 ? 'text-blue-800' : 'text-orange-800'}`}>€{saldoPeriodo.toFixed(2)}</p>
             </div>
           </div>
-          
+
           <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
             <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Saldos Atuais (Conta Real)</p>
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -290,11 +322,11 @@ export default function Movimentos() {
                 <SelectItem value="all">Categorias</SelectItem>
                 <SelectGroup>
                   <SelectLabel className="text-[10px] uppercase text-muted-foreground">Despesas</SelectLabel>
-                  {categoriasDespesaOrdenadas.map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                  {categoriasDespesaOrdenadas.map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
                 </SelectGroup>
                 <SelectGroup>
                   <SelectLabel className="text-[10px] uppercase text-muted-foreground mt-2">Receitas</SelectLabel>
-                  {categoriasReceitaOrdenadas.map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                  {categoriasReceitaOrdenadas.map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
                 </SelectGroup>
               </SelectContent>
             </Select>
@@ -307,22 +339,22 @@ export default function Movimentos() {
               </SelectContent>
             </Select>
             <div className="flex items-center gap-1.5 bg-background border border-input rounded-md px-2">
-              <Input 
-                type="date" 
-                className="w-[125px] border-none shadow-none focus-visible:ring-0 px-1" 
-                value={periodoInicio} 
+              <Input
+                type="date"
+                className="w-[125px] border-none shadow-none focus-visible:ring-0 px-1"
+                value={periodoInicio}
                 min={selectedAno !== 'all' ? `${selectedAno}-01-01` : undefined}
                 max={selectedAno !== 'all' ? `${selectedAno}-12-31` : undefined}
-                onChange={e => setPeriodoInicio(e.target.value)} 
+                onChange={e => setPeriodoInicio(e.target.value)}
               />
               <span className="text-muted-foreground text-xs font-medium">a</span>
-              <Input 
-                type="date" 
-                className="w-[125px] border-none shadow-none focus-visible:ring-0 px-1" 
-                value={periodoFim} 
+              <Input
+                type="date"
+                className="w-[125px] border-none shadow-none focus-visible:ring-0 px-1"
+                value={periodoFim}
                 min={selectedAno !== 'all' ? `${selectedAno}-01-01` : undefined}
                 max={selectedAno !== 'all' ? `${selectedAno}-12-31` : undefined}
-                onChange={e => setPeriodoFim(e.target.value)} 
+                onChange={e => setPeriodoFim(e.target.value)}
               />
             </div>
           </div>
@@ -339,11 +371,11 @@ export default function Movimentos() {
             </thead>
             <tbody className="divide-y divide-border">
               {isLoading ? (
-                 <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">A carregar movimentos...</td></tr>
+                <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">A carregar movimentos...</td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">Nenhum Movimento Encontrado no Período Selecionado</td></tr>
               ) : filtered.map(m => (
-                <tr key={m.id} className="hover:bg-muted/30 transition-colors">
+                <tr key={m.id} className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setOpenPreview(m)}>
                   <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{m.data}</td>
                   <td className="px-4 py-3">
                     <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold ${m.tipo === 'receita' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
@@ -359,10 +391,25 @@ export default function Movimentos() {
                   <td className={`px-4 py-3 font-bold ${m.tipo === 'receita' ? 'text-emerald-600' : 'text-red-600'}`}>
                     {m.tipo === 'receita' ? '+' : '-'}€{(m.valor || 0).toFixed(2)}
                   </td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
                     <div className="flex justify-center gap-1">
-                      <button onClick={() => openEdit(m)} className="p-1.5 hover:bg-muted rounded transition-colors"><Pencil className="w-3.5 h-3.5 text-muted-foreground" /></button>
-                      <button onClick={() => del.mutate(m)} className="p-1.5 hover:bg-red-50 rounded transition-colors"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                      {m.tipo !== 'receita' && (
+                        <button onClick={() => openEdit(m)} className="p-1.5 hover:bg-muted rounded transition-colors">
+                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          if (m.tipo === 'receita') {
+                            setOpenEstorno(m);
+                          } else {
+                            executarEstorno.mutate(m);
+                          }
+                        }}
+                        className="p-1.5 hover:bg-red-50 rounded transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -372,6 +419,86 @@ export default function Movimentos() {
         </div>
       </div>
 
+      {/* POPUP DE PRÉ-VISUALIZAÇÃO DE MOVIMENTO */}
+      <Dialog open={!!openPreview} onOpenChange={(v) => !v && setOpenPreview(null)}>
+        <DialogContent className="max-w-md rounded-xl p-6 z-[200]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5 text-primary" /> Detalhes do Movimento
+            </DialogTitle>
+          </DialogHeader>
+          {openPreview && (
+            <div className="mt-4 space-y-4 text-sm">
+              <div className="flex justify-between items-center border-b pb-2">
+                <span className="text-muted-foreground">Condomínio:</span>
+                <span className="font-bold text-right">{getCondName(openPreview.condominio_id)}</span>
+              </div>
+              <div className="flex justify-between items-center border-b pb-2">
+                <span className="text-muted-foreground">Descrição:</span>
+                <span className="font-bold text-right">{openPreview.descricao}</span>
+              </div>
+              <div className="flex justify-between items-center border-b pb-2">
+                <span className="text-muted-foreground">Valor:</span>
+                <span className={cn("font-bold text-lg", openPreview.tipo === 'receita' ? 'text-emerald-600' : 'text-red-600')}>
+                  {openPreview.tipo === 'receita' ? '+' : '-'}€{openPreview.valor?.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center border-b pb-2">
+                <span className="text-muted-foreground">Conta Utilizada:</span>
+                <span className="capitalize font-bold px-2 py-0.5 bg-accent text-accent-foreground rounded-full text-xs">
+                  {openPreview.conta}
+                </span>
+              </div>
+              <div className="flex justify-between items-center border-b pb-2">
+                <span className="text-muted-foreground">Método Pagamento:</span>
+                <span className="capitalize font-medium text-right">{openPreview.metodo_pagamento?.replace('_', ' ') || 'N/A'}</span>
+              </div>
+
+              {openPreview.tipo === 'despesa' && openPreview.fornecedor_id && (
+                <div className="flex justify-between items-center border-b pb-2">
+                  <span className="text-muted-foreground">Fornecedor:</span>
+                  <span className="font-medium text-right">{pessoas.find(p => p.id === openPreview.fornecedor_id)?.nome || 'Desconhecido'}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center border-b pb-2">
+                <span className="text-muted-foreground">Data Registo:</span>
+                <span className="font-medium text-right">{openPreview.data}</span>
+              </div>
+
+              {openPreview.observacoes && (
+                <div className="bg-muted/40 p-3 rounded-lg border border-border">
+                  <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider block mb-1">Observações Adicionais:</span>
+                  <p className="text-sm italic">{openPreview.observacoes}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ALERT DIALOG: ESTORNO AUDITADO DE RECEITAS */}
+      <AlertDialog open={!!openEstorno} onOpenChange={(v) => !v && setOpenEstorno(null)}>
+        <AlertDialogContent className="z-[250]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" /> Confirmar Anulação / Estorno Financeiro
+            </AlertDialogTitle>
+            <AlertDialogDescription className="leading-relaxed">
+              Atenção: A eliminação deste movimento de receita irá <strong>reverter os abatimentos na faturação</strong>.
+              As quotas correspondentes serão recolocadas automaticamente com o estado "Pendente" ou "Vencida".<br /><br />
+              Esta ação limpa o histórico bancário desta receita e reverte os saldos de tesouraria do condomínio associado. Pretende prosseguir?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => executarEstorno.mutate(openEstorno)}>
+              Confirmar Estorno Auditado
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* MODAL NOVA DESPESA */}
       <Dialog open={openDespesa} onOpenChange={setOpenDespesa}>
         <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto no-scrollbar rounded-xl z-[200]">
@@ -379,7 +506,7 @@ export default function Movimentos() {
             <DialogTitle className="flex items-center gap-2 text-red-600"><TrendingDown className="w-5 h-5" /> {editing ? 'Editar Despesa' : 'Registar Despesa'}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-            
+
             <div className="sm:col-span-2">
               <Label>Condomínio *</Label>
               <Popover open={comboCondominioOpen} onOpenChange={setComboCondominioOpen}>
@@ -407,7 +534,7 @@ export default function Movimentos() {
               </Popover>
             </div>
 
-            {/* SELETOR DE FORNECEDOR (Pesquisa Inteligente) */}
+            {/* SELETOR DE FORNECEDOR */}
             <div className="sm:col-span-2">
               <Label>Fornecedor</Label>
               <Popover open={comboFornecedorOpen} onOpenChange={setComboFornecedorOpen}>
@@ -420,7 +547,7 @@ export default function Movimentos() {
                 <PopoverContent className="p-0 w-[--radix-popover-trigger-width] z-[210]" align="start">
                   <Command>
                     <CommandInput placeholder="Pesquisar fornecedor por nome..." />
-                    <CommandEmpty>Fornecedor não encontrado.</CommandEmpty>
+                    <CommandEmpty>Fornecedor Não Encontrado</CommandEmpty>
                     <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
                       <CommandItem value="" onSelect={() => { upd('fornecedor_id', ''); setComboFornecedorOpen(false); }}>
                         <Check className={cn("mr-2 h-4 w-4", !form.fornecedor_id ? "opacity-100" : "opacity-0")} />
@@ -437,20 +564,25 @@ export default function Movimentos() {
                 </PopoverContent>
               </Popover>
             </div>
-            
+
             <div className="sm:col-span-2">
               <Label>Categoria da Despesa *</Label>
               <Select value={form.categoria} onValueChange={v => upd('categoria', v)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1">
+                  {/* ADICIONADO O PLACEHOLDER AQUI */}
+                  <SelectValue placeholder="Selecione a categoria..." />
+                </SelectTrigger>
                 <SelectContent className="max-h-48 z-[210]">
-                  {categoriasDespesaOrdenadas.map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
+                  {categoriasDespesaOrdenadas.map(([k, l]) => (
+                    <SelectItem key={k} value={k}>{l}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="sm:col-span-2">
               <Label>Descrição da Despesa *</Label>
-              <Input className="mt-1" value={form.descricao || ''} onChange={e => upd('descricao', e.target.value)} placeholder="Ex: Fatura E-Redes Maio..." />
+              <Input className="mt-1" value={form.descricao || ''} onChange={e => upd('descricao', e.target.value)} placeholder="Ex: Avença Elevadores..." />
             </div>
 
             <div>
@@ -464,27 +596,48 @@ export default function Movimentos() {
 
             <div>
               <Label>Conta a Debitar *</Label>
-              <Select value={form.conta} onValueChange={v => upd('conta', v)}>
+              <Select
+                value={form.conta}
+                onValueChange={v => {
+                  upd('conta', v);
+                  // Lógica de bloqueio inteligente:
+                  if (v === 'caixa') {
+                    upd('metodo_pagamento', 'numerario');
+                  } else if (v === 'banco' && form.metodo_pagamento === 'numerario') {
+                    upd('metodo_pagamento', 'transferencia'); // Volta ao default do banco
+                  }
+                }}
+              >
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent className="z-[210]">
-                  <SelectItem value="banco">Banco (Transferência/Débito)</SelectItem>
-                  <SelectItem value="caixa">Caixa (Numerário)</SelectItem>
+                  <SelectItem value="banco">Banco</SelectItem>
+                  <SelectItem value="caixa">Caixa</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>Método de Pagamento</Label>
-              <Select value={form.metodo_pagamento || ''} onValueChange={v => upd('metodo_pagamento', v)}>
+              <Select
+                value={form.metodo_pagamento || ''}
+                onValueChange={v => upd('metodo_pagamento', v)}
+                disabled={form.conta === 'caixa'}
+              >
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent className="z-[210]">
-                  <SelectItem value="transferencia">Transferência Bancária</SelectItem>
-                  <SelectItem value="debito_direto">Débito Direto</SelectItem>
-                  <SelectItem value="cheque">Cheque</SelectItem>
-                  <SelectItem value="numerario">Numerário (Dinheiro)</SelectItem>
+                  {form.conta === 'banco' ? (
+                    <>
+                      <SelectItem value="transferencia">Transferência Bancária</SelectItem>
+                      <SelectItem value="debito_direto">Débito Direto</SelectItem>
+                      <SelectItem value="deposito">Depósito</SelectItem>
+                      <SelectItem value="cheque">Cheque</SelectItem>
+                    </>
+                  ) : (
+                    <SelectItem value="numerario">Numerário (Dinheiro)</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="sm:col-span-2">
               <Label>Observações Adicionais</Label>
               <Input className="mt-1" value={form.observacoes || ''} onChange={e => upd('observacoes', e.target.value)} placeholder="Justificação, detalhes extras..." />
@@ -492,9 +645,9 @@ export default function Movimentos() {
           </div>
           <DialogFooter className="mt-4 pt-4 border-t border-border">
             <Button variant="outline" onClick={() => setOpenDespesa(false)}>Cancelar</Button>
-            <Button 
+            <Button
               className="bg-red-600 hover:bg-red-700 text-white"
-              onClick={() => save.mutate(form)} 
+              onClick={() => save.mutate(form)}
               disabled={save.isPending || !form.condominio_id || !form.valor || !form.descricao}
             >
               {save.isPending ? 'A registar...' : 'Registar Despesa'}
@@ -514,16 +667,16 @@ export default function Movimentos() {
             <div className="bg-muted/40 border border-border p-4 rounded-xl flex justify-between items-center">
               <div>
                 <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Saldo Transitado do Ano Anterior</p>
-                <p className="text-xs text-muted-foreground">Valor em caixa/banco à data de 1 de Janeiro.</p>
+                <p className="text-xs text-muted-foreground">Saldo à data de 31 de dezembro do ano anterior.</p>
               </div>
               <div className="flex items-center gap-1">
-                 <span className="text-lg font-bold">€</span>
-                 <Input 
-                  type="number" 
-                  className="w-32 font-bold text-right text-lg bg-background" 
-                  value={dreData.saldoInicial} 
-                  onChange={e => setDreData(p => ({...p, saldoInicial: parseFloat(e.target.value) || 0}))} 
-                 />
+                <span className="text-lg font-bold">€</span>
+                <Input
+                  type="number"
+                  className="w-32 font-bold text-right text-lg bg-background"
+                  value={dreData.saldoInicial}
+                  onChange={e => setDreData(p => ({ ...p, saldoInicial: parseFloat(e.target.value) || 0 }))}
+                />
               </div>
             </div>
 
@@ -537,17 +690,17 @@ export default function Movimentos() {
                   {categoriasReceitaOrdenadas.map(([k, label]) => (
                     <div key={k} className="flex items-center justify-between gap-2 border-b border-border/50 pb-2 last:border-0 last:pb-0">
                       <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
-                      <Input 
-                        type="number" 
-                        className="w-24 h-7 text-xs text-right font-semibold" 
-                        value={dreData.receitas[k] || 0} 
-                        onChange={e => setDreData(p => ({...p, receitas: {...p.receitas, [k]: parseFloat(e.target.value) || 0}}))} 
+                      <Input
+                        type="number"
+                        className="w-24 h-7 text-xs text-right font-semibold"
+                        value={dreData.receitas[k] || 0}
+                        onChange={e => setDreData(p => ({ ...p, receitas: { ...p.receitas, [k]: parseFloat(e.target.value) || 0 } }))}
                       />
                     </div>
                   ))}
                   <div className="pt-3 mt-1 border-t border-border flex justify-between items-center">
                     <span className="text-sm font-black text-emerald-700">Total Receitas</span>
-                    <span className="text-lg font-black text-emerald-700">€{Object.values(dreData.receitas).reduce((a,b)=>a+b,0).toFixed(2)}</span>
+                    <span className="text-lg font-black text-emerald-700">€{Object.values(dreData.receitas).reduce((a, b) => a + b, 0).toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -561,17 +714,17 @@ export default function Movimentos() {
                   {categoriasDespesaOrdenadas.map(([k, label]) => (
                     <div key={k} className="flex items-center justify-between gap-2 border-b border-border/50 pb-2 last:border-0 last:pb-0">
                       <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
-                      <Input 
-                        type="number" 
-                        className="w-24 h-7 text-xs text-right font-semibold" 
-                        value={dreData.despesas[k] || 0} 
-                        onChange={e => setDreData(p => ({...p, despesas: {...p.despesas, [k]: parseFloat(e.target.value) || 0}}))} 
+                      <Input
+                        type="number"
+                        className="w-24 h-7 text-xs text-right font-semibold"
+                        value={dreData.despesas[k] || 0}
+                        onChange={e => setDreData(p => ({ ...p, despesas: { ...p.despesas, [k]: parseFloat(e.target.value) || 0 } }))}
                       />
                     </div>
                   ))}
                   <div className="pt-3 mt-1 border-t border-border flex justify-between items-center">
                     <span className="text-sm font-black text-red-700">Total Despesas</span>
-                    <span className="text-lg font-black text-red-700">€{Object.values(dreData.despesas).reduce((a,b)=>a+b,0).toFixed(2)}</span>
+                    <span className="text-lg font-black text-red-700">€{Object.values(dreData.despesas).reduce((a, b) => a + b, 0).toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -581,17 +734,17 @@ export default function Movimentos() {
             <div className="border-t border-border pt-5 flex flex-col md:flex-row gap-6 items-end justify-between">
               <div className="w-full md:w-1/2">
                 <Label>Observações ao Fecho</Label>
-                <textarea 
-                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-y" 
+                <textarea
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-y"
                   placeholder="Parecer da administração, anomalias reportadas..."
                   value={dreData.observacoes}
-                  onChange={e => setDreData(p => ({...p, observacoes: e.target.value}))}
+                  onChange={e => setDreData(p => ({ ...p, observacoes: e.target.value }))}
                 />
               </div>
               <div className="w-full md:w-1/2 bg-blue-50/50 border border-blue-200 p-4 rounded-xl text-right">
                 <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-1">Saldo de Fecho (Transportar)</p>
                 <p className="text-4xl font-black text-blue-800">
-                  €{(dreData.saldoInicial + Object.values(dreData.receitas).reduce((a,b)=>a+b,0) - Object.values(dreData.despesas).reduce((a,b)=>a+b,0)).toFixed(2)}
+                  €{(dreData.saldoInicial + Object.values(dreData.receitas).reduce((a, b) => a + b, 0) - Object.values(dreData.despesas).reduce((a, b) => a + b, 0)).toFixed(2)}
                 </p>
               </div>
             </div>
@@ -599,13 +752,13 @@ export default function Movimentos() {
           </div>
 
           <DialogFooter className="mt-6 pt-4 border-t border-border flex justify-between sm:justify-between items-center">
-             <p className="text-xs text-muted-foreground hidden sm:block">Este documento servirá de base à aprovação de contas em Assembleia.</p>
-             <div className="flex gap-2">
-               <Button variant="outline" onClick={() => setOpenFecho(false)}>Cancelar</Button>
-               <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2" onClick={handleEmitirFecho}>
-                 <FileCheck className="w-4 h-4" /> Emitir PDF de Fecho
-               </Button>
-             </div>
+            <p className="text-xs text-muted-foreground hidden sm:block">Este documento servirá de base à aprovação de contas em assembleia.</p>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setOpenFecho(false)}>Cancelar</Button>
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2" onClick={handleEmitirFecho}>
+                <FileCheck className="w-4 h-4" /> Emitir PDF de Fecho
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

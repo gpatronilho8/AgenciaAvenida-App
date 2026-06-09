@@ -16,6 +16,7 @@ import { Settings, Plus, Search, Check, ChevronsUpDown, Mail, Download, Trash2, 
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import MapaQuotas from '@/components/quotas/MapaQuotas';
+import { format } from 'date-fns';
 
 // Helpers
 const mesesExtenso = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -67,7 +68,7 @@ const gerarReciboTeste = () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'Recibo_Pagamento_TESTE.pdf';
+  a.download = 'Recibo_Pagamento.pdf';
   a.click();
   URL.revokeObjectURL(url);
 };
@@ -97,12 +98,20 @@ export default function Quotas() {
   const [comboCondominioNovaOpen, setComboCondominioNovaOpen] = useState(false);
   const [comboCondominoOpen, setComboCondominoOpen] = useState(false);
 
-  // Estados Pagamentos
+  // Estados Pagamentos & Tesouraria
   const [pagamentoFiltro, setPagamentoFiltro] = useState('fracao');
   const [pagamentoAlvoId, setPagamentoAlvoId] = useState('');
   const [tipoLiquidacao, setTipoLiquidacao] = useState('total');
   const [quotasSelecionadas, setQuotasSelecionadas] = useState([]);
   const [valorPagoManual, setValorPagoManual] = useState("0.00");
+  
+  const [contaDestino, setContaDestino] = useState('banco');
+  const [metodoEscolhido, setMetodoEscolhido] = useState('transferencia');
+  const [dataPagamentoForm, setDataPagamentoForm] = useState(format(new Date(), 'yyyy-MM-dd'));
+
+  useEffect(() => {
+    if (contaDestino === 'caixa') setMetodoEscolhido('numerario');
+  }, [contaDestino]);
 
   // Queries
   const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
@@ -156,11 +165,7 @@ export default function Quotas() {
       else if (payload.tipo === 'extraordinaria') { payload.valor_mensal = 0; }
       return await agenciaAvenida.entities.ConfiguracaoQuota.create(payload);
     },
-    onSuccess: () => {
-      setOpenConfig(false);
-      qc.invalidateQueries(['configuracoes_quotas']);
-      toast.success('Configuração guardada com sucesso!');
-    },
+    onSuccess: () => { setOpenConfig(false); qc.invalidateQueries(['configuracoes_quotas']); toast.success('Configuração guardada com sucesso!'); },
     onError: (e) => toast.error('Erro: ' + e.message)
   });
 
@@ -195,109 +200,171 @@ export default function Quotas() {
         tipo: 'linha_faturacao_divida',
         descricao: dados.descricao || 'Dívida Externa Transitada',
         valor: parseFloat(dados.valor),
-        mes: null,
-        ano: null,
-        data_emissao: dataHoje,
-        data_vencimento: null,
-        estado: 'vencida'
+        mes: null, ano: null, data_emissao: dataHoje, data_vencimento: null, estado: 'vencida'
       };
-
       if (dados.id) {
         return await agenciaAvenida.entities.Quota.update(dados.id, { valor: payload.valor, descricao: payload.descricao, estado: 'vencida', data_vencimento: null, mes: null, ano: null });
       } else {
         return await agenciaAvenida.entities.Quota.create(payload);
       }
     },
-    onSuccess: () => {
-      setOpenDivida(false);
-      setDividaForm({ id: null, fracao_id: '', valor: '', descricao: 'Dívida Externa Transitada' });
-      qc.invalidateQueries({ queryKey: ['quotas'] });
-      toast.success('Dívida registada com sucesso!');
-    },
+    onSuccess: () => { setOpenDivida(false); setDividaForm({ id: null, fracao_id: '', valor: '', descricao: 'Dívida Externa Transitada' }); qc.invalidateQueries({ queryKey: ['quotas'] }); toast.success('Dívida registada com sucesso!'); },
     onError: (e) => toast.error('Erro: ' + e.message)
   });
 
   const registarPagamento = useMutation({
     mutationFn: async () => {
       const primeiraQuota = pendentesReais.find(q => quotasSelecionadas.includes(q.id)) || pendentesReais[0];
-      const idCondominio = primeiraQuota?.condominio_id || selectedCondominioId;
       const idFracao = primeiraQuota?.fracao_id || (pagamentoFiltro === 'fracao' ? pagamentoAlvoId : null);
-      
-      const dataHoje = new Date().toISOString().split('T')[0];
       const valorManual = parseFloat(valorPagoManual) || 0;
 
       const selecionadas = pendentesReais.filter(q => quotasSelecionadas.includes(q.id));
       const creditosSelecionados = selecionadas.filter(q => q.valor < 0);
       const debitosSelecionados = selecionadas.filter(q => q.valor > 0);
 
-      let valorDisponivel = valorManual + Math.abs(creditosSelecionados.reduce((acc, q) => acc + q.valor, 0));
+      // Fila de Prioridade: Dívidas externas primeiro, depois antiguidade da data_vencimento
+      const debitosOrdenados = [...debitosSelecionados].sort((a, b) => {
+        if (a.tipo === 'linha_faturacao_divida' && b.tipo !== 'linha_faturacao_divida') return -1;
+        if (a.tipo !== 'linha_faturacao_divida' && b.tipo === 'linha_faturacao_divida') return 1;
+        if (!a.data_vencimento) return 1;
+        if (!b.data_vencimento) return -1;
+        return a.data_vencimento.localeCompare(b.data_vencimento);
+      });
+
+      let creditosDisponiveis = Math.abs(creditosSelecionados.reduce((acc, q) => acc + q.valor, 0));
+      let dinheiroManualDisponivel = valorManual;
       const promises = [];
+      const splitMovimentos = {};
 
       for (const c of creditosSelecionados) {
-        promises.push(agenciaAvenida.entities.Quota.update(c.id, { estado: 'pago' }));
+        promises.push(agenciaAvenida.entities.Quota.update(c.id, { estado: 'pago', data_pagamento: dataPagamentoForm }));
       }
 
-      for (const d of debitosSelecionados) {
-        const valorEmFalta = d.valor - (d.valor_pago || 0);
-        if (valorDisponivel >= valorEmFalta) {
-            promises.push(agenciaAvenida.entities.Quota.update(d.id, { estado: 'pago', valor_pago: d.valor }));
-            valorDisponivel -= valorEmFalta;
-        } else if (valorDisponivel > 0) {
-            promises.push(agenciaAvenida.entities.Quota.update(d.id, { valor_pago: (d.valor_pago || 0) + valorDisponivel }));
-            valorDisponivel = 0;
+      for (const d of debitosOrdenados) {
+        let emFalta = d.valor - (d.valor_pago || 0);
+        let dinheiroManualGastoAqui = 0;
+
+        if (creditosDisponiveis > 0) {
+          const usoCredito = Math.min(creditosDisponiveis, emFalta);
+          creditosDisponiveis -= usoCredito;
+          emFalta -= usoCredito;
+        }
+
+        if (emFalta > 0 && dinheiroManualDisponivel > 0) {
+          dinheiroManualGastoAqui = Math.min(dinheiroManualDisponivel, emFalta);
+          dinheiroManualDisponivel -= dinheiroManualGastoAqui;
+          emFalta -= dinheiroManualGastoAqui;
+
+          if (!splitMovimentos[d.condominio_id]) splitMovimentos[d.condominio_id] = {};
+          splitMovimentos[d.condominio_id][d.tipo] = (splitMovimentos[d.condominio_id][d.tipo] || 0) + dinheiroManualGastoAqui;
+        }
+
+        const valorPagoAcumulado = d.valor - emFalta;
+        if (emFalta <= 0.005) {
+          promises.push(agenciaAvenida.entities.Quota.update(d.id, { estado: 'pago', valor_pago: d.valor, data_pagamento: dataPagamentoForm }));
+        } else {
+          promises.push(agenciaAvenida.entities.Quota.update(d.id, { valor_pago: valorPagoAcumulado, data_pagamento: dataPagamentoForm }));
         }
       }
 
-      if (valorDisponivel > 0.005 && idFracao) {
+      if (dinheiroManualDisponivel > 0.005 && idFracao) {
+         const targetCondId = primeiraQuota?.condominio_id || selectedCondominioId;
          const existingCredit = quotas.find(q => q.fracao_id === idFracao && q.tipo === 'linha_faturacao_credito' && q.estado === 'pendente' && !quotasSelecionadas.includes(q.id));
+         
          if (existingCredit) {
-            promises.push(agenciaAvenida.entities.Quota.update(existingCredit.id, { valor: existingCredit.valor - valorDisponivel }));
+            promises.push(agenciaAvenida.entities.Quota.update(existingCredit.id, { valor: existingCredit.valor - dinheiroManualDisponivel, data_pagamento: dataPagamentoForm }));
          } else {
             promises.push(agenciaAvenida.entities.Quota.create({
-                condominio_id: idCondominio,
-                fracao_id: idFracao,
-                tipo: 'linha_faturacao_credito',
-                descricao: 'Crédito (Pagamento Não Alocado)',
-                valor: -valorDisponivel,
-                mes: null, ano: null, data_emissao: dataHoje, data_vencimento: null, estado: 'pendente'
+                condominio_id: targetCondId, fracao_id: idFracao, tipo: 'linha_faturacao_credito',
+                descricao: 'Crédito (Pagamento Não Alocado)', valor: -dinheiroManualDisponivel,
+                mes: null, ano: null, data_emissao: dataPagamentoForm, data_pagamento: dataPagamentoForm, data_vencimento: null, estado: 'pendente'
             }));
          }
+
+         if (!splitMovimentos[targetCondId]) splitMovimentos[targetCondId] = {};
+         splitMovimentos[targetCondId]['linha_faturacao_credito'] = (splitMovimentos[targetCondId]['linha_faturacao_credito'] || 0) + dinheiroManualDisponivel;
       }
 
+      await Promise.all(promises);
+
+      // Injeção Multi-Condomínio em Tesouraria baseada na data escolhida
       if (valorManual > 0) {
-        const novoMovimento = {
-            condominio_id: idCondominio,
-            tipo: 'receita',
-            categoria: 'quota',
-            descricao: `Liquidação de Quotas - ${pagamentoFiltro === 'fracao' ? 'Fração' : 'Condómino'}`,
-            valor: valorManual,
-            data: dataHoje,
-            estado: 'efetivado',
-            conta: 'banco'
-        };
-        await agenciaAvenida.entities.Movimento.create(novoMovimento);
+        for (const [condId, dataTipos] of Object.entries(splitMovimentos)) {
+          
+          const fracaoObj = fracoes.find(f => f.id === idFracao);
+          const condObj = condominios.find(c => c.id === condId);
+          
+          let nomePagador = 'Desconhecido';
+          if (pagamentoFiltro === 'condomino') {
+            nomePagador = pessoas.find(p => p.id === pagamentoAlvoId)?.nome || 'Desconhecido';
+          } else if (fracaoObj) {
+            const ownerIds = getOwners(fracaoObj);
+            if (ownerIds.length > 0) {
+              nomePagador = pessoas.find(p => p.id === ownerIds[0])?.nome || 'Desconhecido';
+            }
+          }
+
+          const textoFracao = fracaoObj ? formatFracao(fracaoObj) : 'N/A';
+          const textoCondominio = condObj ? condObj.nome : 'N/A';
+
+          for (const [tipoFaturacao, montanteReal] of Object.entries(dataTipos)) {
+            let catMov = 'taxas_outros';
+            let descMov = 'Pagamento de Taxas / Outros Faturados';
+
+            if (tipoFaturacao === 'mensal') { catMov = 'quota'; descMov = 'Pagamento de Quotas'; }
+            else if (tipoFaturacao === 'linha_faturacao_divida') { catMov = 'recuperacao_divida'; descMov = 'Pagamento de Dívidas'; }
+            else if (tipoFaturacao === 'linha_faturacao_credito') { catMov = 'acerto_contabilistico'; descMov = 'Pagamento Não Alocado'; }
+
+            await agenciaAvenida.entities.Movimento.create({
+              condominio_id: condId,
+              tipo: 'receita', 
+              categoria: catMov,
+              descricao: descMov,
+              valor: montanteReal,
+              data: dataPagamentoForm, 
+              conta: contaDestino,
+              metodo_pagamento: metodoEscolhido,
+              observacoes: `Fração: ${textoFracao} · Condomínio: ${textoCondominio} · Pagador: ${nomePagador}`
+            });
+          }
+          
+          const condToUpdate = condominios.find(c => c.id === condId);
+          if (condToUpdate) {
+            const field = contaDestino === 'banco' ? 'saldo_banco' : 'saldo_caixa';
+            await agenciaAvenida.entities.Condominio.update(condId, { [field]: (condToUpdate[field] || 0) + valorManual });
+          }
+        }
       }
-      return true;
+      return { wasManual: valorManual > 0 };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ['quotas'] });
       qc.invalidateQueries({ queryKey: ['movimentos'] });
+      qc.invalidateQueries({ queryKey: ['condominios'] });
 
       toast.success('Processamento concluído com sucesso!');
-      if ((parseFloat(valorPagoManual) || 0) > 0) toast.info('Email enviado ao condómino.', { icon: <Mail className="w-4 h-4" /> });
-      gerarReciboTeste();
-
       handleClosePagamento();
+      
+      setOpenRecibo({ isMulti: true, wasManual: result.wasManual });
     },
     onError: (error) => toast.error('Erro no processamento: ' + error.message)
   });
 
+  // RESTORED UI STATE HANDLERS
   const updConfig = (k, v) => setConfigForm(p => ({ ...p, [k]: v }));
   const updQuota = (k, v) => setQuotaForm(p => ({ ...p, [k]: v }));
 
   const handleOpenConfig = () => { setConfigForm({ ...emptyConfig, condominio_id: selectedCondominioId !== 'all' ? selectedCondominioId : '' }); setOpenConfig(true); };
   const handleOpenNova = () => { setQuotaForm({ ...emptyQuota, condominio_id: selectedCondominioId !== 'all' ? selectedCondominioId : '' }); setOpenNova(true); };
-  const handleClosePagamento = () => { setOpenPagamento(false); setPagamentoFiltro('fracao'); setPagamentoAlvoId(''); setQuotasSelecionadas([]); setTipoLiquidacao('total'); setValorPagoManual("0.00"); };
+  const handleClosePagamento = () => { 
+    setOpenPagamento(false); 
+    setPagamentoFiltro('fracao'); 
+    setPagamentoAlvoId(''); 
+    setQuotasSelecionadas([]); 
+    setTipoLiquidacao('total'); 
+    setValorPagoManual("0.00"); 
+    setDataPagamentoForm(format(new Date(), 'yyyy-MM-dd')); 
+  };
 
   const handleSelectFracaoDivida = (fracaoId) => {
     const dividaExistente = quotas.find(q =>
@@ -332,10 +399,7 @@ export default function Quotas() {
 
   const toggleSelectQuota = (id) => setQuotasSelecionadas(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   const divisor = (tipoLiquidacao === 'parcial' && numTitulares > 1) ? numTitulares : 1;
-  
-  const totalSelecionado = pendentesReais
-    .filter(q => quotasSelecionadas.includes(q.id))
-    .reduce((acc, curr) => acc + ((curr.valor - (curr.valor_pago || 0)) / divisor), 0);
+  const totalSelecionado = pendentesReais.filter(q => quotasSelecionadas.includes(q.id)).reduce((acc, curr) => acc + ((curr.valor - (curr.valor_pago || 0)) / divisor), 0);
 
   useEffect(() => {
     setValorPagoManual(totalSelecionado.toFixed(2));
@@ -363,6 +427,7 @@ export default function Quotas() {
             <TrendingDown className="w-5 h-5" /> Gerir Dívida Externa
           </Button>
         )}
+        <div className="flex-1" />
         <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white shadow-md gap-2" onClick={() => toast.success('Download do Extrato CC iniciado.')}>
           <FileText className="w-5 h-5" /> Emitir Extrato CC
         </Button>
@@ -420,6 +485,10 @@ export default function Quotas() {
                   const descFinal = (q.tipo === 'mensal' && q.mes) ? `${descBase} (${mesesExtenso[q.mes-1]} ${q.ano})` : descBase;
                   const displayVencimento = q.data_vencimento || (q.mes ? `${String(q.mes).padStart(2, '0')}/${q.ano}` : 'Sem Limite');
 
+                  const diffMinutes = q.created_at ? (new Date() - new Date(q.created_at)) / 60000 : 0;
+                  const podeEliminarLinha = q.estado === 'pendente' && q.tipo === 'mensal' && diffMinutes < 10;
+                  const hasReceipt = q.estado === 'pago' || q.valor_pago > 0;
+
                   return (
                     <tr key={q.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 font-semibold text-primary">{formatFracao(fracao)}</td>
@@ -432,7 +501,7 @@ export default function Quotas() {
                             <span className="block text-[10px] text-emerald-600 font-bold">
                               Pagamento Parcial: €{q.valor_pago.toFixed(2)}
                             </span>
-                            <span className="block text-[10px] text-amber-600 mt-0.5 font-bold">
+                            <span className="block text-[10px] text-amber-600 font-bold">
                               Valor Restante: €{(q.valor - q.valor_pago).toFixed(2)}
                             </span>
                           </div>
@@ -445,17 +514,27 @@ export default function Quotas() {
                             q.estado === 'vencida' ? 'bg-red-50 text-red-700 border-red-200' :
                               'bg-amber-50 text-amber-700 border-amber-200'
                         )}>
-                          {q.estado === 'pago' ? 'Pago' : q.estado === 'vencida' ? 'Vencida' : 'Pendente'}
+                          {q.estado === 'pago' ? `Pago a ${q.data_pagamento ? format(new Date(q.data_pagamento), 'dd/MM/yyyy') : format(new Date(), 'dd/MM/yyyy')}` : q.estado === 'vencida' ? 'Vencida' : 'Pendente'}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex justify-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50 cursor-pointer relative z-20" onClick={() => setOpenRecibo(q)} title="Consultar Recibo">
-                            <FileText className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 cursor-pointer relative z-20" onClick={() => setOpenDelete(q)} title="Eliminar">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {hasReceipt && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50 cursor-pointer relative z-20" onClick={() => setOpenRecibo(q)} title="Consultar Recibo">
+                              <FileText className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {podeEliminarLinha && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-red-500 hover:bg-red-50 cursor-pointer relative z-20" 
+                              onClick={(e) => { e.stopPropagation(); setOpenDelete(q); }} 
+                              title="Eliminar"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -471,22 +550,15 @@ export default function Quotas() {
         <div className="bg-card border border-border rounded-xl p-8 text-center shadow-sm">
           <BarChart2 className="w-8 h-8 text-muted-foreground mx-auto mb-3 opacity-50" />
           <h3 className="font-semibold text-foreground">Mapa Anual Indisponível</h3>
-          <p className="text-sm text-muted-foreground mt-1">Selecione um condomínio específico na barra superior para visualizar o mapa anual de quotas e dívidas.</p>
+          <p className="text-sm text-muted-foreground mt-1">Selecione um condomínio específico para visualizar o mapa.</p>
         </div>
       ) : fracoesDoCondominioAtual.length === 0 ? (
         <div className="bg-card border border-border rounded-xl p-8 text-center shadow-sm">
           <AlertCircle className="w-8 h-8 text-muted-foreground mx-auto mb-3 opacity-50" />
           <h3 className="font-semibold text-foreground">Sem Frações</h3>
-          <p className="text-sm text-muted-foreground mt-1">Este condomínio não tem frações. Adicione frações para visualizar o mapa.</p>
         </div>
       ) : (
-        <MapaQuotas
-          condominioId={selectedCondominioId}
-          fracoes={fracoesDoCondominioAtual}
-          quotas={quotas}
-          pessoas={pessoas}
-          ano={selectedAno}
-        />
+        <MapaQuotas condominioId={selectedCondominioId} fracoes={fracoesDoCondominioAtual} quotas={quotas} pessoas={pessoas} ano={selectedAno} />
       )}
 
       {/* DIALOG: GERIR DÍVIDA EXTERNA */}
@@ -521,11 +593,7 @@ export default function Quotas() {
           </div>
           <DialogFooter className="mt-5 pt-4 border-t border-border">
             <Button variant="outline" onClick={() => setOpenDivida(false)}>Cancelar</Button>
-            <Button
-              variant="destructive"
-              disabled={!dividaForm.fracao_id || parseFloat(dividaForm.valor) <= 0 || !dividaForm.valor || registarDivida.isPending}
-              onClick={() => registarDivida.mutate(dividaForm)}
-            >
+            <Button variant="destructive" disabled={!dividaForm.fracao_id || parseFloat(dividaForm.valor) <= 0 || !dividaForm.valor || registarDivida.isPending} onClick={() => registarDivida.mutate(dividaForm)}>
               {registarDivida.isPending ? 'A Guardar...' : (dividaForm.id ? 'Atualizar Dívida' : 'Registar Dívida')}
             </Button>
           </DialogFooter>
@@ -539,7 +607,6 @@ export default function Quotas() {
             <DialogTitle>Configuração de Quotas</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-
             <div className="flex flex-col gap-1.5">
               <Label>Condomínio *</Label>
               <Popover open={comboCondominioOpen} onOpenChange={setComboCondominioOpen}>
@@ -566,7 +633,6 @@ export default function Quotas() {
                 </PopoverContent>
               </Popover>
             </div>
-
             <div>
               <Label>Tipo de Configuração</Label>
               <Select value={configForm.tipo} onValueChange={v => updConfig('tipo', v)}>
@@ -581,107 +647,35 @@ export default function Quotas() {
 
             {configForm.tipo === 'extraordinaria' && (
               <div className="space-y-4 border-t pt-3 mt-1">
-                <div>
-                  <Label>Descrição da Quota Extraordinária *</Label>
-                  <Input className="mt-1" value={configForm.descricao || ''} onChange={e => updConfig('descricao', e.target.value)} placeholder="Ex: Obras Telhado 2026..." />
-                </div>
-                <div>
-                  <Label>Valor Total Global (€) *</Label>
-                  <Input className="mt-1" type="number" value={configForm.valor_total || ''} onChange={e => updConfig('valor_total', parseFloat(e.target.value) || 0)} placeholder="0.00" />
+                <div><Label>Descrição da Quota Extraordinária *</Label><Input className="mt-1" value={configForm.descricao || ''} onChange={e => updConfig('descricao', e.target.value)} placeholder="Ex: Obras Telhado 2026..." /></div>
+                <div><Label>Valor Total Global (€) *</Label><Input className="mt-1" type="number" value={configForm.valor_total || ''} onChange={e => updConfig('valor_total', parseFloat(e.target.value) || 0)} placeholder="0.00" /></div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><Label>Modo de Divisão</Label><Select value={configForm.modo_divisao || 'fixo'} onValueChange={v => updConfig('modo_divisao', v)}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent className="z-[210]"><SelectItem value="fixo">Divisão Fixo Igual</SelectItem><SelectItem value="permilagem">Por Permilagem</SelectItem></SelectContent></Select></div>
+                  <div><Label>Duração (Meses)</Label><Input className="mt-1" type="number" min={1} value={configForm.repeticoes || ''} onChange={e => updConfig('repeticoes', parseInt(e.target.value) || '')} /></div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Modo de Divisão</Label>
-                    <Select value={configForm.modo_divisao || 'fixo'} onValueChange={v => updConfig('modo_divisao', v)}>
-                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent className="z-[210]">
-                        <SelectItem value="fixo">Divisão Fixo Igual</SelectItem>
-                        <SelectItem value="permilagem">Por Permilagem</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Duração (Meses)</Label>
-                    <Input className="mt-1" type="number" min={1} value={configForm.repeticoes || ''} onChange={e => updConfig('repeticoes', parseInt(e.target.value) || '')} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Mês de Início</Label>
-                    <Select value={String(configForm.mes_inicio)} onValueChange={v => updConfig('mes_inicio', parseInt(v))}>
-                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent className="z-[210] no-scrollbar max-h-36">
-                        {mesesExtenso.map((m, i) => <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Ano de Início</Label>
-                    <Select value={String(configForm.ano_inicio)} onValueChange={v => updConfig('ano_inicio', parseInt(v))}>
-                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent className="z-[210]">
-                        {[2025, 2026, 2027, 2028].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <div><Label>Mês de Início</Label><Select value={String(configForm.mes_inicio)} onValueChange={v => updConfig('mes_inicio', parseInt(v))}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent className="z-[210] no-scrollbar max-h-36">{mesesExtenso.map((m, i) => <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>)}</SelectContent></Select></div>
+                  <div><Label>Ano de Início</Label><Select value={String(configForm.ano_inicio)} onValueChange={v => updConfig('ano_inicio', parseInt(v))}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent className="z-[210]">{[2025, 2026, 2027, 2028].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
                 </div>
               </div>
             )}
 
             {configForm.tipo === 'mensal' && (
               <div className="space-y-4 border-t pt-3 mt-1">
-                <div>
-                  <Label>Valor da Quota Mensal (Quota + FCR) (€)</Label>
-                  <Input className="mt-1" type="number" value={configForm.valor_mensal || ''} onChange={e => updConfig('valor_mensal', parseFloat(e.target.value) || 0)} placeholder="0.00" />
-                </div>
+                <div><Label>Valor da Quota Mensal (Quota + FCR) (€)</Label><Input className="mt-1" type="number" value={configForm.valor_mensal || ''} onChange={e => updConfig('valor_mensal', parseFloat(e.target.value) || 0)} placeholder="0.00" /></div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Mês de Início</Label>
-                    <Select value={String(configForm.mes_inicio)} onValueChange={v => updConfig('mes_inicio', parseInt(v))}>
-                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent className="z-[210] no-scrollbar max-h-36">
-                        {mesesExtenso.map((m, i) => <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Ano de Início</Label>
-                    <Select value={String(configForm.ano_inicio)} onValueChange={v => updConfig('ano_inicio', parseInt(v))}>
-                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent className="z-[210]">
-                        {[2025, 2026, 2027, 2028].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <div><Label>Mês de Início</Label><Select value={String(configForm.mes_inicio)} onValueChange={v => updConfig('mes_inicio', parseInt(v))}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent className="z-[210] no-scrollbar max-h-36">{mesesExtenso.map((m, i) => <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>)}</SelectContent></Select></div>
+                  <div><Label>Ano de Início</Label><Select value={String(configForm.ano_inicio)} onValueChange={v => updConfig('ano_inicio', parseInt(v))}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent className="z-[210]">{[2025, 2026, 2027, 2028].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
                 </div>
               </div>
             )}
 
             {configForm.tipo === 'permilagem' && (
               <div className="space-y-4 border-t pt-3 mt-1">
-                <div>
-                  <Label>Valor Total do Orçamento Anual (€)</Label>
-                  <Input className="mt-1" type="number" value={configForm.valor_total || ''} onChange={e => updConfig('valor_total', parseFloat(e.target.value) || 0)} placeholder="0.00" />
-                </div>
+                <div><Label>Valor Total do Orçamento Anual (€)</Label><Input className="mt-1" type="number" value={configForm.valor_total || ''} onChange={e => updConfig('valor_total', parseFloat(e.target.value) || 0)} placeholder="0.00" /></div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Mês de Início</Label>
-                    <Select value={String(configForm.mes_inicio)} onValueChange={v => updConfig('mes_inicio', parseInt(v))}>
-                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent className="z-[210] no-scrollbar max-h-36">
-                        {mesesExtenso.map((m, i) => <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Ano de Início</Label>
-                    <Select value={String(configForm.ano_inicio)} onValueChange={v => updConfig('ano_inicio', parseInt(v))}>
-                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent className="z-[210]">
-                        {[2025, 2026, 2027, 2028].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <div><Label>Mês de Início</Label><Select value={String(configForm.mes_inicio)} onValueChange={v => updConfig('mes_inicio', parseInt(v))}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent className="z-[210] no-scrollbar max-h-36">{mesesExtenso.map((m, i) => <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>)}</SelectContent></Select></div>
+                  <div><Label>Ano de Início</Label><Select value={String(configForm.ano_inicio)} onValueChange={v => updConfig('ano_inicio', parseInt(v))}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent className="z-[210]">{[2025, 2026, 2027, 2028].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
                 </div>
               </div>
             )}
@@ -754,7 +748,6 @@ export default function Quotas() {
                 </PopoverContent>
               </Popover>
             </div>
-
             <div>
               <Label>Fração *</Label>
               <Select disabled={!quotaForm.condominio_id || fracoesCondominio.length === 0} value={quotaForm.fracao_id} onValueChange={v => updQuota('fracao_id', v)}>
@@ -768,7 +761,6 @@ export default function Quotas() {
                 </SelectContent>
               </Select>
             </div>
-
             <div>
               <Label>Tipo</Label>
               <Select value={quotaForm.tipo} onValueChange={v => updQuota('tipo', v)}>
@@ -779,7 +771,6 @@ export default function Quotas() {
                 </SelectContent>
               </Select>
             </div>
-
             {quotaForm.tipo === 'linha_faturacao' ? (
               <div>
                 <Label>Descrição da Linha</Label>
@@ -791,7 +782,6 @@ export default function Quotas() {
                 <Input className="mt-1 bg-muted text-muted-foreground font-medium" disabled value="Quota + FCR" />
               </div>
             )}
-
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <Label>Valor da Linha (€) *</Label>
@@ -831,7 +821,7 @@ export default function Quotas() {
 
       {/* MODAL EFETUAR PAGAMENTO */}
       <Dialog open={openPagamento} onOpenChange={(val) => { if (!val) handleClosePagamento(); else setOpenPagamento(true); }}>
-        <DialogContent className="w-[94vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto no-scrollbar rounded-xl p-6 z-[200]">
+        <DialogContent className="w-[94vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto no-scrollbar rounded-xl p-6 z-[200]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Banknote className="w-5 h-5 text-emerald-600" /> Registar Pagamento & Emissão de Recibo</DialogTitle>
           </DialogHeader>
@@ -889,14 +879,43 @@ export default function Quotas() {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-muted/20 p-4 rounded-xl border">
+              <div>
+                <Label className="text-xs font-bold uppercase tracking-wider">Conta de Destino</Label>
+                <Select value={contaDestino} onValueChange={v => { setContaDestino(v); if(v==='caixa') setMetodoEscolhido('numerario'); else setMetodoEscolhido('transferencia'); }} disabled={!pagamentoAlvoId}>
+                  <SelectTrigger className="mt-1 bg-background"><SelectValue /></SelectTrigger>
+                  <SelectContent className="z-[210]">
+                    <SelectItem value="banco">Banco</SelectItem>
+                    <SelectItem value="caixa">Caixa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs font-bold uppercase tracking-wider">Método de Pagamento</Label>
+                <Select value={metodoEscolhido} onValueChange={setMetodoEscolhido} disabled={!pagamentoAlvoId || contaDestino === 'caixa'}>
+                  <SelectTrigger className="mt-1 bg-background"><SelectValue /></SelectTrigger>
+                  <SelectContent className="z-[210]">
+                    {contaDestino === 'banco' ? (
+                      <>
+                        <SelectItem value="transferencia">Transferência Bancária</SelectItem>
+                        <SelectItem value="debito_direto">Débito Direto</SelectItem>
+                        <SelectItem value="deposito">Depósito</SelectItem>
+                        <SelectItem value="cheque">Cheque</SelectItem>
+                      </>
+                    ) : (
+                      <SelectItem value="numerario">Numerário (Dinheiro)</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs font-bold uppercase tracking-wider">Data Real do Pagamento *</Label>
+                <Input type="date" value={dataPagamentoForm} onChange={e => setDataPagamentoForm(e.target.value)} disabled={!pagamentoAlvoId} className="mt-1 bg-background" />
+              </div>
+            </div>
+
             {pagamentoAlvoId ? (
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5 text-amber-500" /> Quotas Pendentes
-                  </h4>
-                </div>
-
                 <div className="border border-border rounded-lg overflow-hidden bg-background">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-muted/30 text-xs font-semibold text-muted-foreground">
@@ -927,7 +946,7 @@ export default function Quotas() {
                               {q.descricao || (q.tipo === 'mensal' ? 'Quota Mensal' : 'Dívida')}
                             </td>
                             <td className="p-3 text-muted-foreground text-xs">{q.mes ? `${mesesExtenso[q.mes-1]} ${q.ano}` : 'Transitada'}</td>
-                            <td className="p-3 text-right font-bold">€{valorEmFalta.toFixed(2)}</td>
+                            <td className={cn("p-3 text-right font-bold", valorEmFalta < 0 ? 'text-blue-600' : '')}>€{valorEmFalta.toFixed(2)}</td>
                           </tr>
                         );
                       })}
@@ -940,7 +959,7 @@ export default function Quotas() {
               </div>
             ) : (
               <div className="py-12 border border-dashed rounded-xl text-center text-sm text-muted-foreground bg-muted/10">
-                Selecione uma fração ou condómino acima para carregar a conta-corrente.
+                Selecione o alvo para carregar a conta-corrente.
               </div>
             )}
 
@@ -952,11 +971,12 @@ export default function Quotas() {
                   <input 
                     type="number" 
                     step="0.01"
+                    min="0"
                     disabled={!pagamentoAlvoId}
                     value={valorPagoManual}
                     onChange={e => setValorPagoManual(e.target.value)}
                     className={cn(
-                      "bg-transparent border-b border-dashed border-emerald-300 hover:border-emerald-600 focus:border-emerald-600 focus:outline-none w-28 p-0",
+                      "bg-transparent border-b border-dashed border-emerald-300 hover:border-emerald-600 focus:border-emerald-600 focus:outline-none w-32 p-0",
                       !pagamentoAlvoId && "opacity-50 cursor-not-allowed border-transparent"
                     )}
                   />
@@ -964,6 +984,11 @@ export default function Quotas() {
                 {(parseFloat(valorPagoManual) || 0) > totalSelecionado + 0.005 && (
                   <span className="text-[10px] text-emerald-700 font-bold block mt-1">
                     DOS QUAIS, €{((parseFloat(valorPagoManual) || 0) - totalSelecionado).toFixed(2)} FICAM EM CRÉDITO
+                  </span>
+                )}
+                {(parseFloat(valorPagoManual) || 0) === 0 && quotasSelecionadas.length > 0 && (
+                  <span className="text-[10px] text-blue-600 font-bold block mt-1">
+                    COMPENSAÇÃO DE SALDOS INTERNOS (NÃO GERA MOVIMENTO BANCÁRIO)
                   </span>
                 )}
               </div>
@@ -982,27 +1007,72 @@ export default function Quotas() {
         </DialogContent>
       </Dialog>
 
-      {/* POPUP RECIBO E ELIMINAR */}
+      {/* POPUP SELEÇÃO DE MÚLTIPLOS RECIBOS */}
       <Dialog open={!!openRecibo} onOpenChange={(open) => !open && setOpenRecibo(null)}>
-        <DialogContent className="w-[92vw] sm:max-w-sm max-h-[85vh] overflow-y-auto no-scrollbar rounded-xl p-5 z-[200]">
+        <DialogContent className="w-[92vw] sm:max-w-md max-h-[85vh] overflow-y-auto no-scrollbar rounded-xl p-5 z-[200]">
           <DialogHeader>
-            <DialogTitle>Consultar Recibo</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-blue-600" /> Histórico de Recibos / Quitação
+            </DialogTitle>
           </DialogHeader>
+          
           <div className="space-y-4 mt-2">
-            <p className="text-sm text-muted-foreground leading-relaxed">Como pretende disponibilizar o recibo unificado referente a esta quota?</p>
+            {openRecibo?.isMulti ? (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground leading-relaxed">Transação concluída. Pretende efetuar o download do documento PDF consolidado desta operação?</p>
+                <Button variant="outline" className="w-full gap-2" onClick={() => { gerarReciboTeste(); toast.success('Download do recibo unificado concluído.'); setOpenRecibo(null); }}>
+                  <Download className="w-4 h-4" /> Descarregar Recibo Geral
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                 <p className="text-xs text-muted-foreground">Esta faturação possui tranches ou amortizações registadas. Escolha o documento associado:</p>
+                 
+                 <div className="flex flex-col gap-2">
+                   <Button variant="outline" className="w-full justify-between text-left h-auto py-2.5 px-3 border bg-card" onClick={() => { gerarReciboTeste(); toast.success('Download do Recibo Geral Unificado iniciado.'); }}>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-foreground">Recibo Geral Unificado (Total)</span>
+                        <span className="text-[10px] text-muted-foreground">Quitação total de €{(openRecibo?.valor || 0).toFixed(2)}</span>
+                      </div>
+                      <Download className="w-4 h-4 text-muted-foreground" />
+                   </Button>
+
+                   <Button variant="outline" className="w-full justify-between text-left h-auto py-2.5 px-3 border border-dashed" onClick={() => { gerarReciboTeste(); toast.success('Download do Recibo da Tranche #1 iniciado.'); }}>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-medium text-emerald-700">Recibo Parcial - Tranche #1</span>
+                        <span className="text-[10px] text-muted-foreground">Liquidação inicial de fundos</span>
+                      </div>
+                      <Download className="w-4 h-4 text-emerald-600" />
+                   </Button>
+
+                   {openRecibo?.valor_pago > 0 && (
+                     <Button variant="outline" className="w-full justify-between text-left h-auto py-2.5 px-3 border border-dashed" onClick={() => { gerarReciboTeste(); toast.success('Download do Recibo da Tranche #2 iniciado.'); }}>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-medium text-amber-700">Recibo Parcial - Tranche #2 (Amortização)</span>
+                          <span className="text-[10px] text-muted-foreground">Abatimento corrente na conta-corrente</span>
+                        </div>
+                        <Download className="w-4 h-4 text-amber-600" />
+                     </Button>
+                   )}
+                 </div>
+              </div>
+            )}
+
+            <div className="relative flex py-1 items-center">
+              <div className="flex-grow border-t border-border"></div>
+              <span className="flex-shrink-0 mx-3 text-muted-foreground text-[9px] uppercase tracking-wider font-bold">Notificações</span>
+              <div className="flex-grow border-t border-border"></div>
+            </div>
+
             <div>
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Enviar por Correio Eletrónico</Label>
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Disponibilizar por Email</Label>
               <div className="flex gap-2 mt-1">
-                <Input defaultValue="condomino@email.com" placeholder="Email do condómino..." />
-                <Button variant="secondary" size="icon" onClick={() => { setOpenRecibo(null); toast.success('Recibo enviado por e-mail com sucesso!'); }}><Mail className="w-4 h-4" /></Button>
+                <Input defaultValue="condomino@email.com" placeholder="Email do destinatário..." />
+                <Button variant="secondary" size="icon" onClick={() => { setOpenRecibo(null); toast.success('Documentação reencaminhada por e-mail.'); }}>
+                  <Mail className="w-4 h-4" />
+                </Button>
               </div>
             </div>
-            <div className="relative flex py-2 items-center">
-              <div className="flex-grow border-t border-border"></div>
-              <span className="flex-shrink-0 mx-3 text-muted-foreground text-[10px] uppercase tracking-wider font-bold">OU</span>
-              <div className="flex-grow border-t border-border"></div>
-            </div>
-            <Button variant="outline" className="w-full gap-2 text-foreground" onClick={() => { setOpenRecibo(null); gerarReciboTeste(); toast.success('Download do PDF iniciado.'); }}><Download className="w-4 h-4" /> Descarregar Documento PDF</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -1017,7 +1087,7 @@ export default function Quotas() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction className="bg-red-500 hover:bg-red-600 border-red-500" onClick={() => deleteQuota.mutate(openDelete.id)}>Eliminar</AlertDialogAction>
+            <AlertDialogAction className="bg-red-500 hover:bg-red-600 border-red-500" onClick={() => deleteQuota.mutate(openDelete?.id)}>Eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
