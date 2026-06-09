@@ -137,7 +137,7 @@ export default function Movimentos() {
       qc.invalidateQueries({ queryKey: ['movimentos'] });
       qc.invalidateQueries({ queryKey: ['condominios'] });
       setOpenDespesa(false);
-      toast.success(editing ? 'Despesa atualizada' : 'Despesa registada');
+      toast.success(editing ? 'DESPESA ATUALIZADA COM SUCESSO' : 'DESPESA REGISTADA COM SUCESSO');
     },
   });
 
@@ -186,9 +186,9 @@ export default function Movimentos() {
       qc.invalidateQueries({ queryKey: ['condominios'] });
       qc.invalidateQueries({ queryKey: ['quotas'] });
       setOpenEstorno(null);
-      toast.success('Movimento eliminado e contas restauradas.');
+      toast.success('MOVIMENTO ELIMINADO E CONTAS RESTAURADAS COM SUCESSO.');
     },
-    onError: (e) => toast.error('Erro no estorno: ' + e.message)
+    onError: (e) => toast.error('ERRO NO ESTORNO ' + (e?.message || 'ERRO DESCONHECIDO').toUpperCase())
   });
 
   const upd = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -217,7 +217,7 @@ export default function Movimentos() {
   };
 
   const handleEmitirFecho = () => {
-    toast.success('Emissão do PDF de Fecho de Contas iniciado.');
+    toast.success('EMISSÃO DO FECHO DE CONTAS INICIADO');
     setOpenFecho(false);
   };
 
@@ -250,7 +250,7 @@ export default function Movimentos() {
         <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white shadow-md gap-2" onClick={openNew}>
           <TrendingDown className="w-5 h-5" /> Registar Despesa
         </Button>
-        <Button size="lg" variant="outline" className="shadow-md gap-2 border-primary/20 text-primary hover:bg-primary/5" onClick={() => toast.info('Exportação PDF iniciada.')}>
+        <Button size="lg" variant="outline" className="shadow-md gap-2 border-primary/20 text-primary hover:bg-primary/5" onClick={() => toast.info('EXPORTAÇÃO DO FICHEIRO INICIADA')}>
           <Download className="w-5 h-5" /> Exportar Movimentos
         </Button>
         <div className="flex-1" />

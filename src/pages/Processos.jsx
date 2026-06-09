@@ -51,16 +51,16 @@ const pessoaTipoColor = { condomino: 'bg-blue-100 text-blue-700', fornecedor: 'b
 const normalizeTipoPessoa = (tipoData) => {
   if (!tipoData) return [];
   let parsedArray = [];
-  if (Array.isArray(tipoData)) { parsedArray = tipoData; } 
+  if (Array.isArray(tipoData)) { parsedArray = tipoData; }
   else if (typeof tipoData === 'string') {
-    try { const parsed = JSON.parse(tipoData); parsedArray = Array.isArray(parsed) ? parsed : [tipoData]; } 
+    try { const parsed = JSON.parse(tipoData); parsedArray = Array.isArray(parsed) ? parsed : [tipoData]; }
     catch (e) { parsedArray = tipoData.startsWith('{') && tipoData.endsWith('}') ? tipoData.slice(1, -1).split(',') : (tipoData.includes(',') ? tipoData.split(',') : [tipoData]); }
   }
   let finalArray = [];
   parsedArray.forEach(item => {
     if (typeof item === 'string') {
       let clean = item.trim().replace(/^"|"$/g, '');
-      if (clean.startsWith('[') && clean.endsWith(']')) { try { const innerParsed = JSON.parse(clean); if (Array.isArray(innerParsed)) { finalArray.push(...innerParsed); return; } } catch(e) {} }
+      if (clean.startsWith('[') && clean.endsWith(']')) { try { const innerParsed = JSON.parse(clean); if (Array.isArray(innerParsed)) { finalArray.push(...innerParsed); return; } } catch (e) { } }
       clean = clean.replace(/"/g, '').trim();
       if (clean.includes(',')) finalArray.push(...clean.split(',').map(s => s.trim()));
       else if (clean) finalArray.push(clean);
@@ -85,10 +85,10 @@ function FichaClienteModal({ pessoa, onClose }) {
     <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4" onClick={(e) => { e.stopPropagation(); onClose(); }}>
       <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full no-scrollbar" onClick={e => e.stopPropagation()}>
         <div className="px-6 py-4 border-b flex justify-between items-center">
-           <h2 className="font-bold text-lg">Dados do Cliente</h2>
-           <button onClick={onClose} className="p-1 hover:bg-muted rounded"><X className="w-5 h-5 text-muted-foreground" /></button>
+          <h2 className="font-bold text-lg">Dados do Cliente</h2>
+          <button onClick={onClose} className="p-1 hover:bg-muted rounded"><X className="w-5 h-5 text-muted-foreground" /></button>
         </div>
-        <div className="px-6 py-5 space-y-4 mt-2">
+        <div className="px-6 pt-2 pb-6 space-y-4 mt-2">
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">Nome</p>
             <p className="font-bold text-foreground text-lg">{pessoa.nome}</p>
@@ -102,23 +102,23 @@ function FichaClienteModal({ pessoa, onClose }) {
           {pessoa.nif && (
             <div><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">NIF</p><p className="text-foreground">{pessoa.nif}</p></div>
           )}
-          
+
           {isCliente && pessoa.senha_at && (
-             <div className="pt-2 border-t border-border mt-2">
-               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Senha AT</p>
-               <div className="flex items-center gap-2 bg-muted/30 p-1.5 rounded-lg border border-border/50 max-w-fit">
-                 <span className="text-foreground font-mono bg-background px-3 py-1 rounded border text-sm min-w-[100px] text-center flex-1">
-                   {showSenha ? pessoa.senha_at : '••••••••••'}
-                 </span>
-                 <button onClick={() => setShowSenha(!showSenha)} className="text-muted-foreground hover:text-foreground hover:bg-muted transition-colors p-1.5 rounded-md" title="Mostrar por 10s">
-                   {showSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                 </button>
-               </div>
-             </div>
+            <div className="pt-2 border-t border-border mt-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Senha AT</p>
+              <div className="flex items-center gap-2 bg-muted/30 p-1.5 rounded-lg border border-border/50 max-w-fit">
+                <span className="text-foreground font-mono bg-background px-3 py-1 rounded border text-sm min-w-[100px] text-center flex-1">
+                  {showSenha ? pessoa.senha_at : '••••••••••'}
+                </span>
+                <button onClick={() => setShowSenha(!showSenha)} className="text-muted-foreground hover:text-foreground hover:bg-muted transition-colors p-1.5 rounded-md" title="Mostrar por 10s">
+                  {showSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
           )}
-        </div>
-      </div>
     </div>
+      </div >
+    </div >
   );
 }
 
@@ -146,7 +146,7 @@ function ProcessoPreview({ processo, pessoa, onClose, onEdit, onQuickAction, onU
             <button onClick={onClose} className="p-1 hover:bg-muted rounded"><X className="w-5 h-5 text-muted-foreground" /></button>
           </div>
         </div>
-        <div className="px-6 py-5 space-y-4 print:py-8 max-h-[80vh] overflow-y-auto">
+        <div className="px-6 pt-8 pb-10 space-y-4 print:py-8 max-h-[80vh] overflow-y-auto">
           <div>
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${estadoColor[processo.estado] || 'bg-gray-100 text-gray-700'}`}>
@@ -163,8 +163,8 @@ function ProcessoPreview({ processo, pessoa, onClose, onEdit, onQuickAction, onU
           <div className="bg-muted/30 p-3 rounded-lg border text-sm space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground font-medium">Cliente:</span>
-              <button 
-                onClick={() => setShowFichaCliente(true)} 
+              <button
+                onClick={() => setShowFichaCliente(true)}
                 className="font-semibold text-primary hover:underline hover:text-primary/80 transition-colors"
                 title="Abrir ficha do cliente"
               >
@@ -174,9 +174,9 @@ function ProcessoPreview({ processo, pessoa, onClose, onEdit, onQuickAction, onU
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground font-medium">Pagamento:</span>
               {processo.pago ? (
-                <span className="flex items-center gap-1 text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded"><CheckCircle2 className="w-3.5 h-3.5"/> PAGO</span>
+                <span className="flex items-center gap-1 text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded"><CheckCircle2 className="w-3.5 h-3.5" /> PAGO</span>
               ) : (
-                <span className="flex items-center gap-1 text-xs text-red-500 font-bold bg-red-50 px-2 py-1 rounded"><Circle className="w-3.5 h-3.5"/> POR PAGAR</span>
+                <span className="flex items-center gap-1 text-xs text-red-500 font-bold bg-red-50 px-2 py-1 rounded"><Circle className="w-3.5 h-3.5" /> POR PAGAR</span>
               )}
             </div>
             <div className="flex justify-between mt-2 pt-2 border-t border-border/50">
@@ -188,7 +188,7 @@ function ProcessoPreview({ processo, pessoa, onClose, onEdit, onQuickAction, onU
           {isIRS && (
             <div className="border-t pt-3">
               <div className="flex items-center justify-between mb-3 bg-blue-50/50 p-2 rounded border border-blue-100">
-                <p className="font-semibold text-sm flex items-center gap-2 text-blue-900"><FileText className="w-4 h-4"/> Estado do IRS</p>
+                <p className="font-semibold text-sm flex items-center gap-2 text-blue-900"><FileText className="w-4 h-4" /> Estado do IRS</p>
                 <Select value={processo.irs_estado || 'recebida_documentacao'} onValueChange={(val) => onUpdateIrsEstado(val, processo.id)}>
                   <SelectTrigger className="w-auto h-8 text-xs font-semibold bg-white text-blue-800 border-blue-200 focus:ring-0">
                     <SelectValue />
@@ -200,7 +200,7 @@ function ProcessoPreview({ processo, pessoa, onClose, onEdit, onQuickAction, onU
                   </SelectContent>
                 </Select>
               </div>
-              
+
               {Object.keys(irs).length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2">
                   {IRS_ANEXOS.map(anexo => irs[anexo.id] && (
@@ -217,7 +217,7 @@ function ProcessoPreview({ processo, pessoa, onClose, onEdit, onQuickAction, onU
 
           {docs.length > 0 && (
             <div className="border-t pt-3">
-              <p className="font-semibold text-sm mb-2 flex items-center gap-2"><Paperclip className="w-4 h-4"/> Documentos Anexos</p>
+              <p className="font-semibold text-sm mb-2 flex items-center gap-2"><Paperclip className="w-4 h-4" /> Documentos Anexos</p>
               <div className="space-y-1.5">
                 {docs.map((doc, idx) => (
                   <div key={idx} className="flex items-center justify-between bg-muted/20 p-2.5 rounded-lg border border-border/50 text-sm hover:bg-muted/40 transition-colors">
@@ -252,10 +252,10 @@ function ProcessoPreview({ processo, pessoa, onClose, onEdit, onQuickAction, onU
               </Button>
             )}
           </div>
-          
+
         </div>
       </div>
-      
+
       {/* O nosso Modal Secundário empilhado (Z-index superior) */}
       {showFichaCliente && pessoa && (
         <FichaClienteModal pessoa={pessoa} onClose={() => setShowFichaCliente(false)} />
@@ -271,7 +271,7 @@ export default function Processos() {
   const [editing, setEditing] = useState(null);
   const [search, setSearch] = useState('');
   const [preview, setPreview] = useState(null);
-  
+
   const [openCombo, setOpenCombo] = useState(false);
   const [showNewClient, setShowNewClient] = useState(false);
   const [newClientForm, setNewClientForm] = useState(emptyClient);
@@ -291,40 +291,40 @@ export default function Processos() {
       if (dataToSave.tipo !== 'irs') { dataToSave.irs_campos = {}; dataToSave.irs_estado = null; }
       return editing ? agenciaAvenida.entities.Processo.update(editing, dataToSave) : agenciaAvenida.entities.Processo.create(dataToSave);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['processos'] }); setOpen(false); toast.success('Processo guardado com sucesso!'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['processos'] }); setOpen(false); toast.success('PROCESSO GUARDADO COM SUCESSO'); },
   });
 
   const quickUpdate = useMutation({
     mutationFn: ({ id, payload }) => agenciaAvenida.entities.Processo.update(id, payload),
-    onSuccess: (updatedData) => { 
-      qc.invalidateQueries({ queryKey: ['processos'] }); 
-      if (preview && preview.id === updatedData.id) setPreview(updatedData); else setPreview(null); 
-      toast.success('Atualizado com sucesso!'); 
+    onSuccess: (updatedData) => {
+      qc.invalidateQueries({ queryKey: ['processos'] });
+      if (preview && preview.id === updatedData.id) setPreview(updatedData); else setPreview(null);
+      toast.success('PROCESSO ATUALIZADO COM SUCESSO');
     },
   });
 
   const del = useMutation({
     mutationFn: (id) => agenciaAvenida.entities.Processo.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['processos'] }); toast.success('Processo eliminado!'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['processos'] }); toast.success('PROCESSO ELIMINADO COM SUCESSO'); },
   });
 
   const saveClient = useMutation({
     mutationFn: (data) => agenciaAvenida.entities.Pessoa.create(data),
-    onSuccess: (createdClient) => { 
-      qc.invalidateQueries({ queryKey: ['pessoas'] }); 
-      setShowNewClient(false); 
+    onSuccess: (createdClient) => {
+      qc.invalidateQueries({ queryKey: ['pessoas'] });
+      setShowNewClient(false);
       upd('pessoa_id', createdClient.id);
-      toast.success('Cliente criado e selecionado!'); 
+      toast.success('CLIENTE CRIADO E SELECIONADO COM SUCESSO');
     },
   });
 
   const openNew = () => { setForm(empty); setEditing(null); setOpen(true); };
-  const openEdit = (p) => { 
-    setForm({ ...p, irs_campos: normalizeJsonb(p.irs_campos, {}), documentos: normalizeJsonb(p.documentos, []), irs_estado: p.irs_estado || 'recebida_documentacao' }); 
-    setEditing(p.id); 
-    setOpen(true); 
+  const openEdit = (p) => {
+    setForm({ ...p, irs_campos: normalizeJsonb(p.irs_campos, {}), documentos: normalizeJsonb(p.documentos, []), irs_estado: p.irs_estado || 'recebida_documentacao' });
+    setEditing(p.id);
+    setOpen(true);
   };
-  
+
   const upd = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const toggleIrsCampo = (campoId) => {
@@ -352,14 +352,14 @@ export default function Processos() {
       const documentToAdd = { nome: file.name, url: data.publicUrl };
       const atuais = normalizeJsonb(form.documentos, []);
       upd('documentos', [...atuais, documentToAdd]);
-      
-      toast.success('Ficheiro anexado com sucesso!');
+
+      toast.success('FICHEIRO ANEXADO COM SUCESSO');
     } catch (err) {
       console.error(err);
-      toast.error('Erro ao enviar ficheiro. Verificou as permissões do Storage no Supabase?');
+      toast.error('ERRO AO ENVIAR FICHEIRO');
     } finally {
       setUploadingDoc(false);
-      e.target.value = null; 
+      e.target.value = null;
     }
   };
 
@@ -387,14 +387,14 @@ export default function Processos() {
 
     // Mesmo que dê erro físico (ex: ficheiro já não existia), apagamos visualmente da lista do processo
     upd('documentos', atuais.filter((_, idx) => idx !== indexToRemove));
-    toast.success('Documento eliminado com sucesso!');
+    toast.success('DOCUMENTO ELIMINADO COM SUCESSO');
   };
 
   const filtered = processos.filter(p => {
     const pessoa = pessoas.find(pes => pes.id === p.pessoa_id);
     const textSearch = search.toLowerCase();
     const tipoLabel = tipoProcessoLabel[p.tipo]?.toLowerCase() || p.tipo?.toLowerCase();
-    
+
     const matchSearch = !search || p.descricao?.toLowerCase().includes(textSearch) || tipoLabel.includes(textSearch) || pessoa?.nome?.toLowerCase().includes(textSearch);
     const matchMe = !filterMe || p.atribuido_a === MEU_USER_ID;
 
@@ -407,15 +407,15 @@ export default function Processos() {
         <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />Novo Processo</Button>
       } />
 
-<div className="flex flex-col sm:flex-row gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input className="pl-9" placeholder="Pesquisar por cliente ou processo..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Button 
-           variant={filterMe ? "default" : "secondary"}
-           onClick={() => setFilterMe(!filterMe)}
-           className={filterMe ? "bg-primary" : "bg-muted text-muted-foreground"}
+        <Button
+          variant={filterMe ? "default" : "secondary"}
+          onClick={() => setFilterMe(!filterMe)}
+          className={filterMe ? "bg-primary" : "bg-muted text-muted-foreground"}
         >
           Ver Meus Processos
         </Button>
@@ -431,11 +431,10 @@ export default function Processos() {
           const tituloProcesso = isOutro && p.descricao ? p.descricao : (tipoProcessoLabel[p.tipo] || p.tipo);
 
           return (
-            <div 
-              key={p.id} 
-              className={`rounded-xl border p-5 shadow-sm hover:shadow-md transition-all cursor-pointer relative group flex flex-col h-full ${
-                isUrgente ? 'border-red-400 bg-red-50/30' : 'bg-card border-border'
-              }`}
+            <div
+              key={p.id}
+              className={`rounded-xl border p-5 shadow-sm hover:shadow-md transition-all cursor-pointer relative group flex flex-col h-full ${isUrgente ? 'border-red-400 bg-red-50/30' : 'bg-card border-border'
+                }`}
               onClick={() => setPreview(p)}
             >
               <div className="flex items-start justify-between mb-2">
@@ -457,9 +456,9 @@ export default function Processos() {
                   <button onClick={() => del.mutate(p.id)} className="p-1.5 hover:bg-red-50 rounded transition-colors bg-white/50" title="Apagar"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
                 </div>
               </div>
-              
+
               {!isOutro && p.descricao && <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{p.descricao}</p>}
-              
+
               <div className="mt-auto space-y-1.5 pt-4 border-t border-border/50 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Cliente:</span>
@@ -468,9 +467,9 @@ export default function Processos() {
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Pagamento:</span>
                   {p.pago ? (
-                     <span className="text-emerald-600 font-bold flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5"/> Pago</span>
+                    <span className="text-emerald-600 font-bold flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> Pago</span>
                   ) : (
-                     <span className="text-red-500 font-bold flex items-center gap-1"><Circle className="w-3.5 h-3.5"/> Pendente</span>
+                    <span className="text-red-500 font-bold flex items-center gap-1"><Circle className="w-3.5 h-3.5" /> Pendente</span>
                   )}
                 </div>
               </div>
@@ -482,11 +481,11 @@ export default function Processos() {
         )}
       </div>
 
-      {preview && <ProcessoPreview 
-        processo={preview} 
-        pessoa={pessoas.find(pes => pes.id === preview.pessoa_id)} 
-        onClose={() => setPreview(null)} 
-        onEdit={(p) => { setPreview(null); openEdit(p); }} 
+      {preview && <ProcessoPreview
+        processo={preview}
+        pessoa={pessoas.find(pes => pes.id === preview.pessoa_id)}
+        onClose={() => setPreview(null)}
+        onEdit={(p) => { setPreview(null); openEdit(p); }}
         onQuickAction={(action, proc) => {
           if (action === 'pagar') { quickUpdate.mutate({ id: proc.id, payload: { pago: true } }); }
           if (action === 'concluir') { quickUpdate.mutate({ id: proc.id, payload: { estado: 'concluido' } }); }
@@ -502,7 +501,7 @@ export default function Processos() {
             <DialogTitle>{editing ? 'Editar Processo' : 'Novo Processo'}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-            
+
             <div className="sm:col-span-2 flex flex-col gap-1.5">
               <Label>Cliente *</Label>
               <Popover open={openCombo} onOpenChange={setOpenCombo}>
@@ -569,7 +568,7 @@ export default function Processos() {
               <div className="sm:col-span-2 bg-blue-50/50 p-4 rounded-lg border border-blue-100 mt-2 space-y-4">
                 <div>
                   <Label className="text-base font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                    <FileText className="w-5 h-5"/> Atributos IRS
+                    <FileText className="w-5 h-5" /> Atributos IRS
                   </Label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {IRS_ANEXOS.map((anexo) => (
@@ -639,9 +638,9 @@ export default function Processos() {
 
             <div className="sm:col-span-2 border-t pt-4 mt-2">
               <Label className="text-base font-semibold mb-3 flex items-center gap-2">
-                <Paperclip className="w-4 h-4"/> Documentos Anexos
+                <Paperclip className="w-4 h-4" /> Documentos Anexos
               </Label>
-              
+
               <div className="space-y-2 mb-4">
                 {normalizeJsonb(form.documentos, []).length === 0 ? (
                   <p className="text-sm text-muted-foreground bg-muted/20 p-3 rounded text-center border border-dashed">
@@ -667,8 +666,8 @@ export default function Processos() {
                   <Label className="text-sm font-medium text-muted-foreground flex items-center justify-center w-full cursor-pointer py-3 rounded-md transition-colors hover:text-primary">
                     <UploadCloud className="w-5 h-5 mr-2" />
                     {uploadingDoc ? <span className="animate-pulse text-blue-500 font-bold">A carregar para o sistema...</span> : 'Clique para escolher um ficheiro do PC'}
-                    <Input 
-                      type="file" 
+                    <Input
+                      type="file"
                       accept=".pdf,image/*"
                       onChange={handleFileUpload}
                       disabled={uploadingDoc}
@@ -678,7 +677,7 @@ export default function Processos() {
                 </div>
               </div>
             </div>
-            
+
           </div>
           <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
@@ -697,19 +696,19 @@ export default function Processos() {
           <div className="grid gap-4 mt-2">
             <div>
               <Label>Nome *</Label>
-              <Input value={newClientForm.nome} onChange={e => setNewClientForm({...newClientForm, nome: e.target.value})} autoFocus />
+              <Input value={newClientForm.nome} onChange={e => setNewClientForm({ ...newClientForm, nome: e.target.value })} autoFocus />
             </div>
             <div>
               <Label>NIF</Label>
-              <Input value={newClientForm.nif} onChange={e => setNewClientForm({...newClientForm, nif: e.target.value})} />
+              <Input value={newClientForm.nif} onChange={e => setNewClientForm({ ...newClientForm, nif: e.target.value })} />
             </div>
             <div>
               <Label>Telemóvel</Label>
-              <Input value={newClientForm.telefone} onChange={e => setNewClientForm({...newClientForm, telefone: e.target.value})} />
+              <Input value={newClientForm.telefone} onChange={e => setNewClientForm({ ...newClientForm, telefone: e.target.value })} />
             </div>
             <div>
               <Label>Email</Label>
-              <Input value={newClientForm.email} onChange={e => setNewClientForm({...newClientForm, email: e.target.value})} />
+              <Input value={newClientForm.email} onChange={e => setNewClientForm({ ...newClientForm, email: e.target.value })} />
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-4">

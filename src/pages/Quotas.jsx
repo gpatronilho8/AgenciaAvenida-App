@@ -149,12 +149,12 @@ export default function Quotas() {
   // MUTAÇÕES
   const deleteQuota = useMutation({
     mutationFn: (id) => agenciaAvenida.entities.Quota.delete(id),
-    onSuccess: () => { qc.invalidateQueries(['quotas']); setOpenDelete(null); toast.success('Registo eliminado.'); }
+    onSuccess: () => { qc.invalidateQueries(['quotas']); setOpenDelete(null); toast.success('REGISTO ELIMINADO COM SUCESSO'); }
   });
 
   const deleteConfig = useMutation({
     mutationFn: (id) => agenciaAvenida.entities.ConfiguracaoQuota.delete(id),
-    onSuccess: () => { qc.invalidateQueries(['configuracoes_quotas']); toast.success('Configuração eliminada.'); }
+    onSuccess: () => { qc.invalidateQueries(['configuracoes_quotas']); toast.success('CONFIGURAÇÃO ELIMINADA COM SUCESSO'); }
   });
 
   const saveConfig = useMutation({
@@ -165,8 +165,8 @@ export default function Quotas() {
       else if (payload.tipo === 'extraordinaria') { payload.valor_mensal = 0; }
       return await agenciaAvenida.entities.ConfiguracaoQuota.create(payload);
     },
-    onSuccess: () => { setOpenConfig(false); qc.invalidateQueries(['configuracoes_quotas']); toast.success('Configuração guardada com sucesso!'); },
-    onError: (e) => toast.error('Erro: ' + e.message)
+    onSuccess: () => { setOpenConfig(false); qc.invalidateQueries(['configuracoes_quotas']); toast.success('CONFIGURAÇÃO GUARDADA COM SUCESSO'); },
+    onError: (e) => toast.error('ERRO: ' + (e?.message || 'ERRO DESCONHECIDO').toUpperCase())
   });
 
   const lancarLinha = useMutation({
@@ -187,8 +187,8 @@ export default function Quotas() {
       };
       return await agenciaAvenida.entities.Quota.create(payload);
     },
-    onSuccess: () => { setOpenNova(false); qc.invalidateQueries({ queryKey: ['quotas'] }); toast.success('Linha lançada!'); },
-    onError: (e) => toast.error('Erro: ' + e.message)
+    onSuccess: () => { setOpenNova(false); qc.invalidateQueries({ queryKey: ['quotas'] }); toast.success('LINHA INSERIDA COM SUCESSO'); },
+    onError: (e) => toast.error('ERRO: ' + (e?.message || 'ERRO DESCONHECIDO').toUpperCase())
   });
 
   const registarDivida = useMutation({
@@ -208,8 +208,8 @@ export default function Quotas() {
         return await agenciaAvenida.entities.Quota.create(payload);
       }
     },
-    onSuccess: () => { setOpenDivida(false); setDividaForm({ id: null, fracao_id: '', valor: '', descricao: 'Dívida Externa Transitada' }); qc.invalidateQueries({ queryKey: ['quotas'] }); toast.success('Dívida registada com sucesso!'); },
-    onError: (e) => toast.error('Erro: ' + e.message)
+    onSuccess: () => { setOpenDivida(false); setDividaForm({ id: null, fracao_id: '', valor: '', descricao: 'Dívida Externa Transitada' }); qc.invalidateQueries({ queryKey: ['quotas'] }); toast.success('DÍVIDA REGISTADA COM SUCESSO'); },
+    onError: (e) => toast.error('ERRO: ' + (e?.message || 'ERRO DESCONHECIDO').toUpperCase())
   });
 
   const registarPagamento = useMutation({
@@ -342,12 +342,12 @@ export default function Quotas() {
       qc.invalidateQueries({ queryKey: ['movimentos'] });
       qc.invalidateQueries({ queryKey: ['condominios'] });
 
-      toast.success('Processamento concluído com sucesso!');
+      toast.success('PROCESSAMENTO CONCLUÍDO COM SUCESSO');
       handleClosePagamento();
       
       setOpenRecibo({ isMulti: true, wasManual: result.wasManual });
     },
-    onError: (error) => toast.error('Erro no processamento: ' + error.message)
+    onError: (error) => toast.error('ERRO NO PROCESSAMENTO: ' + (error?.message || 'ERRO DESCONHECIDO').toUpperCase())
   });
 
   // RESTORED UI STATE HANDLERS
@@ -428,7 +428,7 @@ export default function Quotas() {
           </Button>
         )}
         <div className="flex-1" />
-        <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white shadow-md gap-2" onClick={() => toast.success('Download do Extrato CC iniciado.')}>
+        <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white shadow-md gap-2" onClick={() => toast.success('DOWNLOAD DA CONTA-CORRENTE INICIADO')}>
           <FileText className="w-5 h-5" /> Emitir Extrato CC
         </Button>
       </div>
@@ -1020,7 +1020,7 @@ export default function Quotas() {
             {openRecibo?.isMulti ? (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground leading-relaxed">Transação concluída. Pretende efetuar o download do documento PDF consolidado desta operação?</p>
-                <Button variant="outline" className="w-full gap-2" onClick={() => { gerarReciboTeste(); toast.success('Download do recibo unificado concluído.'); setOpenRecibo(null); }}>
+                <Button variant="outline" className="w-full gap-2" onClick={() => { gerarReciboTeste(); toast.success('DOWNLOAD DO RECIBO UNIFICADO CONCLUÍDO'); setOpenRecibo(null); }}>
                   <Download className="w-4 h-4" /> Descarregar Recibo Geral
                 </Button>
               </div>
@@ -1029,7 +1029,7 @@ export default function Quotas() {
                  <p className="text-xs text-muted-foreground">Esta faturação possui tranches ou amortizações registadas. Escolha o documento associado:</p>
                  
                  <div className="flex flex-col gap-2">
-                   <Button variant="outline" className="w-full justify-between text-left h-auto py-2.5 px-3 border bg-card" onClick={() => { gerarReciboTeste(); toast.success('Download do Recibo Geral Unificado iniciado.'); }}>
+                   <Button variant="outline" className="w-full justify-between text-left h-auto py-2.5 px-3 border bg-card" onClick={() => { gerarReciboTeste(); toast.success('DOWNLOAD DO RECIBO GERAL UNIFICADO INICIADO'); }}>
                       <div className="flex flex-col">
                         <span className="text-xs font-bold text-foreground">Recibo Geral Unificado (Total)</span>
                         <span className="text-[10px] text-muted-foreground">Quitação total de €{(openRecibo?.valor || 0).toFixed(2)}</span>
@@ -1037,7 +1037,7 @@ export default function Quotas() {
                       <Download className="w-4 h-4 text-muted-foreground" />
                    </Button>
 
-                   <Button variant="outline" className="w-full justify-between text-left h-auto py-2.5 px-3 border border-dashed" onClick={() => { gerarReciboTeste(); toast.success('Download do Recibo da Tranche #1 iniciado.'); }}>
+                   <Button variant="outline" className="w-full justify-between text-left h-auto py-2.5 px-3 border border-dashed" onClick={() => { gerarReciboTeste(); toast.success('DOWNLOAD DO RECIBO DA TRANCHE #1 INICIADO'); }}>
                       <div className="flex flex-col">
                         <span className="text-xs font-medium text-emerald-700">Recibo Parcial - Tranche #1</span>
                         <span className="text-[10px] text-muted-foreground">Liquidação inicial de fundos</span>
@@ -1046,7 +1046,7 @@ export default function Quotas() {
                    </Button>
 
                    {openRecibo?.valor_pago > 0 && (
-                     <Button variant="outline" className="w-full justify-between text-left h-auto py-2.5 px-3 border border-dashed" onClick={() => { gerarReciboTeste(); toast.success('Download do Recibo da Tranche #2 iniciado.'); }}>
+                     <Button variant="outline" className="w-full justify-between text-left h-auto py-2.5 px-3 border border-dashed" onClick={() => { gerarReciboTeste(); toast.success('DOWNLOAD DO RECIBO DA TRANCHE #2 INICIADO'); }}>
                         <div className="flex flex-col">
                           <span className="text-xs font-medium text-amber-700">Recibo Parcial - Tranche #2 (Amortização)</span>
                           <span className="text-[10px] text-muted-foreground">Abatimento corrente na conta-corrente</span>
@@ -1068,7 +1068,7 @@ export default function Quotas() {
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Disponibilizar por Email</Label>
               <div className="flex gap-2 mt-1">
                 <Input defaultValue="condomino@email.com" placeholder="Email do destinatário..." />
-                <Button variant="secondary" size="icon" onClick={() => { setOpenRecibo(null); toast.success('Documentação reencaminhada por e-mail.'); }}>
+                <Button variant="secondary" size="icon" onClick={() => { setOpenRecibo(null); toast.success('DOCUMENTAÇÃO ENVIADA POR E-MAIL'); }}>
                   <Mail className="w-4 h-4" />
                 </Button>
               </div>

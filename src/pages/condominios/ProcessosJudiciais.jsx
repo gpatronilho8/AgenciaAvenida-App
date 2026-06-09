@@ -53,12 +53,12 @@ export default function ProcessosJudiciais() {
 
   const save = useMutation({
     mutationFn: (d) => editing ? agenciaAvenida.entities.ProcessoJudicial.update(editing, d) : agenciaAvenida.entities.ProcessoJudicial.create(d),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['processos-judiciais'] }); setOpen(false); toast.success('Processo guardado'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['processos-judiciais'] }); setOpen(false); toast.success('PROCESSO GUARDADO COM SUCESSO'); },
   });
 
   const remove = useMutation({
     mutationFn: (id) => agenciaAvenida.entities.ProcessoJudicial.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['processos-judiciais'] }); toast.success('Processo eliminado'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['processos-judiciais'] }); toast.success('PROCESSO ELIMINADO COM SUCESSO'); },
   });
 
   const lancarDespesa = useMutation({
@@ -75,7 +75,7 @@ export default function ProcessosJudiciais() {
       custos[custoIdx] = { ...custo, despesa_lancada: true, despesa_id: despesa.id };
       return agenciaAvenida.entities.ProcessoJudicial.update(processo.id, { custos });
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['processos-judiciais'] }); toast.success('Despesa lançada no condomínio'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['processos-judiciais'] }); toast.success('DESPESA LANÇADA NO CONDOMÍNIO COM SUCESSO'); },
   });
 
   const upd = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -315,8 +315,8 @@ export default function ProcessosJudiciais() {
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button
               onClick={() => {
-                if (!form.pessoa_id) { toast.error('Selecione o devedor'); return; }
-                if (!form.condominio_id) { toast.error('Selecione o condomínio'); return; }
+                if (!form.pessoa_id) { toast.error('SELECIONE O DEVEDOR'); return; }
+                if (!form.condominio_id) { toast.error('SELECIONE O CONDOMÍNIO'); return; }
                 save.mutate(form);
               }}
               disabled={save.isPending}

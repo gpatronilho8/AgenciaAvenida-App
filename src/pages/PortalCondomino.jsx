@@ -71,7 +71,7 @@ export default function PortalCondomino() {
     });
     setShowOcorrForm(false);
     setOcorrForm({ titulo: '', descricao: '', tipo: 'avaria', prioridade: 'media' });
-    toast.success('Ocorrência submetida com sucesso!');
+    toast.success('PEDIDO SUBMETIDO COM SUCESSO');
   };
 
   const tabs = [

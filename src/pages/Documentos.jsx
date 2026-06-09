@@ -92,12 +92,12 @@ export default function Documentos() {
 
   const save = useMutation({
     mutationFn: (data) => editing ? agenciaAvenida.entities.Documento.update(editing, data) : agenciaAvenida.entities.Documento.create(data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['documentos'] }); setOpen(false); toast.success('Documento guardado'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['documentos'] }); setOpen(false); toast.success('DOCUMENTO GUARDADO COM SUCESSO'); },
   });
 
   const del = useMutation({
     mutationFn: (id) => agenciaAvenida.entities.Documento.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['documentos'] }); toast.success('Documento eliminado'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['documentos'] }); toast.success('DOCUMENTO ELIMINADO COM SUCESSO'); },
   });
 
   const openNew = () => { setForm(empty); setEditing(null); setOpen(true); };
@@ -112,7 +112,7 @@ export default function Documentos() {
     const { file_url } = await agenciaAvenida.integrations.Core.UploadFile({ file });
     upd('ficheiro_url', file_url);
     setUploading(false);
-    toast.success('Ficheiro carregado');
+    toast.success('FICHEIRO CARREGADO COM SUCESSO');
   };
 
   const filtered = documentos.filter(d => {

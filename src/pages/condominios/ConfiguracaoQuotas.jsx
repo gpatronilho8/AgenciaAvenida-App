@@ -39,13 +39,13 @@ export default function ConfiguracaoQuotas({ open, onClose }) {
     mutationFn: (d) => configAtual
       ? agenciaAvenida.entities.ConfiguracaoQuota.update(configAtual.id, d)
       : agenciaAvenida.entities.ConfiguracaoQuota.create({ ...d, condominio_id: formCond }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['config-quotas'] }); toast.success('Configuração guardada'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['config-quotas'] }); toast.success('CONFIGURAÇÃO GUARDADA COM SUCESSO'); },
   });
 
   const gerarQuotasAutomaticas = async () => {
     const cfg = configAtual || config;
     const frac = fracoes.filter(f => f.condominio_id === formCond && f.ativa !== false);
-    if (!frac.length) { toast.error('Sem frações ativas neste condomínio'); return; }
+    if (!frac.length) { toast.error('SEM FRAÇÕES ATIVAS NESTE CONDOMÍNIO'); return; }
     setLoading(true);
 
     const hoje = new Date();
@@ -82,14 +82,14 @@ export default function ConfiguracaoQuotas({ open, onClose }) {
     }
     setLoading(false);
     qc.invalidateQueries({ queryKey: ['quotas'] });
-    toast.success(criadas > 0 ? `${criadas} quota(s) criadas automaticamente` : 'Todas as quotas deste mês já existem');
+    toast.success(criadas > 0 ? `${criadas} QUOTAS CRIADAS AUTOMATICAMENTE` : 'TODAS AS QUOTAS JÁ FORAM GERADAS PARA ESTE MÊS');
   };
 
   const criarExtraordinaria = async () => {
     const frac = extraForm.fracao_id
       ? fracoes.filter(f => f.id === extraForm.fracao_id)
       : fracoes.filter(f => f.condominio_id === formCond);
-    if (!frac.length) { toast.error('Sem frações selecionadas'); return; }
+    if (!frac.length) { toast.error('SEM FRAÇÕES SELECIONADAS'); return; }
     setLoading(true);
 
     for (let rep = 0; rep < (parseInt(extraForm.repeticoes) || 1); rep++) {
@@ -111,7 +111,7 @@ export default function ConfiguracaoQuotas({ open, onClose }) {
     }
     setLoading(false);
     qc.invalidateQueries({ queryKey: ['quotas'] });
-    toast.success('Quota(s) extraordinária(s) criadas');
+    toast.success('QUOTA(S) EXTRAORDINÁRIA(S) CRIADAS COM SUCESSO');
     onClose();
   };
 

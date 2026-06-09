@@ -172,12 +172,12 @@ export default function Pessoas() {
 
   const save = useMutation({
     mutationFn: (data) => editing ? agenciaAvenida.entities.Pessoa.update(editing, data) : agenciaAvenida.entities.Pessoa.create(data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['pessoas'] }); setOpen(false); toast.success('Entidade guardada com sucesso!'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['pessoas'] }); setOpen(false); toast.success('ENTIDADE GUARDADA COM SUCESSO'); },
   });
 
   const del = useMutation({
     mutationFn: (id) => agenciaAvenida.entities.Pessoa.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['pessoas'] }); toast.success('Entidade eliminada!'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['pessoas'] }); toast.success('ENTIDADE ELIMINADA COM SUCESSO'); },
   });
 
   const openNew = () => { setForm(empty); setEditing(null); setOpen(true); };

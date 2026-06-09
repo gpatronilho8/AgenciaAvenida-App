@@ -15,6 +15,7 @@ const variants = {
   alta: 'bg-orange-100 text-orange-700',
   media: 'bg-yellow-100 text-yellow-700',
   baixa: 'bg-blue-100 text-blue-700',
+  normal: 'bg-blue-100 text-blue-700',
 };
 
 const labels = {
@@ -29,6 +30,7 @@ const labels = {
   ativo: 'Ativo',
   inativo: 'Inativo',
   urgente: 'Urgente',
+  normal: 'Normal',
   alta: 'Alta',
   media: 'Média',
   baixa: 'Baixa',

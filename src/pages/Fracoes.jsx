@@ -154,7 +154,7 @@ export default function Fracoes() {
 
   const save = useMutation({
     mutationFn: (data) => editing ? agenciaAvenida.entities.Fracao.update(editing, data) : agenciaAvenida.entities.Fracao.create(data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['fracoes'] }); setOpen(false); toast.success('Fração guardada com sucesso!'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['fracoes'] }); setOpen(false); toast.success('FRAÇÃO GUARDADA COM SUCESSO'); },
   });
 
   const saveClient = useMutation({
@@ -163,7 +163,7 @@ export default function Fracoes() {
       qc.invalidateQueries({ queryKey: ['pessoas'] });
       setShowNewClient(false);
       setForm(p => ({ ...p, titulares: [...normalizeArray(p.titulares), created.id] }));
-      toast.success('Titular criado e associado!');
+      toast.success('TITULAR CRIADO E ASSOCIADO COM SUCESSO');
     },
   });
 

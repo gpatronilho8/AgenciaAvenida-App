@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import PageHeader from '@/components/ui/PageHeader';
@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { useCondominio } from '@/lib/CondominioContext';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/api/supabase.js';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 const tiposOcorrencia = {
@@ -27,7 +28,7 @@ const tiposOcorrencia = {
 
 const empty = {
   condominio_id: '', fracao_id: '', titulo: '', descricao: '', tipo: 'avaria',
-  prioridade: 'media', estado: 'aberta', canal_submissao: 'interno',
+  prioridade: 'normal', estado: 'aberta', canal_submissao: 'interno',
   data_abertura: format(new Date(), 'yyyy-MM-dd'), observacoes: '',
   resposta_cliente: '', atribuido_a: '', fornecedor_id: '', reportada_por: null, anexos: []
 };
@@ -67,6 +68,12 @@ const formatFracao = (f) => {
 };
 
 function OcorrenciaPreview({ ocorrencia, condominios, fracoes, pessoas, users, onClose, onEdit }) {
+  // Estado para controlar o modal central de contacto
+  const [showPessoa, setShowPessoa] = useState(null);
+
+  const pessoaMemory = useRef(null);
+  if (showPessoa) pessoaMemory.current = showPessoa;
+  const pessoaParaMostrar = showPessoa || pessoaMemory.current;
   const condNome = condominios.find(c => c.id === ocorrencia.condominio_id)?.nome || '-';
   const fracaoCod = formatFracao(fracoes.find(f => f.id === ocorrencia.fracao_id));
   const atribuidoUser = users?.find(u => u.id === ocorrencia.atribuido_a);
@@ -74,94 +81,157 @@ function OcorrenciaPreview({ ocorrencia, condominios, fracoes, pessoas, users, o
   const fornecedor = pessoas.find(p => p.id === ocorrencia.fornecedor_id)?.nome || '-';
   const reportadaPorObj = pessoas.find(p => p.id === ocorrencia.reportada_por);
 
-  return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto no-scrollbar rounded-xl z-[200]">
-        <div className="flex items-start justify-between mb-4 print:hidden pr-8">
-          <div>
-            <h2 className="text-xl font-bold">{ocorrencia.titulo}</h2>
-            <p className="text-sm text-muted-foreground">{condNome} · {fracaoCod}</p>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            <Button size="sm" variant="outline" className="gap-1" onClick={() => window.print()}>
-              <Printer className="w-3.5 h-3.5" />Imprimir
-            </Button>
-            <Button size="sm" onClick={onEdit} className="gap-1">
-              <Pencil className="w-3.5 h-3.5" />Editar
-            </Button>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3 bg-muted/40 border border-border rounded-lg p-4 mb-4 text-sm">
-          <div><span className="font-medium text-muted-foreground">Estado:</span> <StatusBadge status={ocorrencia.estado} /></div>
-          <div><span className="font-medium text-muted-foreground">Prioridade:</span> <StatusBadge status={ocorrencia.prioridade} /></div>
-          <div><span className="font-medium text-muted-foreground">Tipo:</span> <span className="font-semibold">{tiposOcorrencia[ocorrencia.tipo] || ocorrencia.tipo}</span></div>
-          <div><span className="font-medium text-muted-foreground">Canal:</span> <span className="capitalize font-semibold">{ocorrencia.canal_submissao?.replace('_', ' ')}</span></div>
-          <div><span className="font-medium text-muted-foreground">Data abertura:</span> <span className="font-semibold">{ocorrencia.data_abertura}</span></div>
-          {ocorrencia.data_resolucao && <div><span className="font-medium text-muted-foreground">Data resolução:</span> <span className="font-semibold">{ocorrencia.data_resolucao}</span></div>}
-          
-          <div className="flex items-center">
-            <span className="font-medium text-muted-foreground mr-1">Reportada por:</span> 
-            {reportadaPorObj ? (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <span className="font-semibold text-primary cursor-pointer hover:underline">{reportadaPorObj.nome}</span>
-                </PopoverTrigger>
-                <PopoverContent className="w-64 p-3 z-[210]">
-                  <p className="font-bold text-sm mb-2 text-foreground">Contacto Rápido</p>
-                  <div className="space-y-1">
-                    <p className="text-xs flex justify-between"><span className="text-muted-foreground">Tel:</span> <span className="font-medium">{reportadaPorObj.telefone || 'N/A'}</span></p>
-                    <p className="text-xs flex justify-between"><span className="text-muted-foreground">Email:</span> <span className="font-medium">{reportadaPorObj.email || 'N/A'}</span></p>
-                    <p className="text-xs flex justify-between"><span className="text-muted-foreground">NIF:</span> <span className="font-medium">{reportadaPorObj.nif || 'N/A'}</span></p>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            ) : (
-              <span className="font-semibold text-primary">Administração / Interno</span>
-            )}
-          </div>
-          
-          {ocorrencia.atribuido_a && <div><span className="font-medium text-muted-foreground">Staff Atribuído:</span> <span className="font-semibold">{atribuido}</span></div>}
-          {ocorrencia.fornecedor_id && <div><span className="font-medium text-muted-foreground">Fornecedor:</span> <span className="font-semibold">{fornecedor}</span></div>}
-        </div>
-        {ocorrencia.descricao && (
-          <div className="mb-4 bg-background border border-border rounded-lg p-3 shadow-sm">
-            <p className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-1">Descrição do Problema</p>
-            <p className="text-sm text-foreground">{ocorrencia.descricao}</p>
-          </div>
-        )}
-        {ocorrencia.observacoes && (
-          <div className="mb-4">
-            <p className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-1">Observações Internas</p>
-            <p className="text-sm text-muted-foreground italic bg-muted/30 p-2 rounded border border-dashed">{ocorrencia.observacoes}</p>
-          </div>
-        )}
-        {ocorrencia.resposta_cliente && (
-          <div className="mb-4 bg-blue-50 border border-blue-100 rounded-lg p-3">
-            <p className="font-bold text-xs uppercase tracking-wider text-blue-800 mb-1">Resposta enviada ao Condómino</p>
-            <p className="text-sm text-blue-900">{ocorrencia.resposta_cliente}</p>
-          </div>
-        )}
-        {ocorrencia.anexos?.length > 0 && (
-          <div>
-            <p className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-2">Anexos / Provas</p>
-            <div className="flex flex-col gap-2">
-              {ocorrencia.anexos.map((url, i) => {
-                const fileNameRaw = url.split('/').pop();
-                const displayFileName = decodeURIComponent(fileNameRaw.substring(fileNameRaw.indexOf('-') + 1)) || `Anexo ${i+1}`;
-                const isPdf = url.toLowerCase().endsWith('.pdf');
+  const qc = useQueryClient();
+  const [notas, setNotas] = useState(ocorrencia.observacoes || '');
 
-                return (
-                  <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-2 border border-border rounded-lg hover:bg-muted/50 transition-colors">
-                    {isPdf ? <FileText className="w-8 h-8 text-red-500 shrink-0" /> : <img src={url} alt="" className="w-8 h-8 object-cover rounded shrink-0 border border-border" />}
-                    <span className="text-sm font-medium text-primary hover:underline truncate">{displayFileName}</span>
-                  </a>
-                );
-              })}
+  const saveNotas = useMutation({
+    mutationFn: (novasNotas) => agenciaAvenida.entities.Ocorrencia.update(ocorrencia.id, { observacoes: novasNotas }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ocorrencias'] });
+      toast.success('NOTAS INTERNAS ATUALIZADAS');
+      onClose();
+    }
+  });
+
+  return (
+    <>
+      <Dialog open onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl min-h-[55vh] max-h-[90vh] overflow-y-auto no-scrollbar rounded-xl">
+          <div className="flex items-start justify-between mb-4 print:hidden pr-8">
+            <div>
+              <h2 className="text-xl font-bold">{ocorrencia.titulo}</h2>
+              <p className="text-sm text-muted-foreground">{condNome} · {fracaoCod}</p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button size="sm" variant="outline" className="gap-1" onClick={() => window.print()}>
+                <Printer className="w-3.5 h-3.5" />Imprimir
+              </Button>
+              <Button size="sm" onClick={onEdit} className="gap-1">
+                <Pencil className="w-3.5 h-3.5" />Editar
+              </Button>
             </div>
           </div>
-        )}
-      </DialogContent>
-    </Dialog>
+          <div className="grid grid-cols-2 gap-3 bg-muted/40 border border-border rounded-lg p-4 mb-6 text-sm">
+            <div><span className="font-medium text-muted-foreground">Estado:</span> <StatusBadge status={ocorrencia.estado} /></div>
+            <div><span className="font-medium text-muted-foreground">Prioridade:</span> <StatusBadge status={ocorrencia.prioridade} /></div>
+            <div><span className="font-medium text-muted-foreground">Tipo:</span> <span className="font-semibold">{tiposOcorrencia[ocorrencia.tipo] || ocorrencia.tipo}</span></div>
+            <div><span className="font-medium text-muted-foreground">Canal:</span> <span className="capitalize font-semibold">{ocorrencia.canal_submissao?.replace('_', ' ')}</span></div>
+            <div><span className="font-medium text-muted-foreground">Data abertura:</span> <span className="font-semibold">{ocorrencia.data_abertura}</span></div>
+            {ocorrencia.data_resolucao && <div><span className="font-medium text-muted-foreground">Data resolução:</span> <span className="font-semibold">{ocorrencia.data_resolucao}</span></div>}
+
+            <div className="flex items-center">
+              <span className="font-medium text-muted-foreground mr-2">Reportada por:</span>
+              {reportadaPorObj ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowPessoa(reportadaPorObj); }}
+                  className="text-primary hover:underline text-xs font-semibold whitespace-nowrap bg-primary/5 px-2 py-0.5 rounded"
+                >
+                  {reportadaPorObj.nome}
+                </button>
+              ) : (
+                <span className="text-muted-foreground text-xs italic">
+                  Interno
+                </span>
+              )}
+            </div>
+
+            {ocorrencia.atribuido_a && <div><span className="font-medium text-muted-foreground">Staff Atribuído:</span> <span className="font-semibold">{atribuido}</span></div>}
+            {ocorrencia.fornecedor_id && <div><span className="font-medium text-muted-foreground">Fornecedor:</span> <span className="font-semibold">{fornecedor}</span></div>}
+          </div>
+          {ocorrencia.descricao && (
+            <div className="mb-4 bg-background border border-border rounded-lg p-3 shadow-sm">
+              <p className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-1">Descrição do Problema</p>
+              <p className="text-sm text-foreground">{ocorrencia.descricao}</p>
+            </div>
+          )}
+
+          <div className="mb-4 bg-muted/10 border border-border rounded-lg p-3">
+            <p className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-2">Observações Internas</p>
+            <textarea
+              className="w-full text-sm text-foreground bg-background p-2 rounded-md border border-dashed border-input min-h-[80px] resize-y focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all mb-2"
+              value={notas}
+              onChange={(e) => setNotas(e.target.value)}
+              placeholder="Escreva ou edite anotações exclusivas para a equipa..."
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full bg-muted hover:bg-muted-foreground/20 text-muted-foreground font-semibold transition-colors"
+              onClick={() => saveNotas.mutate(notas)}
+              disabled={saveNotas.isPending || notas === ocorrencia.observacoes}
+            >
+              {saveNotas.isPending ? 'A gravar...' : 'Guardar Notas'}
+            </Button>
+          </div>
+
+          {ocorrencia.resposta_cliente && (
+            <div className="mb-4 bg-blue-50 border border-blue-100 rounded-lg p-3">
+              <p className="font-bold text-xs uppercase tracking-wider text-blue-800 mb-1">Resposta enviada ao Condómino</p>
+              <p className="text-sm text-blue-900">{ocorrencia.resposta_cliente}</p>
+            </div>
+          )}
+          {ocorrencia.anexos?.length > 0 && (
+            <div>
+              <p className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-2">Anexos / Provas</p>
+              <div className="flex flex-col gap-2">
+                {ocorrencia.anexos.map((url, i) => {
+                  const fileNameRaw = url.split('/').pop();
+                  const displayFileName = decodeURIComponent(fileNameRaw.substring(fileNameRaw.indexOf('-') + 1)) || `Anexo ${i + 1}`;
+                  const isPdf = url.toLowerCase().endsWith('.pdf');
+
+                  return (
+                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-2 border border-border rounded-lg hover:bg-muted/50 transition-colors">
+                      {isPdf ? <FileText className="w-8 h-8 text-red-500 shrink-0" /> : <img src={url} alt="" className="w-8 h-8 object-cover rounded shrink-0 border border-border" />}
+                      <span className="text-sm font-medium text-primary hover:underline truncate">{displayFileName}</span>
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL CENTRAL DE DETALHES DA PESSOA (Sobreposto) */}
+      <Dialog open={showPessoa !== null} onOpenChange={(open) => !open && setShowPessoa(null)}>
+        <DialogContent
+          className="max-w-sm z-[250] no-scrollbar"
+          overlayClassName="z-[240] bg-black/60"
+        >
+          {pessoaParaMostrar && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Dados de Contacto</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 mt-2">
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">Nome</p>
+                  <p className="font-bold text-foreground text-lg">{pessoaParaMostrar.nome}</p>
+                </div>
+                {pessoaParaMostrar.telefone && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">Telefone</p>
+                    <p className="text-foreground">{pessoaParaMostrar.telefone}</p>
+                  </div>
+                )}
+                {pessoaParaMostrar.email && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">Email</p>
+                    <p className="text-foreground">{pessoaParaMostrar.email}</p>
+                  </div>
+                )}
+                {pessoaParaMostrar.nif && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">NIF</p>
+                    <p className="text-foreground">{pessoaParaMostrar.nif}</p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -197,17 +267,17 @@ export default function Ocorrencias() {
       const payload = { ...data, fracao_id: data.fracao_id === '__area_comum__' ? '' : data.fracao_id };
       return editing ? agenciaAvenida.entities.Ocorrencia.update(editing, payload) : agenciaAvenida.entities.Ocorrencia.create(payload);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['ocorrencias'] }); setOpen(false); toast.success('Ocorrência guardada'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['ocorrencias'] }); setOpen(false); toast.success('OCORRÊNCIA GUARDADA COM SUCESSO'); },
   });
 
   const avancar = useMutation({
     mutationFn: ({ id, estado }) => agenciaAvenida.entities.Ocorrencia.update(id, { estado, ...(estado === 'resolvida' ? { data_resolucao: format(new Date(), 'yyyy-MM-dd') } : {}) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['ocorrencias'] }); toast.success('Estado atualizado'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['ocorrencias'] }); toast.success('ESTADO ATUALIZADO COM SUCESSO'); },
   });
 
   const del = useMutation({
     mutationFn: (id) => agenciaAvenida.entities.Ocorrencia.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['ocorrencias'] }); toast.success('Ocorrência eliminada'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['ocorrencias'] }); toast.success('OCORRÊNCIA ELIMINADA COM SUCESSO'); },
   });
 
   const openNew = () => {
@@ -238,10 +308,10 @@ export default function Ocorrencias() {
   const handleFotoUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-    
+
     setUploading(true);
     const urls = [];
-    
+
     try {
       for (const file of files) {
         const fileExt = file.name.split('.').pop();
@@ -251,7 +321,7 @@ export default function Ocorrencias() {
         const filePath = `ocorrencias/${fileName}`;
 
         const { data, error } = await supabase.storage
-          .from('documentos') 
+          .from('documentos')
           .upload(filePath, file);
 
         if (error) throw error;
@@ -262,13 +332,13 @@ export default function Ocorrencias() {
 
         urls.push(publicUrlData.publicUrl);
       }
-      
+
       setForm(p => ({ ...p, anexos: [...(p.anexos || []), ...urls] }));
-      toast.success(`${urls.length} anexo(s) carregado(s) com sucesso.`);
-      
+      toast.success(`${urls.length} ANEXO(S) CARREGADO(S) COM SUCESSO`);
+
     } catch (error) {
       console.error("Erro de upload no Supabase:", error);
-      toast.error("Falha no upload: Verifica se o Bucket 'documentos' tem as políticas corretas.");
+      toast.error("FALHA NO UPLOAD");
     } finally {
       setUploading(false);
       e.target.value = null;
@@ -279,10 +349,16 @@ export default function Ocorrencias() {
 
   const filteredAll = ocorrencias.filter(o => {
     const matchCond = selectedCondominioId === 'all' || o.condominio_id === selectedCondominioId;
-    const matchAno = selectedAno === 'all' ||
+    
+    // Converte a data para texto genérico (previne erros se a BD devolver um formato inesperado)
+    const dataStr = String(o.data_abertura || '');
+    
+    const matchAno = 
+      !selectedAno || 
+      selectedAno === 'all' ||
       o.estado === 'aberta' ||
       o.estado === 'em_progresso' ||
-      (o.data_abertura && o.data_abertura.startsWith(String(selectedAno)));
+      dataStr.includes(String(selectedAno));
 
     return matchCond && matchAno;
   });
@@ -330,7 +406,7 @@ export default function Ocorrencias() {
           <Input className="pl-9 bg-background w-full" placeholder="Pesquisar ocorrência..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <div className="flex flex-wrap gap-2 w-full lg:w-auto">
-          <Button 
+          <Button
             variant={filterAtribuido === user?.id ? "default" : "secondary"}
             onClick={() => setFilterAtribuido(filterAtribuido === user?.id ? 'all' : user?.id)}
             className={filterAtribuido === user?.id ? "bg-primary" : "bg-muted text-muted-foreground border-transparent"}
@@ -347,7 +423,7 @@ export default function Ocorrencias() {
               <SelectItem value="resolvida">Resolvida</SelectItem>
             </SelectContent>
           </Select>
-          
+
           <Select value={filterAtribuido} onValueChange={setFilterAtribuido}>
             <SelectTrigger className="w-[160px] bg-background"><SelectValue placeholder="Atribuído a" /></SelectTrigger>
             <SelectContent>
@@ -368,46 +444,46 @@ export default function Ocorrencias() {
             onClick={() => setPreview(o)}
           >
             <div>
-               <div className="flex items-start justify-between mb-3">
-                 <div className="flex items-center gap-3">
-                   <div className="p-2.5 bg-muted rounded-xl">
-                     <AlertTriangle className="w-5 h-5 text-muted-foreground" />
-                   </div>
-                   <div>
-                     <p className="font-bold text-foreground leading-tight">{o.titulo}</p>
-                     <p className="text-xs font-medium text-muted-foreground mt-0.5">{getCondName(o.condominio_id)} · {getFracaoCode(o.fracao_id)}</p>
-                   </div>
-                 </div>
-                 <div className="flex gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-                   <button onClick={() => openEdit(o)} className="p-1.5 hover:bg-muted rounded transition-colors"><Pencil className="w-4 h-4 text-muted-foreground" /></button>
-                   <button onClick={() => del.mutate(o.id)} className="p-1.5 hover:bg-red-50 rounded transition-colors"><Trash2 className="w-4 h-4 text-red-400" /></button>
-                 </div>
-               </div>
-               {o.descricao && <p className="text-sm text-muted-foreground mb-4 line-clamp-2 leading-relaxed">{o.descricao}</p>}
-               {getAtribuidoName(o.atribuido_a) && (
-                 <p className="text-xs text-foreground font-medium mb-3 flex items-center gap-1.5">
-                    <span className="bg-primary/10 text-primary w-5 h-5 rounded-full flex items-center justify-center text-[10px]">A</span> 
-                    <span>{getAtribuidoName(o.atribuido_a)}</span>
-                 </p>
-               )}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-muted rounded-xl">
+                    <AlertTriangle className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-foreground leading-tight">{o.titulo}</p>
+                    <p className="text-xs font-medium text-muted-foreground mt-0.5">{getCondName(o.condominio_id)} · {getFracaoCode(o.fracao_id)}</p>
+                  </div>
+                </div>
+                <div className="flex gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => openEdit(o)} className="p-1.5 hover:bg-muted rounded transition-colors"><Pencil className="w-4 h-4 text-muted-foreground" /></button>
+                  <button onClick={() => del.mutate(o.id)} className="p-1.5 hover:bg-red-50 rounded transition-colors"><Trash2 className="w-4 h-4 text-red-400" /></button>
+                </div>
+              </div>
+              {o.descricao && <p className="text-sm text-muted-foreground mb-4 line-clamp-2 leading-relaxed">{o.descricao}</p>}
+              {getAtribuidoName(o.atribuido_a) && (
+                <p className="text-xs text-foreground font-medium mb-3 flex items-center gap-1.5">
+                  <span className="bg-primary/10 text-primary w-5 h-5 rounded-full flex items-center justify-center text-[10px]">A</span>
+                  <span>{getAtribuidoName(o.atribuido_a)}</span>
+                </p>
+              )}
             </div>
-            
+
             <div>
-               <div className="flex items-center justify-between border-t border-border pt-4">
-                 <div className="flex gap-2">
-                   <StatusBadge status={o.estado} />
-                   <StatusBadge status={o.prioridade} />
-                 </div>
-                 {estadoFlow[o.estado] && (
-                   <Button size="sm" variant="outline" className="text-xs font-bold" onClick={e => { e.stopPropagation(); avancar.mutate({ id: o.id, estado: estadoFlow[o.estado] }); }}>
-                     {estadoNext[o.estado]}
-                   </Button>
-                 )}
-               </div>
-               <div className="flex items-center justify-between mt-3">
-                 <p className="text-xs font-medium text-muted-foreground tracking-wider uppercase">{o.data_abertura}</p>
-                 {o.anexos?.length > 0 && <span className="text-xs font-bold text-muted-foreground flex items-center gap-1">📎 {o.anexos.length} anexo(s)</span>}
-               </div>
+              <div className="flex items-center justify-between border-t border-border pt-4">
+                <div className="flex gap-2">
+                  <StatusBadge status={o.estado} />
+                  <StatusBadge status={o.prioridade} />
+                </div>
+                {estadoFlow[o.estado] && (
+                  <Button size="sm" variant="outline" className="text-xs font-bold" onClick={e => { e.stopPropagation(); avancar.mutate({ id: o.id, estado: estadoFlow[o.estado] }); }}>
+                    {estadoNext[o.estado]}
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center justify-between mt-3">
+                <p className="text-xs font-medium text-muted-foreground tracking-wider uppercase">{o.data_abertura}</p>
+                {o.anexos?.length > 0 && <span className="text-xs font-bold text-muted-foreground flex items-center gap-1">📎 {o.anexos.length} anexo(s)</span>}
+              </div>
             </div>
           </div>
         ))}
@@ -435,7 +511,7 @@ export default function Ocorrencias() {
             <DialogTitle className="flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-amber-500" /> {editing ? 'Editar Ocorrência' : 'Nova Ocorrência'}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-            
+
             {/* LINHA 1: CONDOMINIO E FRAÇÃO */}
             <div className="sm:col-span-1">
               <Label>Condomínio *</Label>
@@ -528,9 +604,7 @@ export default function Ocorrencias() {
                 <Select value={form.prioridade} onValueChange={v => upd('prioridade', v)}>
                   <SelectTrigger className="mt-1 bg-background"><SelectValue /></SelectTrigger>
                   <SelectContent className="z-[210]">
-                    <SelectItem value="baixa">Baixa</SelectItem>
-                    <SelectItem value="media">Média</SelectItem>
-                    <SelectItem value="alta">Alta</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
                     <SelectItem value="urgente">Urgente</SelectItem>
                   </SelectContent>
                 </Select>
@@ -552,10 +626,10 @@ export default function Ocorrencias() {
             {form.canal_submissao === 'portal_condomino' && (
               <div className="sm:col-span-2 mt-2">
                 <Label>Descrição Completa do Problema (Pelo Condómino)</Label>
-                <textarea 
-                  className="mt-1 w-full rounded-md border border-input px-3 py-2 text-sm min-h-[80px] resize-y bg-muted opacity-80 cursor-not-allowed" 
-                  value={form.descricao || ''} 
-                  onChange={e => upd('descricao', e.target.value)} 
+                <textarea
+                  className="mt-1 w-full rounded-md border border-input px-3 py-2 text-sm min-h-[80px] resize-y bg-muted opacity-80 cursor-not-allowed"
+                  value={form.descricao || ''}
+                  onChange={e => upd('descricao', e.target.value)}
                   disabled={true}
                   placeholder="Detalhes da anomalia submetida pelo condómino..."
                 />
@@ -565,12 +639,12 @@ export default function Ocorrencias() {
 
             {/* OBSERVACOES INTERNAS */}
             <div className="sm:col-span-2">
-              <Label>Observações Internas (Staff)</Label>
-              <textarea 
-                className="mt-1 w-full rounded-md border border-dashed border-input bg-background px-3 py-2 text-sm min-h-[60px] resize-y" 
-                value={form.observacoes || ''} 
-                onChange={e => upd('observacoes', e.target.value)} 
-                placeholder="Anotações para a equipa..." 
+              <Label>Observações Internas</Label>
+              <textarea
+                className="mt-1 w-full rounded-md border border-dashed border-input bg-background px-3 py-2 text-sm min-h-[60px] resize-y"
+                value={form.observacoes || ''}
+                onChange={e => upd('observacoes', e.target.value)}
+                placeholder="Escreva ou edite anotações exclusivas para a equipa..."
               />
             </div>
 
@@ -578,17 +652,17 @@ export default function Ocorrencias() {
             {form.canal_submissao === 'portal_condomino' && (
               <div className="sm:col-span-2 bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3 mt-2">
                 <Label className="text-blue-800 font-bold flex items-center gap-1.5"><Send className="w-4 h-4" /> Resposta ao Condómino (Visível no Portal)</Label>
-                <textarea 
-                  className="w-full rounded-md border border-blue-300 bg-white px-3 py-2 text-sm min-h-[80px] resize-y focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
-                  value={form.resposta_cliente || ''} 
-                  onChange={e => upd('resposta_cliente', e.target.value)} 
-                  placeholder="Escreva a resposta que o condómino irá ler..." 
+                <textarea
+                  className="w-full rounded-md border border-blue-300 bg-white px-3 py-2 text-sm min-h-[80px] resize-y focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  value={form.resposta_cliente || ''}
+                  onChange={e => upd('resposta_cliente', e.target.value)}
+                  placeholder="Escreva a resposta que o condómino irá ler..."
                 />
-                <Button 
+                <Button
                   type="button"
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold gap-2"
                   onClick={() => {
-                    if(!form.titulo || !form.condominio_id) { toast.error("Preencha os campos obrigatórios primeiro."); return; }
+                    if (!form.titulo || !form.condominio_id) { toast.error("PREENCHA OS CAMPOS OBRIGATÓRIOS PRIMEIRO"); return; }
                     save.mutate({ ...form, estado: 'resolvida', data_resolucao: format(new Date(), 'yyyy-MM-dd') });
                   }}
                 >
@@ -608,7 +682,7 @@ export default function Ocorrencias() {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="mt-2">
               <Label>Fornecedor (Externo)</Label>
               <Popover open={comboFornecedorOpen} onOpenChange={setComboFornecedorOpen}>
@@ -650,12 +724,12 @@ export default function Ocorrencias() {
                   <span className="text-sm font-medium text-muted-foreground">{uploading ? 'A enviar ficheiros...' : 'Clique para carregar fotos ou documentos'}</span>
                   <input type="file" multiple accept="image/*,.pdf" onChange={handleFotoUpload} className="hidden" disabled={uploading} />
                 </label>
-                
+
                 {form.anexos?.length > 0 && (
                   <div className="flex flex-col gap-2 mt-4">
                     {form.anexos.map((url, i) => {
                       const fileNameRaw = url.split('/').pop();
-                      const displayFileName = decodeURIComponent(fileNameRaw.substring(fileNameRaw.indexOf('-') + 1)) || `Anexo ${i+1}`;
+                      const displayFileName = decodeURIComponent(fileNameRaw.substring(fileNameRaw.indexOf('-') + 1)) || `Anexo ${i + 1}`;
                       const isPdf = url.toLowerCase().endsWith('.pdf');
 
                       return (

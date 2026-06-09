@@ -33,7 +33,7 @@ export default function Assembleias() {
 
   const del = useMutation({
     mutationFn: (id) => agenciaAvenida.entities.Assembleia.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['assembleias'] }); toast.success('Assembleia eliminada'); }
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['assembleias'] }); toast.success('ASSEMBLEIA ELIMINADA COM SUCESSO'); }
   });
 
   const filtered = useMemo(() => assembleias.filter(a =>

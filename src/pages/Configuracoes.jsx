@@ -22,7 +22,7 @@ export default function Configuracoes() {
     setSaving(true);
     await new Promise(r => setTimeout(r, 800));
     setSaving(false);
-    toast.success('Configurações guardadas');
+    toast.success('CONFIGURAÇÕES GUARDADAS');
   };
 
   const handleTestEmail = async () => {
@@ -32,7 +32,7 @@ export default function Configuracoes() {
       subject: 'Teste - Agência Avenida',
       body: `<h2>Email de teste</h2><p>As suas configurações de email estão a funcionar corretamente.</p><p><strong>Agência Avenida</strong> - Gestão de Condomínios</p>`,
     });
-    toast.success(`Email de teste enviado para ${user.email}`);
+    toast.success(`E-MAIL DE TESTE ENVIADO COM SUCESSO`);
   };
 
   return (

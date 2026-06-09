@@ -241,7 +241,7 @@ export default function Condominios() {
       
       return editing ? agenciaAvenida.entities.Condominio.update(editing, payload) : agenciaAvenida.entities.Condominio.create(payload);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['condominios'] }); setOpen(false); toast.success('Condomínio guardado'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['condominios'] }); setOpen(false); toast.success('CONDOMÍNIO GUARDADO COM SUCESSO'); },
   });
 
   const inactivate = useMutation({
@@ -250,7 +250,7 @@ export default function Condominios() {
       qc.invalidateQueries({ queryKey: ['condominios'] });
       setInactivateModal(null);
       setOpen(false); // Fecha o formulário de edição após inativar
-      toast.success('Condomínio arquivado e inativado.');
+      toast.success('CONDOMÍNIO ARQUIVADO & INATIVADO COM SUCESSO');
     }
   });
 
@@ -260,7 +260,7 @@ export default function Condominios() {
       qc.invalidateQueries({ queryKey: ['pessoas'] });
       setShowNewClient(false);
       f('pessoa_id', created.id);
-      toast.success('Pessoa criada e selecionada!');
+      toast.success('PESSOA CRIADA E SELECIONADA COM SUCESSO');
     },
   });
 
