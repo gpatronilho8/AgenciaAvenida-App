@@ -1,97 +1,155 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Search, TrendingUp, TrendingDown, Wallet, Pencil, Trash2 } from 'lucide-react';
+import { Select, SelectContent, SelectGroup, SelectLabel, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Plus, Search, TrendingUp, TrendingDown, Wallet, Pencil, Trash2, Download, Calculator, FileCheck, Check, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { useCondominio } from '@/lib/CondominioContext';
+import { cn } from '@/lib/utils';
 
-const categoriaLabels = {
-  quota: 'Quota', limpeza: 'Limpeza', manutencao: 'Manutenção', seguros: 'Seguros',
-  eletricidade: 'Eletricidade', agua: 'Água', elevador: 'Elevador',
-  jardim: 'Jardim', administracao: 'Administração', obras: 'Obras', outros: 'Outros'
+const categoriasDespesa = {
+  limpeza: 'Limpeza', manutencao_obras: 'Manutenção / Obras', seguros: 'Seguros',
+  eletricidade: 'Eletricidade', agua: 'Água', elevadores: 'Elevadores',
+  encargos_juridicos: 'Encargos Jurídicos', encargos_administrativos: 'Encargos Administrativos',
+  encargos_bancarios: 'Encargos Bancários', acerto_contabilistico: 'Acerto Contabilístico',
+  piscina: 'Piscina', encargos_camararios: 'Encargos Camarários'
 };
 
-const empty = {
-  condominio_id: '', tipo: 'despesa', categoria: 'outros', descricao: '',
+const categoriasReceita = {
+  quota: 'Quotas', recuperacao_divida: 'Recuperação Dívida', taxas_outros: 'Taxas / Outros Faturados'
+};
+
+const allCategorias = { ...categoriasDespesa, ...categoriasReceita };
+
+// Ordenação alfabética das categorias com base nos rótulos visuais
+const categoriasDespesaOrdenadas = Object.entries(categoriasDespesa).sort((a, b) => a[1].localeCompare(b[1], 'pt'));
+const categoriasReceitaOrdenadas = Object.entries(categoriasReceita).sort((a, b) => a[1].localeCompare(b[1], 'pt'));
+
+const emptyDespesa = {
+  condominio_id: '', tipo: 'despesa', categoria: 'limpeza', descricao: '',
   valor: '', data: format(new Date(), 'yyyy-MM-dd'), conta: 'banco',
-  metodo_pagamento: 'transferencia', numero_documento: '', observacoes: ''
+  metodo_pagamento: 'transferencia', fornecedor_id: '', observacoes: ''
+};
+
+const normalizeTipoPessoa = (tipoData) => {
+  if (!tipoData) return [];
+  let parsedArray = [];
+  if (Array.isArray(tipoData)) parsedArray = tipoData;
+  else if (typeof tipoData === 'string') {
+    try { const parsed = JSON.parse(tipoData); parsedArray = Array.isArray(parsed) ? parsed : [tipoData]; }
+    catch (e) {
+      const cleanStr = tipoData.trim().replace(/^\{|\}$/g, '');
+      parsedArray = cleanStr.includes(',') ? cleanStr.split(',') : [cleanStr];
+    }
+  }
+  let finalArray = [];
+  parsedArray.forEach(item => {
+    if (item === null || item === undefined) return;
+    if (typeof item === 'string') {
+      let clean = item.trim().replace(/^"|"$/g, '');
+      if (clean.startsWith('[') && clean.endsWith(']')) { try { const innerParsed = JSON.parse(clean); if (Array.isArray(innerParsed)) { finalArray.push(...innerParsed); return; } } catch (e) { } }
+      clean = clean.replace(/"/g, '').trim();
+      if (clean.includes(',')) finalArray.push(...clean.split(',').map(s => s.trim()));
+      else if (clean) finalArray.push(clean);
+    } else finalArray.push(String(item));
+  });
+  return [...new Set(finalArray)].map(t => String(t).toLowerCase());
 };
 
 export default function Movimentos() {
   const qc = useQueryClient();
-  const { selectedCondominioId } = useCondominio();
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState(empty);
+  const { selectedCondominioId, selectedAno } = useCondominio();
+  
+  // UI States
+  const [openDespesa, setOpenDespesa] = useState(false);
+  const [openFecho, setOpenFecho] = useState(false);
+  const [comboCondominioOpen, setComboCondominioOpen] = useState(false);
+  const [comboFornecedorOpen, setComboFornecedorOpen] = useState(false);
+  const [form, setForm] = useState(emptyDespesa);
   const [editing, setEditing] = useState(null);
+  
+  // Filters
   const [search, setSearch] = useState('');
   const [filterTipo, setFilterTipo] = useState('all');
   const [filterConta, setFilterConta] = useState('all');
+  const [filterCategoria, setFilterCategoria] = useState('all');
 
-  // Filtro de período — default: mês corrente
-  const hoje = new Date();
-  const [periodoInicio, setPeriodoInicio] = useState(format(startOfMonth(hoje), 'yyyy-MM-dd'));
-  const [periodoFim, setPeriodoFim] = useState(format(endOfMonth(hoje), 'yyyy-MM-dd'));
+  const [periodoInicio, setPeriodoInicio] = useState('');
+  const [periodoFim, setPeriodoFim] = useState('');
 
+  useEffect(() => {
+    if (selectedAno !== 'all') {
+      setPeriodoInicio(`${selectedAno}-01-01`);
+      setPeriodoFim(`${selectedAno}-12-31`);
+    } else {
+      const hoje = new Date();
+      setPeriodoInicio(format(startOfMonth(hoje), 'yyyy-MM-dd'));
+      setPeriodoFim(format(endOfMonth(hoje), 'yyyy-MM-dd'));
+    }
+  }, [selectedAno]);
+
+  const [dreData, setDreData] = useState({ receitas: {}, despesas: {}, saldoInicial: 0, observacoes: '' });
+
+  // Queries
   const { data: movimentos = [], isLoading } = useQuery({
     queryKey: ['movimentos'],
     queryFn: () => agenciaAvenida.entities.Movimento.list('-data')
   });
   const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
+  const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
 
+  const condominiosAtivos = condominios.filter(c => c && c.ativo !== false && c.ativo !== 'false').sort((a, b) => String(a.codigo || '').localeCompare(String(b.codigo || ''), undefined, { numeric: true, sensitivity: 'base' }));
+  const fornecedoresAtivos = pessoas.filter(p => p && normalizeTipoPessoa(p.tipo).includes('fornecedor')).sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt'));
+
+  // Mutações
   const save = useMutation({
     mutationFn: (data) => editing
       ? agenciaAvenida.entities.Movimento.update(editing, data)
       : agenciaAvenida.entities.Movimento.create(data),
     onSuccess: async (saved, vars) => {
-      // Atualizar saldo do condomínio
       const cond = condominios.find(c => c.id === vars.condominio_id);
       if (cond) {
         const delta = parseFloat(vars.valor) || 0;
         const saldoField = vars.conta === 'banco' ? 'saldo_banco' : 'saldo_caixa';
         const change = vars.tipo === 'receita' ? delta : -delta;
-        // Se editando, reverter o anterior
+        
         if (editing) {
           const prev = movimentos.find(m => m.id === editing);
           if (prev) {
             const prevField = prev.conta === 'banco' ? 'saldo_banco' : 'saldo_caixa';
             const prevChange = prev.tipo === 'receita' ? -(prev.valor || 0) : (prev.valor || 0);
-            const updates = { [prevField]: (cond[prevField] || 0) + prevChange };
-            await agenciaAvenida.entities.Condominio.update(cond.id, updates);
+            await agenciaAvenida.entities.Condominio.update(cond.id, { [prevField]: (cond[prevField] || 0) + prevChange });
           }
         }
         const condAtual = await agenciaAvenida.entities.Condominio.list();
         const condNow = condAtual.find(c => c.id === vars.condominio_id);
         if (condNow) {
-          await agenciaAvenida.entities.Condominio.update(cond.id, {
-            [saldoField]: (condNow[saldoField] || 0) + change
-          });
+          await agenciaAvenida.entities.Condominio.update(cond.id, { [saldoField]: (condNow[saldoField] || 0) + change });
         }
       }
       qc.invalidateQueries({ queryKey: ['movimentos'] });
       qc.invalidateQueries({ queryKey: ['condominios'] });
-      setOpen(false);
-      toast.success('Movimento guardado');
+      setOpenDespesa(false);
+      toast.success(editing ? 'Despesa atualizada' : 'Despesa registada');
     },
   });
 
   const del = useMutation({
     mutationFn: async (m) => {
       await agenciaAvenida.entities.Movimento.delete(m.id);
-      // Reverter saldo
       const cond = condominios.find(c => c.id === m.condominio_id);
       if (cond) {
         const saldoField = m.conta === 'banco' ? 'saldo_banco' : 'saldo_caixa';
         const change = m.tipo === 'receita' ? -(m.valor || 0) : (m.valor || 0);
-        await agenciaAvenida.entities.Condominio.update(cond.id, {
-          [saldoField]: (cond[saldoField] || 0) + change
-        });
+        await agenciaAvenida.entities.Condominio.update(cond.id, { [saldoField]: (cond[saldoField] || 0) + change });
       }
     },
     onSuccess: () => {
@@ -102,229 +160,453 @@ export default function Movimentos() {
   });
 
   const upd = (k, v) => setForm(p => ({ ...p, [k]: v }));
-  const openNew = () => { setForm(empty); setEditing(null); setOpen(true); };
-  const openEdit = (m) => { setForm(m); setEditing(m.id); setOpen(true); };
+  const openNew = () => { setForm({ ...emptyDespesa, condominio_id: selectedCondominioId === 'all' ? '' : selectedCondominioId }); setEditing(null); setOpenDespesa(true); };
+  const openEdit = (m) => { setForm(m); setEditing(m.id); setOpenDespesa(true); };
   const getCondName = (id) => condominios.find(c => c.id === id)?.nome || '-';
+
+  const handleOpenFecho = () => {
+    const anoFecho = selectedAno === 'all' ? new Date().getFullYear() : selectedAno;
+    const movsAno = movimentos.filter(m => m.condominio_id === selectedCondominioId && String(m.data).startsWith(String(anoFecho)));
+    const movsAnteriores = movimentos.filter(m => m.condominio_id === selectedCondominioId && String(m.data) < `${anoFecho}-01-01`);
+
+    const saldoTransitado = movsAnteriores.reduce((acc, m) => acc + (m.tipo === 'receita' ? m.valor : -m.valor), 0);
+    
+    const recs = {}; const desps = {};
+    Object.keys(categoriasReceita).forEach(k => recs[k] = 0);
+    Object.keys(categoriasDespesa).forEach(k => desps[k] = 0);
+
+    movsAno.forEach(m => {
+      if (m.tipo === 'receita') recs[m.categoria] = (recs[m.categoria] || 0) + m.valor;
+      if (m.tipo === 'despesa') desps[m.categoria] = (desps[m.categoria] || 0) + m.valor;
+    });
+
+    setDreData({ receitas: recs, despesas: desps, saldoInicial: saldoTransitado, observacoes: '' });
+    setOpenFecho(true);
+  };
+
+  const handleEmitirFecho = () => {
+    toast.success('Emissão do PDF de Fecho de Contas iniciado.');
+    setOpenFecho(false);
+  };
 
   const filtered = useMemo(() => movimentos.filter(m => {
     const matchCond = selectedCondominioId === 'all' || m.condominio_id === selectedCondominioId;
     const matchTipo = filterTipo === 'all' || m.tipo === filterTipo;
     const matchConta = filterConta === 'all' || m.conta === filterConta;
+    const matchCat = filterCategoria === 'all' || m.categoria === filterCategoria;
     const matchSearch = !search || m.descricao?.toLowerCase().includes(search.toLowerCase());
     const d = m.data;
     const matchPeriodo = (!periodoInicio || d >= periodoInicio) && (!periodoFim || d <= periodoFim);
-    return matchCond && matchTipo && matchConta && matchSearch && matchPeriodo;
-  }), [movimentos, selectedCondominioId, filterTipo, filterConta, search, periodoInicio, periodoFim]);
+    return matchCond && matchTipo && matchConta && matchCat && matchSearch && matchPeriodo;
+  }), [movimentos, selectedCondominioId, filterTipo, filterConta, filterCategoria, search, periodoInicio, periodoFim]);
 
   const totalReceitas = filtered.filter(m => m.tipo === 'receita').reduce((s, m) => s + (m.valor || 0), 0);
   const totalDespesas = filtered.filter(m => m.tipo === 'despesa').reduce((s, m) => s + (m.valor || 0), 0);
-  const saldo = totalReceitas - totalDespesas;
+  const saldoPeriodo = totalReceitas - totalDespesas;
 
-  // Saldos por conta (todos os movimentos do condomínio selecionado, sem filtro de período)
-  const condSaldos = useMemo(() => {
-    const condFiltrados = selectedCondominioId === 'all' ? condominios : condominios.filter(c => c.id === selectedCondominioId);
-    return condFiltrados.map(c => ({
-      nome: c.nome,
-      banco: c.saldo_banco || 0,
-      caixa: c.saldo_caixa || 0,
-    }));
-  }, [condominios, selectedCondominioId]);
+  const condAtual = condominios.find(c => c.id === selectedCondominioId);
+  const saldoGlobal = condAtual ? ((condAtual.saldo_banco || 0) + (condAtual.saldo_caixa || 0)) : 0;
 
   return (
-    <div>
-      <PageHeader title="Financeiro" subtitle="Registo de movimentos financeiros" action={
-        <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />Novo Movimento</Button>
-      } />
+    <div className="space-y-6">
+      <PageHeader 
+        title="Financeiro & Tesouraria" 
+        subtitle="Registo de movimentos, despesas e fecho de contas." 
+      />
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div className="bg-green-50 rounded-xl p-4 border border-green-100">
-          <div className="flex items-center gap-2 mb-1"><TrendingUp className="w-4 h-4 text-green-600" /><p className="text-xs text-green-700 font-medium">Receitas (período)</p></div>
-          <p className="text-2xl font-bold text-green-800">€{totalReceitas.toFixed(2)}</p>
-        </div>
-        <div className="bg-red-50 rounded-xl p-4 border border-red-100">
-          <div className="flex items-center gap-2 mb-1"><TrendingDown className="w-4 h-4 text-red-600" /><p className="text-xs text-red-700 font-medium">Despesas (período)</p></div>
-          <p className="text-2xl font-bold text-red-800">€{totalDespesas.toFixed(2)}</p>
-        </div>
-        <div className={`rounded-xl p-4 border ${saldo >= 0 ? 'bg-blue-50 border-blue-100' : 'bg-orange-50 border-orange-100'}`}>
-          <div className="flex items-center gap-2 mb-1"><Wallet className="w-4 h-4 text-primary" /><p className="text-xs font-medium text-muted-foreground">Saldo (período)</p></div>
-          <p className={`text-2xl font-bold ${saldo >= 0 ? 'text-blue-800' : 'text-orange-800'}`}>€{saldo.toFixed(2)}</p>
-        </div>
+      <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-center w-full">
+        <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white shadow-md gap-2" onClick={openNew}>
+          <TrendingDown className="w-5 h-5" /> Registar Despesa
+        </Button>
+        <Button size="lg" variant="outline" className="shadow-md gap-2 border-primary/20 text-primary hover:bg-primary/5" onClick={() => toast.info('Exportação PDF iniciada.')}>
+          <Download className="w-5 h-5" /> Exportar Movimentos
+        </Button>
+        <div className="flex-1" />
+        <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white shadow-md gap-2" onClick={handleOpenFecho} disabled={selectedCondominioId === 'all'}>
+          <FileCheck className="w-5 h-5" /> Fecho de Contas
+        </Button>
       </div>
 
-      {/* Saldos contas */}
-      {condSaldos.length > 0 && (
-        <div className="bg-card rounded-xl border border-border p-4 mb-6 shadow-sm">
-          <p className="text-sm font-semibold text-foreground mb-3">Saldos atuais</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {condSaldos.map(c => (
-              <div key={c.nome} className="border border-border rounded-lg p-3">
-                <p className="text-xs font-semibold text-muted-foreground mb-2 truncate">{c.nome}</p>
-                <div className="flex gap-4">
-                  <div><p className="text-xs text-muted-foreground">Banco</p><p className="font-bold text-foreground">€{c.banco.toFixed(2)}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Caixa</p><p className="font-bold text-foreground">€{c.caixa.toFixed(2)}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Total</p><p className="font-bold text-primary">€{(c.banco + c.caixa).toFixed(2)}</p></div>
-                </div>
-              </div>
-            ))}
+      {selectedCondominioId !== 'all' ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-emerald-50 rounded-xl p-5 border border-emerald-100 flex flex-col justify-center">
+              <div className="flex items-center gap-2 mb-2"><TrendingUp className="w-4 h-4 text-emerald-600" /><p className="text-sm text-emerald-800 font-medium">Receitas (período)</p></div>
+              <p className="text-3xl font-black text-emerald-700">€{totalReceitas.toFixed(2)}</p>
+            </div>
+            <div className="bg-red-50 rounded-xl p-5 border border-red-100 flex flex-col justify-center">
+              <div className="flex items-center gap-2 mb-2"><TrendingDown className="w-4 h-4 text-red-600" /><p className="text-sm text-red-800 font-medium">Despesas (período)</p></div>
+              <p className="text-3xl font-black text-red-700">€{totalDespesas.toFixed(2)}</p>
+            </div>
+            <div className={`rounded-xl p-5 border flex flex-col justify-center ${saldoPeriodo >= 0 ? 'bg-blue-50 border-blue-100' : 'bg-orange-50 border-orange-100'}`}>
+              <div className="flex items-center gap-2 mb-2"><Wallet className="w-4 h-4 text-primary" /><p className="text-sm font-medium text-muted-foreground">Variação (período)</p></div>
+              <p className={`text-3xl font-black ${saldoPeriodo >= 0 ? 'text-blue-800' : 'text-orange-800'}`}>€{saldoPeriodo.toFixed(2)}</p>
+            </div>
           </div>
+          
+          <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Saldos Atuais (Conta Real)</p>
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div className="w-full sm:w-1/3 flex justify-between items-end border-b sm:border-b-0 sm:border-r border-border pb-3 sm:pb-0 sm:pr-6">
+                <span className="text-sm text-muted-foreground font-medium">Banco</span>
+                <span className="text-2xl font-bold text-foreground">€{(condAtual?.saldo_banco || 0).toFixed(2)}</span>
+              </div>
+              <div className="w-full sm:w-1/3 flex justify-between items-end border-b sm:border-b-0 sm:border-r border-border pb-3 sm:pb-0 sm:pr-6">
+                <span className="text-sm text-muted-foreground font-medium">Caixa</span>
+                <span className="text-2xl font-bold text-foreground">€{(condAtual?.saldo_caixa || 0).toFixed(2)}</span>
+              </div>
+              <div className="w-full sm:w-1/3 flex justify-between items-end pt-1 sm:pt-0 sm:pl-2">
+                <span className="text-sm text-muted-foreground font-bold">Total Disponível</span>
+                <span className="text-3xl font-black text-primary">€{saldoGlobal.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="py-8 bg-muted/30 border border-dashed rounded-xl text-center">
+          <p className="text-muted-foreground">Selecione um condomínio na barra superior para visualizar o painel financeiro e os saldos.</p>
         </div>
       )}
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        <div className="relative flex-1 min-w-40">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Pesquisar..." value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <Select value={filterTipo} onValueChange={setFilterTipo}>
-          <SelectTrigger className="w-36"><SelectValue placeholder="Tipo" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="receita">Receitas</SelectItem>
-            <SelectItem value="despesa">Despesas</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filterConta} onValueChange={setFilterConta}>
-          <SelectTrigger className="w-32"><SelectValue placeholder="Conta" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
-            <SelectItem value="banco">Banco</SelectItem>
-            <SelectItem value="caixa">Caixa</SelectItem>
-          </SelectContent>
-        </Select>
-        <div className="flex items-center gap-2">
-          <Input type="date" className="w-36" value={periodoInicio} onChange={e => setPeriodoInicio(e.target.value)} />
-          <span className="text-muted-foreground text-sm">até</span>
-          <Input type="date" className="w-36" value={periodoFim} onChange={e => setPeriodoFim(e.target.value)} />
-        </div>
-      </div>
-
-      {isLoading && <div className="text-center py-16 text-muted-foreground">A carregar...</div>}
-
+      {/* FILTROS */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="p-4 border-b border-border flex flex-col lg:flex-row gap-3 bg-muted/20">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input className="pl-9 bg-background w-full" placeholder="Pesquisar movimento..." value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <div className="flex flex-wrap gap-2 w-full lg:w-auto">
+            <Select value={filterTipo} onValueChange={setFilterTipo}>
+              <SelectTrigger className="w-[120px] bg-background"><SelectValue placeholder="Tipo" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tipos</SelectItem>
+                <SelectItem value="receita">Receitas</SelectItem>
+                <SelectItem value="despesa">Despesas</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterCategoria} onValueChange={setFilterCategoria}>
+              <SelectTrigger className="w-[160px] bg-background"><SelectValue placeholder="Categoria" /></SelectTrigger>
+              <SelectContent className="max-h-56">
+                <SelectItem value="all">Categorias</SelectItem>
+                <SelectGroup>
+                  <SelectLabel className="text-[10px] uppercase text-muted-foreground">Despesas</SelectLabel>
+                  {categoriasDespesaOrdenadas.map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                </SelectGroup>
+                <SelectGroup>
+                  <SelectLabel className="text-[10px] uppercase text-muted-foreground mt-2">Receitas</SelectLabel>
+                  {categoriasReceitaOrdenadas.map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <Select value={filterConta} onValueChange={setFilterConta}>
+              <SelectTrigger className="w-[120px] bg-background"><SelectValue placeholder="Conta" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Contas</SelectItem>
+                <SelectItem value="banco">Banco</SelectItem>
+                <SelectItem value="caixa">Caixa</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-1.5 bg-background border border-input rounded-md px-2">
+              <Input 
+                type="date" 
+                className="w-[125px] border-none shadow-none focus-visible:ring-0 px-1" 
+                value={periodoInicio} 
+                min={selectedAno !== 'all' ? `${selectedAno}-01-01` : undefined}
+                max={selectedAno !== 'all' ? `${selectedAno}-12-31` : undefined}
+                onChange={e => setPeriodoInicio(e.target.value)} 
+              />
+              <span className="text-muted-foreground text-xs font-medium">a</span>
+              <Input 
+                type="date" 
+                className="w-[125px] border-none shadow-none focus-visible:ring-0 px-1" 
+                value={periodoFim} 
+                min={selectedAno !== 'all' ? `${selectedAno}-01-01` : undefined}
+                max={selectedAno !== 'all' ? `${selectedAno}-12-31` : undefined}
+                onChange={e => setPeriodoFim(e.target.value)} 
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto no-scrollbar">
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr>
                 {['Data', 'Tipo', 'Condomínio', 'Categoria', 'Descrição', 'Conta', 'Valor', 'Ações'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">{h}</th>
+                  <th key={h} className={`px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap ${h === 'Ações' ? 'text-center' : ''}`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.map(m => (
+              {isLoading ? (
+                 <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">A carregar movimentos...</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">Nenhum Movimento Encontrado no Período Selecionado</td></tr>
+              ) : filtered.map(m => (
                 <tr key={m.id} className="hover:bg-muted/30 transition-colors">
                   <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{m.data}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.tipo === 'receita' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold ${m.tipo === 'receita' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                       {m.tipo === 'receita' ? 'Receita' : 'Despesa'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{getCondName(m.condominio_id)}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{categoriaLabels[m.categoria] || m.categoria}</td>
-                  <td className="px-4 py-3">{m.descricao}</td>
+                  <td className="px-4 py-3 font-medium text-muted-foreground">{getCondName(m.condominio_id)}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{allCategorias[m.categoria] || m.categoria}</td>
+                  <td className="px-4 py-3 font-medium">{m.descricao}</td>
                   <td className="px-4 py-3">
-                    <span className="capitalize text-xs bg-accent text-accent-foreground px-2 py-0.5 rounded-full">{m.conta}</span>
+                    <span className="capitalize text-[10px] font-bold tracking-wider bg-accent text-accent-foreground px-2 py-0.5 rounded-full border border-border">{m.conta}</span>
                   </td>
-                  <td className={`px-4 py-3 font-bold ${m.tipo === 'receita' ? 'text-green-600' : 'text-red-600'}`}>
+                  <td className={`px-4 py-3 font-bold ${m.tipo === 'receita' ? 'text-emerald-600' : 'text-red-600'}`}>
                     {m.tipo === 'receita' ? '+' : '-'}€{(m.valor || 0).toFixed(2)}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1">
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex justify-center gap-1">
                       <button onClick={() => openEdit(m)} className="p-1.5 hover:bg-muted rounded transition-colors"><Pencil className="w-3.5 h-3.5 text-muted-foreground" /></button>
                       <button onClick={() => del.mutate(m)} className="p-1.5 hover:bg-red-50 rounded transition-colors"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
                     </div>
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && !isLoading && (
-                <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">Nenhum Movimento Encontrado</td></tr>
-              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+      {/* MODAL NOVA DESPESA */}
+      <Dialog open={openDespesa} onOpenChange={setOpenDespesa}>
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto no-scrollbar rounded-xl z-[200]">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Editar Movimento' : 'Novo Movimento'}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-red-600"><TrendingDown className="w-5 h-5" /> {editing ? 'Editar Despesa' : 'Registar Despesa'}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-            <div>
+            
+            <div className="sm:col-span-2">
               <Label>Condomínio *</Label>
-              <Select value={form.condominio_id} onValueChange={v => upd('condominio_id', v)}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                <SelectContent>{condominios.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
-              </Select>
+              <Popover open={comboCondominioOpen} onOpenChange={setComboCondominioOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={comboCondominioOpen} disabled={selectedCondominioId !== 'all'} className="w-full justify-between font-normal bg-background mt-1">
+                    {form.condominio_id ? condominiosAtivos.find(c => c.id === form.condominio_id)?.nome : "Selecione ou pesquise..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0 w-[--radix-popover-trigger-width] z-[210]" align="start">
+                  <Command>
+                    <CommandInput placeholder="Pesquisar condomínio por nome ou CXX..." />
+                    <CommandEmpty>Condomínio não encontrado.</CommandEmpty>
+                    <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
+                      {condominiosAtivos.map(c => (
+                        <CommandItem key={c.id} value={`${c.nome} ${c.codigo || ''}`} onSelect={() => { upd('condominio_id', c.id); setComboCondominioOpen(false); }}>
+                          <Check className={cn("mr-2 h-4 w-4", form.condominio_id === c.id ? "opacity-100" : "opacity-0")} />
+                          {c.codigo && <span className="font-bold mr-1.5 opacity-80">({c.codigo})</span>}
+                          {c.nome}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
-            <div>
-              <Label>Tipo *</Label>
-              <Select value={form.tipo} onValueChange={v => upd('tipo', v)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="receita">Receita</SelectItem>
-                  <SelectItem value="despesa">Despesa</SelectItem>
-                </SelectContent>
-              </Select>
+
+            {/* SELETOR DE FORNECEDOR (Pesquisa Inteligente) */}
+            <div className="sm:col-span-2">
+              <Label>Fornecedor</Label>
+              <Popover open={comboFornecedorOpen} onOpenChange={setComboFornecedorOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={comboFornecedorOpen} className="w-full justify-between font-normal bg-background mt-1">
+                    {form.fornecedor_id ? fornecedoresAtivos.find(f => f.id === form.fornecedor_id)?.nome : "Selecione ou pesquise o fornecedor..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0 w-[--radix-popover-trigger-width] z-[210]" align="start">
+                  <Command>
+                    <CommandInput placeholder="Pesquisar fornecedor por nome..." />
+                    <CommandEmpty>Fornecedor não encontrado.</CommandEmpty>
+                    <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
+                      <CommandItem value="" onSelect={() => { upd('fornecedor_id', ''); setComboFornecedorOpen(false); }}>
+                        <Check className={cn("mr-2 h-4 w-4", !form.fornecedor_id ? "opacity-100" : "opacity-0")} />
+                        Nenhum / Particular
+                      </CommandItem>
+                      {fornecedoresAtivos.map(f => (
+                        <CommandItem key={f.id} value={f.nome} onSelect={() => { upd('fornecedor_id', f.id); setComboFornecedorOpen(false); }}>
+                          <Check className={cn("mr-2 h-4 w-4", form.fornecedor_id === f.id ? "opacity-100" : "opacity-0")} />
+                          {f.nome}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
-            <div>
-              <Label>Categoria</Label>
+            
+            <div className="sm:col-span-2">
+              <Label>Categoria da Despesa *</Label>
               <Select value={form.categoria} onValueChange={v => upd('categoria', v)}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(categoriaLabels).map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
+                <SelectContent className="max-h-48 z-[210]">
+                  {categoriasDespesaOrdenadas.map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
+            
+            <div className="sm:col-span-2">
+              <Label>Descrição da Despesa *</Label>
+              <Input className="mt-1" value={form.descricao || ''} onChange={e => upd('descricao', e.target.value)} placeholder="Ex: Fatura E-Redes Maio..." />
+            </div>
+
             <div>
-              <Label>Conta</Label>
+              <Label>Valor da Despesa (€) *</Label>
+              <Input className="mt-1 font-bold text-red-600" type="number" step="0.01" value={form.valor || ''} onChange={e => upd('valor', parseFloat(e.target.value) || 0)} />
+            </div>
+            <div>
+              <Label>Data do Documento *</Label>
+              <Input className="mt-1" type="date" value={form.data || ''} onChange={e => upd('data', e.target.value)} />
+            </div>
+
+            <div>
+              <Label>Conta a Debitar *</Label>
               <Select value={form.conta} onValueChange={v => upd('conta', v)}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="banco">Banco</SelectItem>
-                  <SelectItem value="caixa">Caixa</SelectItem>
+                <SelectContent className="z-[210]">
+                  <SelectItem value="banco">Banco (Transferência/Débito)</SelectItem>
+                  <SelectItem value="caixa">Caixa (Numerário)</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="sm:col-span-2">
-              <Label>Descrição *</Label>
-              <Input className="mt-1" value={form.descricao || ''} onChange={e => upd('descricao', e.target.value)} />
-            </div>
-            <div>
-              <Label>Valor (€) *</Label>
-              <Input className="mt-1" type="number" value={form.valor || ''} onChange={e => upd('valor', parseFloat(e.target.value) || 0)} />
-            </div>
-            <div>
-              <Label>Data *</Label>
-              <Input className="mt-1" type="date" value={form.data || ''} onChange={e => upd('data', e.target.value)} />
             </div>
             <div>
               <Label>Método de Pagamento</Label>
               <Select value={form.metodo_pagamento || ''} onValueChange={v => upd('metodo_pagamento', v)}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="transferencia">Transferência</SelectItem>
-                  <SelectItem value="mb">Referência MB</SelectItem>
-                  <SelectItem value="mbway">MB WAY</SelectItem>
-                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                <SelectContent className="z-[210]">
+                  <SelectItem value="transferencia">Transferência Bancária</SelectItem>
+                  <SelectItem value="debito_direto">Débito Direto</SelectItem>
+                  <SelectItem value="cheque">Cheque</SelectItem>
+                  <SelectItem value="numerario">Numerário (Dinheiro)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Nº Documento</Label>
-              <Input className="mt-1" value={form.numero_documento || ''} onChange={e => upd('numero_documento', e.target.value)} />
-            </div>
+            
             <div className="sm:col-span-2">
-              <Label>Observações</Label>
-              <textarea className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[70px] resize-y" value={form.observacoes || ''} onChange={e => upd('observacoes', e.target.value)} />
+              <Label>Observações Adicionais</Label>
+              <Input className="mt-1" value={form.observacoes || ''} onChange={e => upd('observacoes', e.target.value)} placeholder="Justificação, detalhes extras..." />
             </div>
           </div>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => save.mutate(form)} disabled={save.isPending}>{save.isPending ? 'A guardar...' : 'Guardar'}</Button>
+          <DialogFooter className="mt-4 pt-4 border-t border-border">
+            <Button variant="outline" onClick={() => setOpenDespesa(false)}>Cancelar</Button>
+            <Button 
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => save.mutate(form)} 
+              disabled={save.isPending || !form.condominio_id || !form.valor || !form.descricao}
+            >
+              {save.isPending ? 'A registar...' : 'Registar Despesa'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL FECHO DE CONTAS (DRE) */}
+      <Dialog open={openFecho} onOpenChange={setOpenFecho}>
+        <DialogContent className="w-[94vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto no-scrollbar rounded-xl p-6 z-[200]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-700"><Calculator className="w-5 h-5" /> Demonstração de Resultados (Fecho {selectedAno === 'all' ? new Date().getFullYear() : selectedAno})</DialogTitle>
+          </DialogHeader>
+
+          <div className="mt-4 space-y-6">
+            <div className="bg-muted/40 border border-border p-4 rounded-xl flex justify-between items-center">
+              <div>
+                <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Saldo Transitado do Ano Anterior</p>
+                <p className="text-xs text-muted-foreground">Valor em caixa/banco à data de 1 de Janeiro.</p>
+              </div>
+              <div className="flex items-center gap-1">
+                 <span className="text-lg font-bold">€</span>
+                 <Input 
+                  type="number" 
+                  className="w-32 font-bold text-right text-lg bg-background" 
+                  value={dreData.saldoInicial} 
+                  onChange={e => setDreData(p => ({...p, saldoInicial: parseFloat(e.target.value) || 0}))} 
+                 />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* COLUNA RECEITAS */}
+              <div className="space-y-3">
+                <div className="bg-emerald-50 border-b-2 border-emerald-500 p-3 rounded-t-xl">
+                  <h4 className="font-bold text-emerald-800 uppercase tracking-wider text-sm">Resumo de Receitas</h4>
+                </div>
+                <div className="space-y-2 border border-border rounded-b-xl p-3 bg-card shadow-sm">
+                  {categoriasReceitaOrdenadas.map(([k, label]) => (
+                    <div key={k} className="flex items-center justify-between gap-2 border-b border-border/50 pb-2 last:border-0 last:pb-0">
+                      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+                      <Input 
+                        type="number" 
+                        className="w-24 h-7 text-xs text-right font-semibold" 
+                        value={dreData.receitas[k] || 0} 
+                        onChange={e => setDreData(p => ({...p, receitas: {...p.receitas, [k]: parseFloat(e.target.value) || 0}}))} 
+                      />
+                    </div>
+                  ))}
+                  <div className="pt-3 mt-1 border-t border-border flex justify-between items-center">
+                    <span className="text-sm font-black text-emerald-700">Total Receitas</span>
+                    <span className="text-lg font-black text-emerald-700">€{Object.values(dreData.receitas).reduce((a,b)=>a+b,0).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* COLUNA DESPESAS */}
+              <div className="space-y-3">
+                <div className="bg-red-50 border-b-2 border-red-500 p-3 rounded-t-xl">
+                  <h4 className="font-bold text-red-800 uppercase tracking-wider text-sm">Resumo de Despesas</h4>
+                </div>
+                <div className="space-y-2 border border-border rounded-b-xl p-3 bg-card shadow-sm">
+                  {categoriasDespesaOrdenadas.map(([k, label]) => (
+                    <div key={k} className="flex items-center justify-between gap-2 border-b border-border/50 pb-2 last:border-0 last:pb-0">
+                      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+                      <Input 
+                        type="number" 
+                        className="w-24 h-7 text-xs text-right font-semibold" 
+                        value={dreData.despesas[k] || 0} 
+                        onChange={e => setDreData(p => ({...p, despesas: {...p.despesas, [k]: parseFloat(e.target.value) || 0}}))} 
+                      />
+                    </div>
+                  ))}
+                  <div className="pt-3 mt-1 border-t border-border flex justify-between items-center">
+                    <span className="text-sm font-black text-red-700">Total Despesas</span>
+                    <span className="text-lg font-black text-red-700">€{Object.values(dreData.despesas).reduce((a,b)=>a+b,0).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* RESULTADO FINAL */}
+            <div className="border-t border-border pt-5 flex flex-col md:flex-row gap-6 items-end justify-between">
+              <div className="w-full md:w-1/2">
+                <Label>Observações ao Fecho</Label>
+                <textarea 
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-y" 
+                  placeholder="Parecer da administração, anomalias reportadas..."
+                  value={dreData.observacoes}
+                  onChange={e => setDreData(p => ({...p, observacoes: e.target.value}))}
+                />
+              </div>
+              <div className="w-full md:w-1/2 bg-blue-50/50 border border-blue-200 p-4 rounded-xl text-right">
+                <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-1">Saldo de Fecho (Transportar)</p>
+                <p className="text-4xl font-black text-blue-800">
+                  €{(dreData.saldoInicial + Object.values(dreData.receitas).reduce((a,b)=>a+b,0) - Object.values(dreData.despesas).reduce((a,b)=>a+b,0)).toFixed(2)}
+                </p>
+              </div>
+            </div>
+
           </div>
+
+          <DialogFooter className="mt-6 pt-4 border-t border-border flex justify-between sm:justify-between items-center">
+             <p className="text-xs text-muted-foreground hidden sm:block">Este documento servirá de base à aprovação de contas em Assembleia.</p>
+             <div className="flex gap-2">
+               <Button variant="outline" onClick={() => setOpenFecho(false)}>Cancelar</Button>
+               <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2" onClick={handleEmitirFecho}>
+                 <FileCheck className="w-4 h-4" /> Emitir PDF de Fecho
+               </Button>
+             </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
