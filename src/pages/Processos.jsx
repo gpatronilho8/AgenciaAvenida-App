@@ -14,6 +14,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '
 import { Plus, Pencil, Search, Trash2, Printer, X, FileText, CheckCircle2, Circle, Check, ChevronsUpDown, Paperclip, ExternalLink, UploadCloud, EyeOff, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/AuthContext';
 
 // --- DICIONÁRIOS E CONSTANTES DOS PROCESSOS ---
 const tipoProcessoLabel = { renovacao_conducao: 'Renovação Carta Condução', renovacao_cacador: 'Renovação Carta Caçador', irs: 'IRS', legalizacao_automovel: 'Legalização Automóvel', certidao: 'Certidão', contrato_arrendamento: 'Contrato Arrendamento', outro: 'Outro Serviço' };

@@ -74,7 +74,9 @@ export default function CondominiosDashboard() {
   const { data: quotas = [] } = useQuery({ queryKey: ['quotas'], queryFn: () => agenciaAvenida.entities.Quota.list() });
   const { data: ocorrencias = [] } = useQuery({ queryKey: ['ocorrencias'], queryFn: () => agenciaAvenida.entities.Ocorrencia.list() });
   const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => agenciaAvenida.entities.Fracao.list() });
-  const { data: despesas = [] } = useQuery({ queryKey: ['despesas'], queryFn: () => agenciaAvenida.entities.Despesa.list() });
+  
+  // Como as despesas agora estão em Movimentos, ajustamos o request para lá
+  const { data: movimentos = [] } = useQuery({ queryKey: ['movimentos'], queryFn: () => agenciaAvenida.entities.Movimento.list() });
 
   const hoje = new Date();
   const inicioMes = startOfMonth(hoje);
@@ -82,30 +84,41 @@ export default function CondominiosDashboard() {
   const filtrar = (arr) => selectedCondominioId === 'all' ? arr : arr.filter(x => x.condominio_id === selectedCondominioId);
   const quotasFilt = filtrar(quotas);
   const ocorrFilt = filtrar(ocorrencias);
-  const despFilt = filtrar(despesas);
+  const despFilt = filtrar(movimentos.filter(m => m.tipo === 'despesa')); // Extrai apenas as despesas do módulo de movimentos
   const condFilt = selectedCondominioId === 'all' ? condominios : condominios.filter(c => c.id === selectedCondominioId);
   const condominioAtual = condominios.find(c => c.id === selectedCondominioId);
 
-  const recebimentosMes = quotasFilt.filter(q => q.estado === 'pago' && q.data_pagamento && new Date(q.data_pagamento) >= inicioMes).reduce((s, q) => s + (q.valor || 0), 0);
-  const quotasPendentes = quotasFilt.filter(q => q.estado === 'pendente').length;
-  const quotasVencidas = quotasFilt.filter(q => q.estado === 'vencido' || (q.estado === 'pendente' && q.data_vencimento && isAfter(hoje, new Date(q.data_vencimento)))).length;
+  // Lógica Rigorosa de Contagem e Valores
+  const quotasPendentes = quotasFilt.filter(q => q.estado === 'pendente' && q.tipo !== 'linha_faturacao_credito').length;
+  const quotasVencidas = quotasFilt.filter(q => q.estado === 'vencida').length; // Dívidas assumem 'vencida' automaticamente
+  
+  // Recebimentos reais em dinheiro no mês corrente
+  const recebimentosMes = quotasFilt
+    .filter(q => q.estado === 'pago' && q.tipo !== 'linha_faturacao_credito' && q.data_pagamento && new Date(q.data_pagamento) >= inicioMes)
+    .reduce((s, q) => s + (q.valor || 0), 0);
+
   const ocorrenciasPendentes = ocorrFilt.filter(o => o.estado === 'aberta' || o.estado === 'em_progresso').length;
-  const despesasMes = despFilt.filter(d => d.data && new Date(d.data) >= inicioMes).reduce((s, d) => s + (d.valor || 0), 0);
+  
+  // Despesas reais no mês corrente
+  const despesasMes = despFilt
+    .filter(d => d.data && new Date(d.data) >= inicioMes)
+    .reduce((s, d) => s + (d.valor || 0), 0);
+    
   const saldoTotal = condFilt.reduce((s, c) => s + (c.saldo_banco || 0) + (c.saldo_caixa || 0), 0);
 
   const recentOcorrencias = ocorrFilt.filter(o => o.estado !== 'fechada').slice(0, 5);
-  const recentQuotas = quotasFilt.filter(q => q.estado === 'vencido').slice(0, 5);
+  const recentQuotas = quotasFilt.filter(q => q.estado === 'vencida').slice(0, 5);
 
   const mesesLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const chartData = mesesLabels.map((mes, i) => {
     const mesNum = i + 1;
-    const receitas = quotasFilt.filter(q => q.estado === 'pago' && q.data_pagamento && new Date(q.data_pagamento).getMonth() + 1 === mesNum).reduce((s, q) => s + (q.valor || 0), 0);
+    const receitas = quotasFilt.filter(q => q.estado === 'pago' && q.tipo !== 'linha_faturacao_credito' && q.data_pagamento && new Date(q.data_pagamento).getMonth() + 1 === mesNum).reduce((s, q) => s + (q.valor || 0), 0);
     const desp = despFilt.filter(d => d.data && new Date(d.data).getMonth() + 1 === mesNum).reduce((s, d) => s + (d.valor || 0), 0);
     return { mes, receitas, despesas: desp };
   });
 
   const pieData = [
-    { name: 'Pagas', value: quotasFilt.filter(q => q.estado === 'pago').length, color: '#22c55e' },
+    { name: 'Pagas', value: quotasFilt.filter(q => q.estado === 'pago' && q.tipo !== 'linha_faturacao_credito').length, color: '#22c55e' },
     { name: 'Pendentes', value: quotasPendentes, color: '#eab308' },
     { name: 'Vencidas', value: quotasVencidas, color: '#ef4444' },
   ];
@@ -118,7 +131,7 @@ export default function CondominiosDashboard() {
       />
       {selectedCondominioId !== 'all' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-5">
-          <StatCard title="Recebimentos do Mês" value={`€${recebimentosMes.toFixed(2)}`} icon={Euro} color="green" subtitle="Quotas pagas" to="/condominios/quotas" />
+          <StatCard title="Recebimentos do Mês" value={`€${recebimentosMes.toFixed(2)}`} icon={Euro} color="green" subtitle="Quotas e faturas pagas" to="/condominios/quotas" />
           <StatCard title="Saldo Total" value={`€${saldoTotal.toFixed(2)}`} icon={TrendingUp} color="blue" subtitle="Banco + Caixa" to="/condominios/movimentos" />
           <StatCard title="Ocorrências Pendentes" value={ocorrenciasPendentes} icon={AlertTriangle} color="orange" to="/condominios/ocorrencias" />
           <StatCard title="Quotas em Dívida" value={quotasVencidas} icon={CreditCard} color="red" to="/condominios/quotas" />
@@ -139,7 +152,7 @@ export default function CondominiosDashboard() {
       )}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <div className="lg:col-span-2 bg-card rounded-xl border border-border p-5 shadow-sm">
-          <h3 className="font-semibold text-foreground mb-4">Receitas vs Despesas (2026)</h3>
+          <h3 className="font-semibold text-foreground mb-4">Receitas vs Despesas ({hoje.getFullYear()})</h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -191,14 +204,14 @@ export default function CondominiosDashboard() {
           </div>
         </div>
         <div className="bg-card rounded-xl border border-border shadow-sm">
-          <div className="px-5 py-4 border-b border-border"><h3 className="font-semibold">Quotas Vencidas</h3></div>
+          <div className="px-5 py-4 border-b border-border"><h3 className="font-semibold">Valores em Dívida</h3></div>
           <div className="divide-y divide-border">
             {recentQuotas.length === 0 && <p className="text-muted-foreground text-sm text-center py-8">Sem Quotas Vencidas</p>}
             {recentQuotas.map(q => (
               <div key={q.id} className="px-5 py-3 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium">{q.descricao || 'Quota'}</p>
-                  <p className="text-xs text-muted-foreground">Venc: {q.data_vencimento}</p>
+                  <p className="text-sm font-medium">{q.descricao || 'Quota Mensal'}</p>
+                  <p className="text-xs text-red-600">Vencida</p>
                 </div>
                 <span className="text-sm font-bold">€{q.valor?.toFixed(2)}</span>
               </div>

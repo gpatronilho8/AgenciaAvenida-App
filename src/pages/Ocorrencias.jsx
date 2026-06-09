@@ -7,44 +7,82 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Search, AlertTriangle, Pencil, Trash2, Upload, X, Printer } from 'lucide-react';
-import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Plus, Search, AlertTriangle, Pencil, Trash2, Upload, X, Printer, Check, ChevronsUpDown, Send, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { useCondominio } from '@/lib/CondominioContext';
+import { useAuth } from '@/lib/AuthContext';
+import { supabase } from '@/api/supabase.js';
+import { cn } from '@/lib/utils';
+
+const tiposOcorrencia = {
+  avaria: 'Avaria',
+  manutencao: 'Manutenção',
+  limpeza: 'Limpeza',
+  seguranca: 'Segurança',
+  duvidas_faturacao: 'Dúvidas Faturação'
+};
 
 const empty = {
   condominio_id: '', fracao_id: '', titulo: '', descricao: '', tipo: 'avaria',
-  prioridade: 'media', estado: 'aberta', area: 'outro',
+  prioridade: 'media', estado: 'aberta', canal_submissao: 'interno',
   data_abertura: format(new Date(), 'yyyy-MM-dd'), observacoes: '',
-  atribuido_a: '', fornecedor_id: '', fotos_urls: []
+  resposta_cliente: '', atribuido_a: '', fornecedor_id: '', reportada_por: null, anexos: []
 };
 
-const estadoFlow = { aberta: 'em_progresso', em_progresso: 'resolvida', resolvida: 'fechada' };
-const estadoNext = { aberta: 'Iniciar', em_progresso: 'Resolver', resolvida: 'Fechar' };
+// O fluxo de estados agora é apenas Aberta -> Em Progresso -> Resolvida
+const estadoFlow = { aberta: 'em_progresso', em_progresso: 'resolvida' };
+const estadoNext = { aberta: 'Iniciar', em_progresso: 'Resolver' };
 
-const prioridadeBadge = {
-  baixa: 'text-green-700', media: 'text-yellow-700',
-  alta: 'text-orange-700', urgente: 'text-red-700'
+const normalizeTipoPessoa = (tipoData) => {
+  if (!tipoData) return [];
+  let parsedArray = [];
+  if (Array.isArray(tipoData)) parsedArray = tipoData;
+  else if (typeof tipoData === 'string') {
+    try { const parsed = JSON.parse(tipoData); parsedArray = Array.isArray(parsed) ? parsed : [tipoData]; }
+    catch (e) {
+      const cleanStr = tipoData.trim().replace(/^\{|\}$/g, '');
+      parsedArray = cleanStr.includes(',') ? cleanStr.split(',') : [cleanStr];
+    }
+  }
+  let finalArray = [];
+  parsedArray.forEach(item => {
+    if (item === null || item === undefined) return;
+    if (typeof item === 'string') {
+      let clean = item.trim().replace(/^"|"$/g, '');
+      if (clean.startsWith('[') && clean.endsWith(']')) { try { const innerParsed = JSON.parse(clean); if (Array.isArray(innerParsed)) { finalArray.push(...innerParsed); return; } } catch (e) { } }
+      clean = clean.replace(/"/g, '').trim();
+      if (clean.includes(',')) finalArray.push(...clean.split(',').map(s => s.trim()));
+      else if (clean) finalArray.push(clean);
+    } else finalArray.push(String(item));
+  });
+  return [...new Set(finalArray)].map(t => String(t).toLowerCase());
+};
+
+const formatFracao = (f) => {
+  if (!f) return 'Área Comum';
+  return `${f.codigo_fracao || f.codigo || ''} ${f.descricao_piso_lado ? `(${f.descricao_piso_lado})` : ''}`.trim() || 'Área Comum';
 };
 
 function OcorrenciaPreview({ ocorrencia, condominios, fracoes, pessoas, users, onClose, onEdit }) {
   const condNome = condominios.find(c => c.id === ocorrencia.condominio_id)?.nome || '-';
-  const fracaoCod = fracoes.find(f => f.id === ocorrencia.fracao_id)?.codigo || 'Área Comum';
-  const atribuidoPessoa = pessoas.find(p => p.id === ocorrencia.atribuido_a);
+  const fracaoCod = formatFracao(fracoes.find(f => f.id === ocorrencia.fracao_id));
   const atribuidoUser = users?.find(u => u.id === ocorrencia.atribuido_a);
-  const atribuido = atribuidoPessoa?.nome || (atribuidoUser ? (atribuidoUser.full_name || atribuidoUser.email) : null) || '-';
+  const atribuido = atribuidoUser ? (atribuidoUser.full_name || atribuidoUser.email) : '-';
   const fornecedor = pessoas.find(p => p.id === ocorrencia.fornecedor_id)?.nome || '-';
+  const reportadaPorObj = pessoas.find(p => p.id === ocorrencia.reportada_por);
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-start justify-between mb-4 print:hidden">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto no-scrollbar rounded-xl z-[200]">
+        <div className="flex items-start justify-between mb-4 print:hidden pr-8">
           <div>
             <h2 className="text-xl font-bold">{ocorrencia.titulo}</h2>
             <p className="text-sm text-muted-foreground">{condNome} · {fracaoCod}</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 shrink-0">
             <Button size="sm" variant="outline" className="gap-1" onClick={() => window.print()}>
               <Printer className="w-3.5 h-3.5" />Imprimir
             </Button>
@@ -53,39 +91,72 @@ function OcorrenciaPreview({ ocorrencia, condominios, fracoes, pessoas, users, o
             </Button>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3 bg-muted/40 rounded-lg p-4 mb-4 text-sm">
-          <div><span className="font-medium">Estado:</span> <StatusBadge status={ocorrencia.estado} /></div>
-          <div><span className="font-medium">Prioridade:</span> <StatusBadge status={ocorrencia.prioridade} /></div>
-          <div><span className="font-medium">Tipo:</span> <span className="capitalize">{ocorrencia.tipo}</span></div>
-          <div><span className="font-medium">Área:</span> <span className="capitalize">{ocorrencia.area}</span></div>
-          <div><span className="font-medium">Data abertura:</span> {ocorrencia.data_abertura}</div>
-          {ocorrencia.data_resolucao && <div><span className="font-medium">Data resolução:</span> {ocorrencia.data_resolucao}</div>}
-          {ocorrencia.atribuido_a && <div><span className="font-medium">Atribuído a:</span> {atribuido}</div>}
-          {ocorrencia.fornecedor_id && <div><span className="font-medium">Fornecedor:</span> {fornecedor}</div>}
-          {ocorrencia.custo_estimado && <div><span className="font-medium">Custo estimado:</span> €{ocorrencia.custo_estimado}</div>}
-          {ocorrencia.custo_real && <div><span className="font-medium">Custo real:</span> €{ocorrencia.custo_real}</div>}
+        <div className="grid grid-cols-2 gap-3 bg-muted/40 border border-border rounded-lg p-4 mb-4 text-sm">
+          <div><span className="font-medium text-muted-foreground">Estado:</span> <StatusBadge status={ocorrencia.estado} /></div>
+          <div><span className="font-medium text-muted-foreground">Prioridade:</span> <StatusBadge status={ocorrencia.prioridade} /></div>
+          <div><span className="font-medium text-muted-foreground">Tipo:</span> <span className="font-semibold">{tiposOcorrencia[ocorrencia.tipo] || ocorrencia.tipo}</span></div>
+          <div><span className="font-medium text-muted-foreground">Canal:</span> <span className="capitalize font-semibold">{ocorrencia.canal_submissao?.replace('_', ' ')}</span></div>
+          <div><span className="font-medium text-muted-foreground">Data abertura:</span> <span className="font-semibold">{ocorrencia.data_abertura}</span></div>
+          {ocorrencia.data_resolucao && <div><span className="font-medium text-muted-foreground">Data resolução:</span> <span className="font-semibold">{ocorrencia.data_resolucao}</span></div>}
+          
+          <div className="flex items-center">
+            <span className="font-medium text-muted-foreground mr-1">Reportada por:</span> 
+            {reportadaPorObj ? (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <span className="font-semibold text-primary cursor-pointer hover:underline">{reportadaPorObj.nome}</span>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-3 z-[210]">
+                  <p className="font-bold text-sm mb-2 text-foreground">Contacto Rápido</p>
+                  <div className="space-y-1">
+                    <p className="text-xs flex justify-between"><span className="text-muted-foreground">Tel:</span> <span className="font-medium">{reportadaPorObj.telefone || 'N/A'}</span></p>
+                    <p className="text-xs flex justify-between"><span className="text-muted-foreground">Email:</span> <span className="font-medium">{reportadaPorObj.email || 'N/A'}</span></p>
+                    <p className="text-xs flex justify-between"><span className="text-muted-foreground">NIF:</span> <span className="font-medium">{reportadaPorObj.nif || 'N/A'}</span></p>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <span className="font-semibold text-primary">Administração / Interno</span>
+            )}
+          </div>
+          
+          {ocorrencia.atribuido_a && <div><span className="font-medium text-muted-foreground">Staff Atribuído:</span> <span className="font-semibold">{atribuido}</span></div>}
+          {ocorrencia.fornecedor_id && <div><span className="font-medium text-muted-foreground">Fornecedor:</span> <span className="font-semibold">{fornecedor}</span></div>}
         </div>
         {ocorrencia.descricao && (
-          <div className="mb-4">
-            <p className="font-medium text-sm mb-1">Descrição</p>
-            <p className="text-sm text-muted-foreground">{ocorrencia.descricao}</p>
+          <div className="mb-4 bg-background border border-border rounded-lg p-3 shadow-sm">
+            <p className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-1">Descrição do Problema</p>
+            <p className="text-sm text-foreground">{ocorrencia.descricao}</p>
           </div>
         )}
         {ocorrencia.observacoes && (
           <div className="mb-4">
-            <p className="font-medium text-sm mb-1">Observações</p>
-            <p className="text-sm text-muted-foreground">{ocorrencia.observacoes}</p>
+            <p className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-1">Observações Internas</p>
+            <p className="text-sm text-muted-foreground italic bg-muted/30 p-2 rounded border border-dashed">{ocorrencia.observacoes}</p>
           </div>
         )}
-        {ocorrencia.fotos_urls?.length > 0 && (
+        {ocorrencia.resposta_cliente && (
+          <div className="mb-4 bg-blue-50 border border-blue-100 rounded-lg p-3">
+            <p className="font-bold text-xs uppercase tracking-wider text-blue-800 mb-1">Resposta enviada ao Condómino</p>
+            <p className="text-sm text-blue-900">{ocorrencia.resposta_cliente}</p>
+          </div>
+        )}
+        {ocorrencia.anexos?.length > 0 && (
           <div>
-            <p className="font-medium text-sm mb-2">Anexos</p>
-            <div className="grid grid-cols-3 gap-2">
-              {ocorrencia.fotos_urls.map((url, i) => (
-                <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                  <img src={url} alt={`Anexo ${i + 1}`} className="rounded-lg object-cover w-full h-24 border border-border" />
-                </a>
-              ))}
+            <p className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-2">Anexos / Provas</p>
+            <div className="flex flex-col gap-2">
+              {ocorrencia.anexos.map((url, i) => {
+                const fileNameRaw = url.split('/').pop();
+                const displayFileName = decodeURIComponent(fileNameRaw.substring(fileNameRaw.indexOf('-') + 1)) || `Anexo ${i+1}`;
+                const isPdf = url.toLowerCase().endsWith('.pdf');
+
+                return (
+                  <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-2 border border-border rounded-lg hover:bg-muted/50 transition-colors">
+                    {isPdf ? <FileText className="w-8 h-8 text-red-500 shrink-0" /> : <img src={url} alt="" className="w-8 h-8 object-cover rounded shrink-0 border border-border" />}
+                    <span className="text-sm font-medium text-primary hover:underline truncate">{displayFileName}</span>
+                  </a>
+                );
+              })}
             </div>
           </div>
         )}
@@ -96,23 +167,36 @@ function OcorrenciaPreview({ ocorrencia, condominios, fracoes, pessoas, users, o
 
 export default function Ocorrencias() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty);
   const [editing, setEditing] = useState(null);
   const [preview, setPreview] = useState(null);
-  const { selectedCondominioId } = useCondominio();
+  const { selectedCondominioId, selectedAno } = useCondominio();
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState('all');
   const [filterAtribuido, setFilterAtribuido] = useState('all');
   const [uploading, setUploading] = useState(false);
 
+  const [comboCondominioOpen, setComboCondominioOpen] = useState(false);
+  const [comboFornecedorOpen, setComboFornecedorOpen] = useState(false);
+  const [comboReportadaOpen, setComboReportadaOpen] = useState(false);
+
   const { data: ocorrencias = [], isLoading } = useQuery({ queryKey: ['ocorrencias'], queryFn: () => agenciaAvenida.entities.Ocorrencia.list('-data_abertura') });
   const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
   const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => agenciaAvenida.entities.Fracao.list() });
   const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
+  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => agenciaAvenida.entities.User.list() });
+
+  const condominiosAtivos = condominios.filter(c => c && c.ativo !== false && c.ativo !== 'false').sort((a, b) => String(a.codigo || '').localeCompare(String(b.codigo || ''), undefined, { numeric: true, sensitivity: 'base' }));
+  const fornecedoresAtivos = pessoas.filter(p => normalizeTipoPessoa(p.tipo).includes('fornecedor')).sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt'));
+  const condominosAtivos = pessoas.filter(p => normalizeTipoPessoa(p.tipo).includes('condomino')).sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt'));
 
   const save = useMutation({
-    mutationFn: (data) => editing ? agenciaAvenida.entities.Ocorrencia.update(editing, data) : agenciaAvenida.entities.Ocorrencia.create(data),
+    mutationFn: (data) => {
+      const payload = { ...data, fracao_id: data.fracao_id === '__area_comum__' ? '' : data.fracao_id };
+      return editing ? agenciaAvenida.entities.Ocorrencia.update(editing, payload) : agenciaAvenida.entities.Ocorrencia.create(payload);
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['ocorrencias'] }); setOpen(false); toast.success('Ocorrência guardada'); },
   });
 
@@ -126,16 +210,26 @@ export default function Ocorrencias() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['ocorrencias'] }); toast.success('Ocorrência eliminada'); },
   });
 
-  const openNew = () => { setForm(empty); setEditing(null); setOpen(true); };
-  const openEdit = (o) => { setForm({ ...o, fotos_urls: o.fotos_urls || [] }); setEditing(o.id); setOpen(true); };
+  const openNew = () => {
+    setForm({ ...empty, condominio_id: selectedCondominioId === 'all' ? '' : selectedCondominioId });
+    setEditing(null);
+    setUploading(false);
+    setOpen(true);
+  };
+
+  const openEdit = (o) => {
+    setForm({ ...o, fracao_id: o.fracao_id || '__area_comum__', anexos: o.anexos || [] });
+    setEditing(o.id);
+    setUploading(false);
+    setOpen(true);
+  };
+
   const upd = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const getCondName = (id) => condominios.find(c => c.id === id)?.nome || '-';
-  const getFracaoCode = (id) => fracoes.find(f => f.id === id)?.codigo || 'Área Comum';
+  const getFracaoCode = (id) => formatFracao(fracoes.find(f => f.id === id));
   const getAtribuidoName = (id) => {
     if (!id) return null;
-    const pessoa = pessoas.find(p => p.id === id);
-    if (pessoa) return pessoa.nome;
     const user = users.find(u => u.id === id);
     if (user) return user.full_name || user.email;
     return id;
@@ -144,30 +238,63 @@ export default function Ocorrencias() {
   const handleFotoUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
+    
     setUploading(true);
     const urls = [];
-    for (const file of files) {
-      const { file_url } = await agenciaAvenida.integrations.Core.UploadFile({ file });
-      urls.push(file_url);
+    
+    try {
+      for (const file of files) {
+        const fileExt = file.name.split('.').pop();
+        // Preservar o nome original limpo para fácil leitura futura
+        const safeName = file.name.replace(`.${fileExt}`, '').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 30);
+        const fileName = `${Date.now()}-${safeName}.${fileExt}`;
+        const filePath = `ocorrencias/${fileName}`;
+
+        const { data, error } = await supabase.storage
+          .from('documentos') 
+          .upload(filePath, file);
+
+        if (error) throw error;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('documentos')
+          .getPublicUrl(filePath);
+
+        urls.push(publicUrlData.publicUrl);
+      }
+      
+      setForm(p => ({ ...p, anexos: [...(p.anexos || []), ...urls] }));
+      toast.success(`${urls.length} anexo(s) carregado(s) com sucesso.`);
+      
+    } catch (error) {
+      console.error("Erro de upload no Supabase:", error);
+      toast.error("Falha no upload: Verifica se o Bucket 'documentos' tem as políticas corretas.");
+    } finally {
+      setUploading(false);
+      e.target.value = null;
     }
-    setForm(p => ({ ...p, fotos_urls: [...(p.fotos_urls || []), ...urls] }));
-    setUploading(false);
-    toast.success(`${urls.length} anexo(s) carregado(s)`);
   };
 
-  const removeAnexo = (idx) => setForm(p => ({ ...p, fotos_urls: p.fotos_urls.filter((_, i) => i !== idx) }));
+  const removeAnexo = (idx) => setForm(p => ({ ...p, anexos: p.anexos.filter((_, i) => i !== idx) }));
 
-  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => agenciaAvenida.entities.User.list() });
-
-  const filtered = ocorrencias.filter(o => {
-    const matchSearch = !search || o.titulo?.toLowerCase().includes(search.toLowerCase());
-    const matchEstado = filterEstado === 'all' || o.estado === filterEstado;
+  const filteredAll = ocorrencias.filter(o => {
     const matchCond = selectedCondominioId === 'all' || o.condominio_id === selectedCondominioId;
-    const matchAtribuido = filterAtribuido === 'all' || o.atribuido_a === filterAtribuido;
-    return matchSearch && matchEstado && matchCond && matchAtribuido;
+    const matchAno = selectedAno === 'all' ||
+      o.estado === 'aberta' ||
+      o.estado === 'em_progresso' ||
+      (o.data_abertura && o.data_abertura.startsWith(String(selectedAno)));
+
+    return matchCond && matchAno;
   });
 
-  const filteredAll = selectedCondominioId === 'all' ? ocorrencias : ocorrencias.filter(o => o.condominio_id === selectedCondominioId);
+  const filtered = filteredAll.filter(o => {
+    const matchSearch = !search || o.titulo?.toLowerCase().includes(search.toLowerCase());
+    const matchEstado = filterEstado === 'all' || o.estado === filterEstado;
+    const matchAtribuido = filterAtribuido === 'all' || o.atribuido_a === filterAtribuido;
+
+    return matchSearch && matchEstado && matchAtribuido;
+  });
+
   const stats = {
     aberta: filteredAll.filter(o => o.estado === 'aberta').length,
     em_progresso: filteredAll.filter(o => o.estado === 'em_progresso').length,
@@ -175,12 +302,12 @@ export default function Ocorrencias() {
   };
 
   return (
-    <div>
-      <PageHeader title="Ocorrências" subtitle="Gestão de avarias e manutenções" action={
+    <div className="space-y-6 relative z-10">
+      <PageHeader title="Ocorrências & Contactos" subtitle="Tratamento de ocorrências e apoio ao condómino" action={
         <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />Nova Ocorrência</Button>
       } />
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {[
           { label: 'Abertas', value: stats.aberta, cls: 'bg-blue-50 border-blue-100 text-blue-700', estado: 'aberta' },
           { label: 'Em Progresso', value: stats.em_progresso, cls: 'bg-orange-50 border-orange-100 text-orange-700', estado: 'em_progresso' },
@@ -191,88 +318,104 @@ export default function Ocorrencias() {
             onClick={() => setFilterEstado(f => f === s.estado ? 'all' : s.estado)}
             className={`rounded-xl p-4 border cursor-pointer transition-all hover:shadow-md ${filterEstado === s.estado ? 'ring-2 ring-primary' : ''} ${s.cls}`}
           >
-            <p className="text-xs font-medium">{s.label}</p>
-            <p className="text-2xl font-bold">{s.value}</p>
+            <p className="text-xs font-medium uppercase tracking-wider">{s.label}</p>
+            <p className="text-3xl font-black mt-1">{s.value}</p>
           </div>
         ))}
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-4 flex flex-col lg:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Pesquisar ocorrência..." value={search} onChange={e => setSearch(e.target.value)} />
+          <Input className="pl-9 bg-background w-full" placeholder="Pesquisar ocorrência..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Select value={filterEstado} onValueChange={setFilterEstado}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="Estado" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="aberta">Aberta</SelectItem>
-            <SelectItem value="em_progresso">Em Progresso</SelectItem>
-            <SelectItem value="resolvida">Resolvida</SelectItem>
-            <SelectItem value="fechada">Fechada</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filterAtribuido} onValueChange={setFilterAtribuido}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Atribuído a" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {pessoas.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
-            {users.map(u => <SelectItem key={`user-${u.id}`} value={u.id}>{u.full_name || u.email} (staff)</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap gap-2 w-full lg:w-auto">
+          <Button 
+            variant={filterAtribuido === user?.id ? "default" : "secondary"}
+            onClick={() => setFilterAtribuido(filterAtribuido === user?.id ? 'all' : user?.id)}
+            className={filterAtribuido === user?.id ? "bg-primary" : "bg-muted text-muted-foreground border-transparent"}
+          >
+            Atribuído a Mim
+          </Button>
+
+          <Select value={filterEstado} onValueChange={setFilterEstado}>
+            <SelectTrigger className="w-[140px] bg-background"><SelectValue placeholder="Estado" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos Estados</SelectItem>
+              <SelectItem value="aberta">Aberta</SelectItem>
+              <SelectItem value="em_progresso">Em Progresso</SelectItem>
+              <SelectItem value="resolvida">Resolvida</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Select value={filterAtribuido} onValueChange={setFilterAtribuido}>
+            <SelectTrigger className="w-[160px] bg-background"><SelectValue placeholder="Atribuído a" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Membros</SelectItem>
+              {users.map(u => <SelectItem key={`user-${u.id}`} value={u.id}>{u.full_name || u.email}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {isLoading && <div className="text-center py-16 text-muted-foreground">A carregar...</div>}
+      {isLoading && <div className="text-center py-16 text-muted-foreground">A carregar ocorrências...</div>}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {filtered.map(o => (
           <div
             key={o.id}
-            className="bg-card rounded-xl border border-border p-5 shadow-sm hover:shadow-md transition-all cursor-pointer"
+            className="bg-card rounded-xl border border-border p-5 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
             onClick={() => setPreview(o)}
           >
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-muted rounded-lg">
-                  <AlertTriangle className="w-4 h-4 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="font-semibold text-foreground">{o.titulo}</p>
-                  <p className="text-xs text-muted-foreground">{getCondName(o.condominio_id)} · {getFracaoCode(o.fracao_id)}</p>
-                </div>
-              </div>
-              <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                <button onClick={() => openEdit(o)} className="p-1.5 hover:bg-muted rounded transition-colors"><Pencil className="w-3.5 h-3.5 text-muted-foreground" /></button>
-                <button onClick={() => del.mutate(o.id)} className="p-1.5 hover:bg-red-50 rounded transition-colors"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
-              </div>
+            <div>
+               <div className="flex items-start justify-between mb-3">
+                 <div className="flex items-center gap-3">
+                   <div className="p-2.5 bg-muted rounded-xl">
+                     <AlertTriangle className="w-5 h-5 text-muted-foreground" />
+                   </div>
+                   <div>
+                     <p className="font-bold text-foreground leading-tight">{o.titulo}</p>
+                     <p className="text-xs font-medium text-muted-foreground mt-0.5">{getCondName(o.condominio_id)} · {getFracaoCode(o.fracao_id)}</p>
+                   </div>
+                 </div>
+                 <div className="flex gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                   <button onClick={() => openEdit(o)} className="p-1.5 hover:bg-muted rounded transition-colors"><Pencil className="w-4 h-4 text-muted-foreground" /></button>
+                   <button onClick={() => del.mutate(o.id)} className="p-1.5 hover:bg-red-50 rounded transition-colors"><Trash2 className="w-4 h-4 text-red-400" /></button>
+                 </div>
+               </div>
+               {o.descricao && <p className="text-sm text-muted-foreground mb-4 line-clamp-2 leading-relaxed">{o.descricao}</p>}
+               {getAtribuidoName(o.atribuido_a) && (
+                 <p className="text-xs text-foreground font-medium mb-3 flex items-center gap-1.5">
+                    <span className="bg-primary/10 text-primary w-5 h-5 rounded-full flex items-center justify-center text-[10px]">A</span> 
+                    <span>{getAtribuidoName(o.atribuido_a)}</span>
+                 </p>
+               )}
             </div>
-            {o.descricao && <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{o.descricao}</p>}
-            {getAtribuidoName(o.atribuido_a) && (
-              <p className="text-xs text-foreground font-medium mb-2 flex items-center gap-1">👤 <span>{getAtribuidoName(o.atribuido_a)}</span></p>
-            )}
-            <div className="flex items-center justify-between">
-              <div className="flex gap-2">
-                <StatusBadge status={o.estado} />
-                <StatusBadge status={o.prioridade} />
-              </div>
-              {estadoFlow[o.estado] && (
-                <Button size="sm" variant="outline" className="text-xs" onClick={e => { e.stopPropagation(); avancar.mutate({ id: o.id, estado: estadoFlow[o.estado] }); }}>
-                  {estadoNext[o.estado]}
-                </Button>
-              )}
-            </div>
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-xs text-muted-foreground">{o.data_abertura}</p>
-              {o.fotos_urls?.length > 0 && <span className="text-xs text-muted-foreground">📎 {o.fotos_urls.length} anexo(s)</span>}
+            
+            <div>
+               <div className="flex items-center justify-between border-t border-border pt-4">
+                 <div className="flex gap-2">
+                   <StatusBadge status={o.estado} />
+                   <StatusBadge status={o.prioridade} />
+                 </div>
+                 {estadoFlow[o.estado] && (
+                   <Button size="sm" variant="outline" className="text-xs font-bold" onClick={e => { e.stopPropagation(); avancar.mutate({ id: o.id, estado: estadoFlow[o.estado] }); }}>
+                     {estadoNext[o.estado]}
+                   </Button>
+                 )}
+               </div>
+               <div className="flex items-center justify-between mt-3">
+                 <p className="text-xs font-medium text-muted-foreground tracking-wider uppercase">{o.data_abertura}</p>
+                 {o.anexos?.length > 0 && <span className="text-xs font-bold text-muted-foreground flex items-center gap-1">📎 {o.anexos.length} anexo(s)</span>}
+               </div>
             </div>
           </div>
         ))}
         {filtered.length === 0 && !isLoading && (
-          <div className="col-span-full text-center py-16 text-muted-foreground">Nenhuma Ocorrência Encontrada</div>
+          <div className="col-span-full text-center py-16 text-muted-foreground bg-card border border-dashed rounded-xl">Nenhuma Ocorrência Encontrada</div>
         )}
       </div>
 
-      {/* Preview */}
       {preview && (
         <OcorrenciaPreview
           ocorrencia={preview}
@@ -287,135 +430,260 @@ export default function Ocorrencias() {
 
       {/* Form Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[94vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto no-scrollbar rounded-xl p-6 z-[200]">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Editar Ocorrência' : 'Nova Ocorrência'}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-amber-500" /> {editing ? 'Editar Ocorrência' : 'Nova Ocorrência'}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-            <div>
+            
+            {/* LINHA 1: CONDOMINIO E FRAÇÃO */}
+            <div className="sm:col-span-1">
               <Label>Condomínio *</Label>
-              <Select value={form.condominio_id} onValueChange={v => upd('condominio_id', v)}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                <SelectContent>{condominios.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
+              <Popover open={comboCondominioOpen} onOpenChange={setComboCondominioOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={comboCondominioOpen} className="w-full justify-between font-normal bg-background mt-1">
+                    {form.condominio_id ? condominiosAtivos.find(c => c.id === form.condominio_id)?.nome : "Selecione ou pesquise..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0 w-[--radix-popover-trigger-width] z-[210]" align="start">
+                  <Command>
+                    <CommandInput placeholder="Pesquisar condomínio..." />
+                    <CommandEmpty>Condomínio não encontrado.</CommandEmpty>
+                    <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
+                      {condominiosAtivos.map(c => (
+                        <CommandItem key={c.id} value={`${c.nome} ${c.codigo || ''}`} onSelect={() => { upd('condominio_id', c.id); upd('fracao_id', '__area_comum__'); setComboCondominioOpen(false); }}>
+                          <Check className={cn("mr-2 h-4 w-4", form.condominio_id === c.id ? "opacity-100" : "opacity-0")} />
+                          {c.codigo && <span className="font-bold mr-1.5 opacity-80">({c.codigo})</span>}
+                          {c.nome}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="sm:col-span-1">
+              <Label>Fração Envolvida</Label>
+              <Select value={form.fracao_id || '__area_comum__'} onValueChange={v => upd('fracao_id', v)} disabled={!form.condominio_id}>
+                <SelectTrigger className="mt-1 bg-background"><SelectValue placeholder="Área Comum (Sem Fração)" /></SelectTrigger>
+                <SelectContent className="z-[210] max-h-48 no-scrollbar">
+                  <SelectItem value="__area_comum__">Área Comum (Geral)</SelectItem>
+                  {fracoes.filter(f => f.condominio_id === form.condominio_id).map(f => <SelectItem key={f.id} value={f.id}>{formatFracao(f)}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Fração / Área</Label>
-              <Select value={form.fracao_id || ''} onValueChange={v => upd('fracao_id', v)}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                <SelectContent>{fracoes.filter(f => !form.condominio_id || f.condominio_id === form.condominio_id).map(f => <SelectItem key={f.id} value={f.id}>{f.codigo}</SelectItem>)}</SelectContent>
-              </Select>
+
+            {/* LINHA 2: TÍTULO E QUEM REPORTOU */}
+            <div className="sm:col-span-1">
+              <Label>Título / Assunto *</Label>
+              <Input className="mt-1 bg-background" value={form.titulo || ''} onChange={e => upd('titulo', e.target.value)} placeholder="Ex: Lâmpada fundida no R/C..." />
             </div>
+
+            <div className="sm:col-span-1">
+              <Label>Reportada por (Condómino)</Label>
+              <Popover open={comboReportadaOpen} onOpenChange={setComboReportadaOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={comboReportadaOpen} className="w-full justify-between font-normal bg-background mt-1 text-left">
+                    <span className="truncate">
+                      {form.reportada_por ? pessoas.find(p => p.id === form.reportada_por)?.nome : "Administração / Equipa Interna"}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0 w-[--radix-popover-trigger-width] z-[210]" align="start">
+                  <Command>
+                    <CommandInput placeholder="Pesquisar condómino..." />
+                    <CommandEmpty>Condómino não encontrado.</CommandEmpty>
+                    <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
+                      <CommandItem value="Administração / Equipa Interna" onSelect={() => { upd('reportada_por', null); setComboReportadaOpen(false); }}>
+                        <Check className={cn("mr-2 h-4 w-4", !form.reportada_por ? "opacity-100" : "opacity-0")} />
+                        Administração / Equipa Interna
+                      </CommandItem>
+                      {condominosAtivos.map(p => (
+                        <CommandItem key={p.id} value={p.nome} onSelect={() => { upd('reportada_por', p.id); setComboReportadaOpen(false); }}>
+                          <Check className={cn("mr-2 h-4 w-4", form.reportada_por === p.id ? "opacity-100" : "opacity-0")} />
+                          {p.nome}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* LINHA 3: TIPO, PRIORIDADE, ESTADO ALINHADOS */}
+            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <Label>Tipo de Ocorrência</Label>
+                <Select value={form.tipo} onValueChange={v => upd('tipo', v)}>
+                  <SelectTrigger className="mt-1 bg-background"><SelectValue /></SelectTrigger>
+                  <SelectContent className="z-[210]">
+                    {Object.entries(tiposOcorrencia).map(([k, label]) => <SelectItem key={k} value={k}>{label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Prioridade</Label>
+                <Select value={form.prioridade} onValueChange={v => upd('prioridade', v)}>
+                  <SelectTrigger className="mt-1 bg-background"><SelectValue /></SelectTrigger>
+                  <SelectContent className="z-[210]">
+                    <SelectItem value="baixa">Baixa</SelectItem>
+                    <SelectItem value="media">Média</SelectItem>
+                    <SelectItem value="alta">Alta</SelectItem>
+                    <SelectItem value="urgente">Urgente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Estado</Label>
+                <Select value={form.estado} onValueChange={v => upd('estado', v)}>
+                  <SelectTrigger className="mt-1 bg-background"><SelectValue /></SelectTrigger>
+                  <SelectContent className="z-[210]">
+                    <SelectItem value="aberta">Aberta</SelectItem>
+                    <SelectItem value="em_progresso">Em Progresso</SelectItem>
+                    <SelectItem value="resolvida">Resolvida</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* DESCRICAO APENAS PARA PORTAL */}
+            {form.canal_submissao === 'portal_condomino' && (
+              <div className="sm:col-span-2 mt-2">
+                <Label>Descrição Completa do Problema (Pelo Condómino)</Label>
+                <textarea 
+                  className="mt-1 w-full rounded-md border border-input px-3 py-2 text-sm min-h-[80px] resize-y bg-muted opacity-80 cursor-not-allowed" 
+                  value={form.descricao || ''} 
+                  onChange={e => upd('descricao', e.target.value)} 
+                  disabled={true}
+                  placeholder="Detalhes da anomalia submetida pelo condómino..."
+                />
+                <span className="text-[10px] text-amber-600 font-bold">Bloqueado. Apenas o condómino pode editar a sua submissão original.</span>
+              </div>
+            )}
+
+            {/* OBSERVACOES INTERNAS */}
             <div className="sm:col-span-2">
-              <Label>Título *</Label>
-              <Input className="mt-1" value={form.titulo || ''} onChange={e => upd('titulo', e.target.value)} />
+              <Label>Observações Internas (Staff)</Label>
+              <textarea 
+                className="mt-1 w-full rounded-md border border-dashed border-input bg-background px-3 py-2 text-sm min-h-[60px] resize-y" 
+                value={form.observacoes || ''} 
+                onChange={e => upd('observacoes', e.target.value)} 
+                placeholder="Anotações para a equipa..." 
+              />
             </div>
-            <div>
-              <Label>Tipo</Label>
-              <Select value={form.tipo} onValueChange={v => upd('tipo', v)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {['avaria', 'manutencao', 'limpeza', 'seguranca', 'outro'].map(t => <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>)}
+
+            {/* SE CANAL PORTAL -> MOSTRA CAIXA RESPOSTA AO CLIENTE */}
+            {form.canal_submissao === 'portal_condomino' && (
+              <div className="sm:col-span-2 bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3 mt-2">
+                <Label className="text-blue-800 font-bold flex items-center gap-1.5"><Send className="w-4 h-4" /> Resposta ao Condómino (Visível no Portal)</Label>
+                <textarea 
+                  className="w-full rounded-md border border-blue-300 bg-white px-3 py-2 text-sm min-h-[80px] resize-y focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
+                  value={form.resposta_cliente || ''} 
+                  onChange={e => upd('resposta_cliente', e.target.value)} 
+                  placeholder="Escreva a resposta que o condómino irá ler..." 
+                />
+                <Button 
+                  type="button"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold gap-2"
+                  onClick={() => {
+                    if(!form.titulo || !form.condominio_id) { toast.error("Preencha os campos obrigatórios primeiro."); return; }
+                    save.mutate({ ...form, estado: 'resolvida', data_resolucao: format(new Date(), 'yyyy-MM-dd') });
+                  }}
+                >
+                  <Check className="w-4 h-4" /> Guardar Resposta & Resolver Processo
+                </Button>
+              </div>
+            )}
+
+            {/* ATRIBUICAO E FORNECEDOR */}
+            <div className="mt-2">
+              <Label>Membro da Equipa Atribuído</Label>
+              <Select value={form.atribuido_a || ''} onValueChange={v => upd('atribuido_a', v === '__none__' ? '' : v)}>
+                <SelectTrigger className="mt-1 bg-background"><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                <SelectContent className="z-[210]">
+                  <SelectItem value="__none__">Não Atribuído</SelectItem>
+                  {users.map(u => <SelectItem key={u.id} value={u.id}>👤 {u.full_name || u.email}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Área</Label>
-              <Select value={form.area} onValueChange={v => upd('area', v)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {['fracao', 'hall', 'escadas', 'garagem', 'jardim', 'cobertura', 'elevador', 'outro'].map(a => <SelectItem key={a} value={a} className="capitalize">{a}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            
+            <div className="mt-2">
+              <Label>Fornecedor (Externo)</Label>
+              <Popover open={comboFornecedorOpen} onOpenChange={setComboFornecedorOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={comboFornecedorOpen} className="w-full justify-between font-normal bg-background mt-1">
+                    <span className="truncate">
+                      {form.fornecedor_id ? fornecedoresAtivos.find(f => f.id === form.fornecedor_id)?.nome : "Selecione..."}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0 w-[--radix-popover-trigger-width] z-[210]" align="start">
+                  <Command>
+                    <CommandInput placeholder="Pesquisar fornecedor..." />
+                    <CommandEmpty>Fornecedor não encontrado.</CommandEmpty>
+                    <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
+                      <CommandItem value="" onSelect={() => { upd('fornecedor_id', ''); setComboFornecedorOpen(false); }}>
+                        <Check className={cn("mr-2 h-4 w-4", !form.fornecedor_id ? "opacity-100" : "opacity-0")} />
+                        Nenhum
+                      </CommandItem>
+                      {fornecedoresAtivos.map(f => (
+                        <CommandItem key={f.id} value={f.nome} onSelect={() => { upd('fornecedor_id', f.id); setComboFornecedorOpen(false); }}>
+                          <Check className={cn("mr-2 h-4 w-4", form.fornecedor_id === f.id ? "opacity-100" : "opacity-0")} />
+                          {f.nome}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
-            <div>
-              <Label>Prioridade</Label>
-              <Select value={form.prioridade} onValueChange={v => upd('prioridade', v)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="baixa">Baixa</SelectItem>
-                  <SelectItem value="media">Média</SelectItem>
-                  <SelectItem value="alta">Alta</SelectItem>
-                  <SelectItem value="urgente">Urgente</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Estado</Label>
-              <Select value={form.estado} onValueChange={v => upd('estado', v)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="aberta">Aberta</SelectItem>
-                  <SelectItem value="em_progresso">Em Progresso</SelectItem>
-                  <SelectItem value="resolvida">Resolvida</SelectItem>
-                  <SelectItem value="fechada">Fechada</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Data de Abertura</Label>
-              <Input className="mt-1" type="date" value={form.data_abertura || ''} onChange={e => upd('data_abertura', e.target.value)} />
-            </div>
-            <div>
-              <Label>Atribuído a (entidade/staff)</Label>
-              <Select value={form.atribuido_a || ''} onValueChange={v => upd('atribuido_a', v)}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Nenhum" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Nenhum</SelectItem>
-                  {users.length > 0 && users.map(u => <SelectItem key={u.id} value={u.id}>👤 {u.full_name || u.email} (staff)</SelectItem>)}
-                  {pessoas.map(p => <SelectItem key={p.id} value={p.id}>{p.nome} ({p.tipo})</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Fornecedor</Label>
-              <Select value={form.fornecedor_id || ''} onValueChange={v => upd('fornecedor_id', v)}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Nenhum" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Nenhum</SelectItem>
-                  {pessoas.filter(p => p.tipo === 'fornecedor').map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Custo Estimado (€)</Label>
-              <Input className="mt-1" type="number" value={form.custo_estimado || ''} onChange={e => upd('custo_estimado', parseFloat(e.target.value) || 0)} />
-            </div>
-            <div className="sm:col-span-2">
-              <Label>Descrição</Label>
-              <textarea className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-y" value={form.descricao || ''} onChange={e => upd('descricao', e.target.value)} />
-            </div>
-            <div className="sm:col-span-2">
-              <Label>Observações</Label>
-              <textarea className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px] resize-y" value={form.observacoes || ''} onChange={e => upd('observacoes', e.target.value)} />
-            </div>
-            <div className="sm:col-span-2">
-              <Label>Anexos (fotos)</Label>
-              <div className="mt-1">
-                <label className="flex items-center gap-2 cursor-pointer px-3 py-2 border-2 border-dashed border-border rounded-lg hover:border-primary transition-colors">
-                  <Upload className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">{uploading ? 'A carregar...' : 'Adicionar fotos/anexos'}</span>
-                  <input type="file" multiple accept="image/*,.pdf" onChange={handleFotoUpload} className="hidden" />
+
+            {/* ANEXOS / PROVAS */}
+            <div className="sm:col-span-2 border-t border-border pt-4 mt-2">
+              <Label className="font-bold text-xs uppercase tracking-wider text-muted-foreground block mb-3">Anexos & Evidências</Label>
+              <div className="bg-muted/20 border border-dashed border-border rounded-xl p-4">
+                <label className="flex flex-col items-center justify-center gap-2 cursor-pointer p-4 bg-background border border-border rounded-lg hover:border-primary hover:bg-primary/5 transition-colors">
+                  <Upload className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">{uploading ? 'A enviar ficheiros...' : 'Clique para carregar fotos ou documentos'}</span>
+                  <input type="file" multiple accept="image/*,.pdf" onChange={handleFotoUpload} className="hidden" disabled={uploading} />
                 </label>
-                {form.fotos_urls?.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {form.fotos_urls.map((url, i) => (
-                      <div key={i} className="relative">
-                        <img src={url} alt="" className="w-16 h-16 object-cover rounded-lg border border-border" />
-                        <button onClick={() => removeAnexo(i)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center">
-                          <X className="w-2.5 h-2.5" />
-                        </button>
-                      </div>
-                    ))}
+                
+                {form.anexos?.length > 0 && (
+                  <div className="flex flex-col gap-2 mt-4">
+                    {form.anexos.map((url, i) => {
+                      const fileNameRaw = url.split('/').pop();
+                      const displayFileName = decodeURIComponent(fileNameRaw.substring(fileNameRaw.indexOf('-') + 1)) || `Anexo ${i+1}`;
+                      const isPdf = url.toLowerCase().endsWith('.pdf');
+
+                      return (
+                        <div key={i} className="flex items-center justify-between p-2 border border-border rounded-lg bg-background shadow-sm hover:border-primary/50 transition-colors">
+                          <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 overflow-hidden flex-1 group">
+                            {isPdf ? <FileText className="w-8 h-8 text-red-500 shrink-0" /> : <img src={url} alt="" className="w-8 h-8 object-cover rounded shrink-0 border border-border" />}
+                            <span className="text-sm font-medium text-foreground group-hover:text-primary group-hover:underline truncate" title={displayFileName}>
+                              {displayFileName}
+                            </span>
+                          </a>
+                          <button type="button" onClick={() => removeAnexo(i)} className="p-2 ml-2 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-md transition-colors shrink-0">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
             </div>
+
           </div>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => save.mutate(form)} disabled={save.isPending || uploading}>{save.isPending ? 'A guardar...' : 'Guardar'}</Button>
-          </div>
+          <DialogFooter className="mt-6 pt-4 border-t border-border">
+            <Button variant="outline" type="button" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button type="button" onClick={() => save.mutate(form)} disabled={save.isPending || uploading || !form.condominio_id || !form.titulo}>
+              {save.isPending ? 'A guardar...' : 'Guardar Ocorrência'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
