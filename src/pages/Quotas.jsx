@@ -102,7 +102,7 @@ export default function Quotas() {
   const [pagamentoAlvoId, setPagamentoAlvoId] = useState('');
   const [tipoLiquidacao, setTipoLiquidacao] = useState('total');
   const [quotasSelecionadas, setQuotasSelecionadas] = useState([]);
-  const [valorPagoManual, setValorPagoManual] = useState("0.00"); // NOVO ESTADO: Valor editável no pagamento
+  const [valorPagoManual, setValorPagoManual] = useState("0.00");
 
   // Queries
   const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
@@ -219,53 +219,72 @@ export default function Quotas() {
 
   const registarPagamento = useMutation({
     mutationFn: async () => {
-      const primeiraQuota = pendentesReais.find(q => q.id === quotasSelecionadas[0]);
+      const primeiraQuota = pendentesReais.find(q => quotasSelecionadas.includes(q.id)) || pendentesReais[0];
       const idCondominio = primeiraQuota?.condominio_id || selectedCondominioId;
+      const idFracao = primeiraQuota?.fracao_id || (pagamentoFiltro === 'fracao' ? pagamentoAlvoId : null);
+      
       const dataHoje = new Date().toISOString().split('T')[0];
+      const valorManual = parseFloat(valorPagoManual) || 0;
 
-      const updatePromises = quotasSelecionadas.map(id => agenciaAvenida.entities.Quota.update(id, { estado: 'pago' }));
-      await Promise.all(updatePromises);
+      const selecionadas = pendentesReais.filter(q => quotasSelecionadas.includes(q.id));
+      const creditosSelecionados = selecionadas.filter(q => q.valor < 0);
+      const debitosSelecionados = selecionadas.filter(q => q.valor > 0);
 
-      // NOVO: Gerar o crédito se houver pagamento a mais (Total Editado > Total Selecionado)
-      const valorDado = parseFloat(valorPagoManual) || 0;
-      const valorDasQuotas = totalSelecionado;
-      const diferenca = valorDado - valorDasQuotas;
+      let valorDisponivel = valorManual + Math.abs(creditosSelecionados.reduce((acc, q) => acc + q.valor, 0));
+      const promises = [];
 
-      if (diferenca > 0.005) { // Tolerância de casas decimais
-        await agenciaAvenida.entities.Quota.create({
-          condominio_id: idCondominio,
-          fracao_id: primeiraQuota?.fracao_id,
-          tipo: 'linha_faturacao_credito',
-          descricao: 'Pagamentos Não Alocados',
-          valor: -diferenca, // NEGATIVO = CRÉDITO!
-          mes: null,
-          ano: null,
-          data_emissao: dataHoje,
-          data_vencimento: null,
-          estado: 'pendente'
-        });
+      for (const c of creditosSelecionados) {
+        promises.push(agenciaAvenida.entities.Quota.update(c.id, { estado: 'pago' }));
       }
 
-      // O Movimento regista o valor exato que o utilizador digitou (o dinheiro que entrou no banco)
-      const novoMovimento = {
-        condominio_id: idCondominio,
-        tipo: 'receita',
-        categoria: 'quota',
-        descricao: `Liquidação de Quotas - ${pagamentoFiltro === 'fracao' ? 'Fração' : 'Condómino'}`,
-        valor: valorDado,
-        data: dataHoje,
-        estado: 'efetivado',
-        conta: 'banco'
-      };
-      await agenciaAvenida.entities.Movimento.create(novoMovimento);
+      for (const d of debitosSelecionados) {
+        const valorEmFalta = d.valor - (d.valor_pago || 0);
+        if (valorDisponivel >= valorEmFalta) {
+            promises.push(agenciaAvenida.entities.Quota.update(d.id, { estado: 'pago', valor_pago: d.valor }));
+            valorDisponivel -= valorEmFalta;
+        } else if (valorDisponivel > 0) {
+            promises.push(agenciaAvenida.entities.Quota.update(d.id, { valor_pago: (d.valor_pago || 0) + valorDisponivel }));
+            valorDisponivel = 0;
+        }
+      }
+
+      if (valorDisponivel > 0.005 && idFracao) {
+         const existingCredit = quotas.find(q => q.fracao_id === idFracao && q.tipo === 'linha_faturacao_credito' && q.estado === 'pendente' && !quotasSelecionadas.includes(q.id));
+         if (existingCredit) {
+            promises.push(agenciaAvenida.entities.Quota.update(existingCredit.id, { valor: existingCredit.valor - valorDisponivel }));
+         } else {
+            promises.push(agenciaAvenida.entities.Quota.create({
+                condominio_id: idCondominio,
+                fracao_id: idFracao,
+                tipo: 'linha_faturacao_credito',
+                descricao: 'Crédito (Pagamento Não Alocado)',
+                valor: -valorDisponivel,
+                mes: null, ano: null, data_emissao: dataHoje, data_vencimento: null, estado: 'pendente'
+            }));
+         }
+      }
+
+      if (valorManual > 0) {
+        const novoMovimento = {
+            condominio_id: idCondominio,
+            tipo: 'receita',
+            categoria: 'quota',
+            descricao: `Liquidação de Quotas - ${pagamentoFiltro === 'fracao' ? 'Fração' : 'Condómino'}`,
+            valor: valorManual,
+            data: dataHoje,
+            estado: 'efetivado',
+            conta: 'banco'
+        };
+        await agenciaAvenida.entities.Movimento.create(novoMovimento);
+      }
       return true;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['quotas'] });
       qc.invalidateQueries({ queryKey: ['movimentos'] });
 
-      toast.success('Pagamento registado com sucesso!');
-      toast.info('Email enviado ao condómino.', { icon: <Mail className="w-4 h-4" /> });
+      toast.success('Processamento concluído com sucesso!');
+      if ((parseFloat(valorPagoManual) || 0) > 0) toast.info('Email enviado ao condómino.', { icon: <Mail className="w-4 h-4" /> });
       gerarReciboTeste();
 
       handleClosePagamento();
@@ -313,9 +332,11 @@ export default function Quotas() {
 
   const toggleSelectQuota = (id) => setQuotasSelecionadas(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   const divisor = (tipoLiquidacao === 'parcial' && numTitulares > 1) ? numTitulares : 1;
-  const totalSelecionado = pendentesReais.filter(q => quotasSelecionadas.includes(q.id)).reduce((acc, curr) => acc + (curr.valor / divisor), 0);
+  
+  const totalSelecionado = pendentesReais
+    .filter(q => quotasSelecionadas.includes(q.id))
+    .reduce((acc, curr) => acc + ((curr.valor - (curr.valor_pago || 0)) / divisor), 0);
 
-  // Sincronizar campo input sempre que a seleção de quotas muda
   useEffect(() => {
     setValorPagoManual(totalSelecionado.toFixed(2));
   }, [totalSelecionado]);
@@ -325,6 +346,12 @@ export default function Quotas() {
       <PageHeader
         title="Quotas e Faturação"
         subtitle="Gestão de quotas mensais, extraordinárias e processamento de pagamentos."
+        action={
+          <div className="flex gap-2">
+            <Button variant="outline" className="gap-2" onClick={handleOpenNova}><Plus className="w-4 h-4" /> Nova Quota</Button>
+            <Button variant="secondary" className="gap-2 bg-muted text-muted-foreground" onClick={handleOpenConfig}><Settings className="w-4 h-4" /> Configurar Quotas</Button>
+          </div>
+        }
       />
 
       <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-center w-full">
@@ -336,9 +363,9 @@ export default function Quotas() {
             <TrendingDown className="w-5 h-5" /> Gerir Dívida Externa
           </Button>
         )}
-        <div className="flex-1" />
-        <Button variant="outline" className="gap-2" onClick={handleOpenNova}><Plus className="w-4 h-4" /> Nova Quota</Button>
-        <Button variant="secondary" className="gap-2 bg-muted text-muted-foreground" onClick={handleOpenConfig}><Settings className="w-4 h-4" /> Configurar Quotas</Button>
+        <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white shadow-md gap-2" onClick={() => toast.success('Download do Extrato CC iniciado.')}>
+          <FileText className="w-5 h-5" /> Emitir Extrato CC
+        </Button>
       </div>
 
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -376,7 +403,7 @@ export default function Quotas() {
                 <th className="px-4 py-3">Fração</th>
                 <th className="px-4 py-3">Descrição</th>
                 <th className="px-4 py-3">Vencimento</th>
-                <th className="px-4 py-3">Valor</th>
+                <th className="px-4 py-3">Valor Total</th>
                 <th className="px-4 py-3">Estado</th>
                 <th className="px-4 py-3 text-center w-24">Ações</th>
               </tr>
@@ -389,7 +416,8 @@ export default function Quotas() {
               ) : (
                 quotasFiltradas.map(q => {
                   const fracao = fracoes.find(f => f.id === q.fracao_id);
-                  const descFinal = q.tipo === 'mensal' ? 'Quota + FCR' : q.descricao;
+                  const descBase = q.tipo === 'mensal' ? 'Quota + FCR' : (q.descricao || 'Quota');
+                  const descFinal = (q.tipo === 'mensal' && q.mes) ? `${descBase} (${mesesExtenso[q.mes-1]} ${q.ano})` : descBase;
                   const displayVencimento = q.data_vencimento || (q.mes ? `${String(q.mes).padStart(2, '0')}/${q.ano}` : 'Sem Limite');
 
                   return (
@@ -397,7 +425,19 @@ export default function Quotas() {
                       <td className="px-4 py-3 font-semibold text-primary">{formatFracao(fracao)}</td>
                       <td className="px-4 py-3 text-muted-foreground">{descFinal}</td>
                       <td className="px-4 py-3 text-muted-foreground">{displayVencimento}</td>
-                      <td className="px-4 py-3 font-bold text-foreground">€{(q.valor || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3">
+                        <span className="font-bold text-foreground">€{(q.valor || 0).toFixed(2)}</span>
+                        {(q.valor_pago > 0 && q.estado !== 'pago') && (
+                          <div className="mt-1 leading-none space-y-0.5">
+                            <span className="block text-[10px] text-emerald-600 font-bold">
+                              Pagamento Parcial: €{q.valor_pago.toFixed(2)}
+                            </span>
+                            <span className="block text-[10px] text-amber-600 mt-0.5 font-bold">
+                              Valor Restante: €{(q.valor - q.valor_pago).toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={cn(
                           "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold border",
@@ -413,9 +453,9 @@ export default function Quotas() {
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50 cursor-pointer relative z-20" onClick={() => setOpenRecibo(q)} title="Consultar Recibo">
                             <FileText className="w-4 h-4" />
                           </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 cursor-pointer relative z-20" onClick={() => setOpenDelete(q)} title="Eliminar">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 cursor-pointer relative z-20" onClick={() => setOpenDelete(q)} title="Eliminar">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -449,7 +489,7 @@ export default function Quotas() {
         />
       )}
 
-      {/* DIALOG: GERIR DÍVIDA ANTERIOR */}
+      {/* DIALOG: GERIR DÍVIDA EXTERNA */}
       <Dialog open={openDivida} onOpenChange={setOpenDivida}>
         <DialogContent className="w-[92vw] sm:max-w-md rounded-xl p-5 z-[200]">
           <DialogHeader>
@@ -778,13 +818,13 @@ export default function Quotas() {
             </div>
           </div>
           <DialogFooter className="mt-5 pt-4 border-t border-border gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setOpenNova(false)} disabled={lancarLinha.isPending}>Cancelar</Button>
-            <Button
-              disabled={!quotaForm.condominio_id || !quotaForm.fracao_id || parseFloat(quotaForm.valor || 0) <= 0 || lancarLinha.isPending}
-              onClick={() => lancarLinha.mutate(quotaForm)}
-            >
-              {lancarLinha.isPending ? 'A Lançar...' : 'Lançar Linha'}
-            </Button>
+             <Button variant="outline" onClick={() => setOpenNova(false)} disabled={lancarLinha.isPending}>Cancelar</Button>
+             <Button 
+                disabled={!quotaForm.condominio_id || !quotaForm.fracao_id || parseFloat(quotaForm.valor || 0) <= 0 || lancarLinha.isPending} 
+                onClick={() => lancarLinha.mutate(quotaForm)}
+             >
+               {lancarLinha.isPending ? 'A Lançar...' : 'Lançar Linha'}
+             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -864,13 +904,15 @@ export default function Quotas() {
                         <th className="p-3 w-10 text-center">Sel.</th>
                         <th className="p-3">Descrição</th>
                         <th className="p-3">Data Ref.</th>
-                        <th className="p-3 text-right">Valor</th>
+                        <th className="p-3 text-right">Valor em Falta</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {pendentesReais.map(q => {
                         const fracaoDoMapa = fracoes.find(f => f.id === q.fracao_id);
                         const condominioDoMapa = condominios.find(c => c.id === fracaoDoMapa?.condominio_id);
+                        const valorEmFalta = q.valor - (q.valor_pago || 0);
+
                         return (
                           <tr key={q.id} className={cn("hover:bg-muted/10 transition-colors cursor-pointer", quotasSelecionadas.includes(q.id) && "bg-primary/5")} onClick={() => toggleSelectQuota(q.id)}>
                             <td className="p-3 text-center" onClick={e => e.stopPropagation()}>
@@ -884,8 +926,8 @@ export default function Quotas() {
                               )}
                               {q.descricao || (q.tipo === 'mensal' ? 'Quota Mensal' : 'Dívida')}
                             </td>
-                            <td className="p-3 text-muted-foreground text-xs">{q.mes ? `${mesesExtenso[q.mes - 1]} ${q.ano}` : 'Transitada'}</td>
-                            <td className="p-3 text-right font-bold">€{(q.valor || 0).toFixed(2)}</td>
+                            <td className="p-3 text-muted-foreground text-xs">{q.mes ? `${mesesExtenso[q.mes-1]} ${q.ano}` : 'Transitada'}</td>
+                            <td className="p-3 text-right font-bold">€{valorEmFalta.toFixed(2)}</td>
                           </tr>
                         );
                       })}
@@ -907,24 +949,31 @@ export default function Quotas() {
                 <span className="text-xs text-muted-foreground font-medium block mb-1">A Pagar (Valor Final)</span>
                 <div className="flex items-center justify-center sm:justify-start gap-1 text-2xl font-black text-emerald-600">
                   <span>€</span>
-                  <input
-                    type="number"
+                  <input 
+                    type="number" 
                     step="0.01"
-                    min="0"
+                    disabled={!pagamentoAlvoId}
                     value={valorPagoManual}
                     onChange={e => setValorPagoManual(e.target.value)}
-                    className="bg-transparent border-b border-dashed border-emerald-300 hover:border-emerald-600 focus:border-emerald-600 focus:outline-none w-28 p-0"
+                    className={cn(
+                      "bg-transparent border-b border-dashed border-emerald-300 hover:border-emerald-600 focus:border-emerald-600 focus:outline-none w-28 p-0",
+                      !pagamentoAlvoId && "opacity-50 cursor-not-allowed border-transparent"
+                    )}
                   />
                 </div>
                 {(parseFloat(valorPagoManual) || 0) > totalSelecionado + 0.005 && (
                   <span className="text-[10px] text-emerald-700 font-bold block mt-1">
-                    DOS QUAIS, €{((parseFloat(valorPagoManual) || 0) - totalSelecionado).toFixed(2)} LANÇADOS EM CRÉDITO (NÃO ALOCADO)
+                    DOS QUAIS, €{((parseFloat(valorPagoManual) || 0) - totalSelecionado).toFixed(2)} FICAM EM CRÉDITO
                   </span>
                 )}
               </div>
               <div className="flex gap-2 w-full sm:w-auto mt-3 sm:mt-0">
                 <Button variant="outline" className="flex-1 sm:flex-none" onClick={handleClosePagamento} disabled={registarPagamento.isPending}>Cancelar</Button>
-                <Button disabled={quotasSelecionadas.length === 0 || registarPagamento.isPending} className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none gap-2" onClick={() => registarPagamento.mutate()}>
+                <Button 
+                  disabled={!pagamentoAlvoId || registarPagamento.isPending || (quotasSelecionadas.length === 0 && (parseFloat(valorPagoManual) || 0) <= 0)} 
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none gap-2" 
+                  onClick={() => registarPagamento.mutate()}
+                >
                   {registarPagamento.isPending ? 'A Processar...' : <><Check className="w-4 h-4" /> Confirmar & Emitir</>}
                 </Button>
               </div>
@@ -961,9 +1010,9 @@ export default function Quotas() {
       <AlertDialog open={!!openDelete} onOpenChange={(open) => !open && setOpenDelete(null)}>
         <AlertDialogContent className="w-[92vw] sm:max-w-md rounded-xl z-[200]">
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar Registro de Faturação</AlertDialogTitle>
+            <AlertDialogTitle>Eliminar Linha de Faturação</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que pretende eliminar esta linha de faturação? Esta ação é completamente irreversível e irá limpar o histórico em aberto da conta corrente do condómino afetado.
+              Tem certeza que pretende eliminar esta linha de faturação? Esta ação é completamente irreversível e apenas elimina a linha da quota. Não afeta movimentos associados nem configurações de quotas. Esta opção é recomendada apenas para eliminar linhas lançadas por engano ou em duplicado. Se pretende corrigir o valor ou descrição, considere editar a linha em vez de eliminar.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
