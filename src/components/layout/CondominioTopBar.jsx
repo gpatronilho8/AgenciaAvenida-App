@@ -12,10 +12,14 @@ export default function CondominioTopBar({ module }) {
     queryKey: ['condominios'],
     queryFn: () => agenciaAvenida.entities.Condominio.list(),
   });
+  
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [openAno, setOpenAno] = useState(false); // Estado para o dropdown do Ano
   const [user, setUser] = useState(null);
+  
   const ref = useRef(null);
+  const refAno = useRef(null); // Ref para o dropdown do Ano detetar clique fora
   
   const location = useLocation();
 
@@ -40,8 +44,12 @@ export default function CondominioTopBar({ module }) {
     return c.nome?.toLowerCase().includes(term) || c.codigo?.toLowerCase().includes(term);
   });
 
+  // Fecha os dropdowns ao clicar fora
   useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setSearch(''); } };
+    const handler = (e) => { 
+      if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setSearch(''); }
+      if (refAno.current && !refAno.current.contains(e.target)) { setOpenAno(false); }
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
@@ -49,15 +57,24 @@ export default function CondominioTopBar({ module }) {
   const paginasGlobais = ['/pessoas', '/configuracoes', '/condominios/lista'];
   const mostrarSeletor = module === 'condominios' && !paginasGlobais.includes(location.pathname);
 
+  // Visibilidade exclusiva do Ano
+  const paginasComSeletorAno = ['/condominios/quotas', '/condominios/movimentos', '/condominios/ocorrencias', '/condominios/documentos', '/condominios/processos-judiciais', '/condominios/assembleias'];
+  const mostrarSeletorAno = module === 'condominios' && paginasComSeletorAno.includes(location.pathname);
+
+  // Opções de Anos
+  const opcoesAno = ['all', 2025, 2026, 2027, 2028];
+  const anoLabel = selectedAno === 'all' ? 'Todos' : selectedAno;
+
   return (
     <div className="border-b border-border bg-background px-6 py-2.5 flex items-center gap-3 flex-shrink-0 min-h-[57px]">
       {mostrarSeletor && (
         <>
+          {/* SELETOR DE CONDOMÍNIO */}
           <Building2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden sm:inline-block">Condomínio:</span>
           <div className="relative" ref={ref}>
             <button
-              onClick={() => { setOpen(!open); setSearch(''); }}
+              onClick={() => { setOpen(!open); setSearch(''); setOpenAno(false); }}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-sm font-medium transition-all"
             >
               <span className="max-w-[200px] sm:max-w-[300px] truncate">{label}</span>
@@ -108,19 +125,43 @@ export default function CondominioTopBar({ module }) {
             )}
           </div>
 
-          {/* NOVO SELETOR DE ANO */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden sm:inline-block ml-2">Ano:</span>
-            <select
-              value={selectedAno}
-              onChange={(e) => setSelectedAno(parseInt(e.target.value))}
-              className="px-3 py-1.5 rounded-lg border border-border bg-card text-sm font-medium outline-none hover:bg-muted transition-all"
-            >
-              {[2025, 2026, 2027, 2028].map(ano => (
-                <option key={ano} value={ano}>{ano}</option>
-              ))}
-            </select>
-          </div>
+          {/* SELETOR DE ANO (Estilizado) */}
+          {mostrarSeletorAno && (
+            <>
+              <div className="w-px h-5 bg-border mx-1 hidden sm:block"></div>
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden sm:inline-block">Ano:</span>
+              <div className="relative" ref={refAno}>
+                <button
+                  onClick={() => { setOpenAno(!openAno); setOpen(false); }}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-sm font-medium transition-all min-w-[90px] justify-between"
+                >
+                  <span>{anoLabel}</span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform flex-shrink-0 ${openAno ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {openAno && (
+                  <div className="absolute left-0 top-full mt-1 z-50 bg-card border border-border rounded-xl shadow-lg py-1 min-w-[100px]">
+                    {opcoesAno.map(ano => (
+                      <button
+                        key={ano}
+                        onClick={() => { 
+                          setSelectedAno(ano === 'all' ? 'all' : parseInt(ano)); 
+                          setOpenAno(false); 
+                        }}
+                        className={`w-full text-left flex items-center px-3 py-2 text-sm transition-colors ${
+                          selectedAno === ano || (selectedAno === 'all' && ano === 'all')
+                            ? 'text-primary font-semibold bg-primary/5' 
+                            : 'text-foreground hover:bg-muted'
+                        }`}
+                      >
+                        {ano === 'all' ? 'Todos' : ano}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
 
