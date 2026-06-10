@@ -21,6 +21,17 @@ import { format } from 'date-fns';
 // Helpers
 const mesesExtenso = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
+const parseJsonArray = (data) => {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  try {
+    const parsed = JSON.parse(data);
+    return Array.isArray(parsed) ? parsed : [data];
+  } catch {
+    return [data];
+  }
+};
+
 const normalizeTipoPessoa = (tipoData) => {
   if (!tipoData) return [];
   let parsedArray = [];
@@ -104,7 +115,7 @@ export default function Quotas() {
   const [tipoLiquidacao, setTipoLiquidacao] = useState('total');
   const [quotasSelecionadas, setQuotasSelecionadas] = useState([]);
   const [valorPagoManual, setValorPagoManual] = useState("0.00");
-  
+
   const [contaDestino, setContaDestino] = useState('banco');
   const [metodoEscolhido, setMetodoEscolhido] = useState('transferencia');
   const [dataPagamentoForm, setDataPagamentoForm] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -138,6 +149,14 @@ export default function Quotas() {
     const matchFracao = fracao?.codigo_fracao?.toLowerCase().includes(termo) || fracao?.descricao_piso_lado?.toLowerCase().includes(termo);
     const matchDesc = q.descricao?.toLowerCase().includes(termo);
     return !search || matchFracao || matchDesc;
+  }).sort((a, b) => {
+    // 1. Quotas sem data de vencimento (null ou vazias) ficam no topo
+    if (!a.data_vencimento && b.data_vencimento) return -1;
+    if (a.data_vencimento && !b.data_vencimento) return 1;
+    if (!a.data_vencimento && !b.data_vencimento) return 0;
+
+    // 2. Ordenação Descendente (Mais recente primeiro)
+    return new Date(b.data_vencimento) - new Date(a.data_vencimento);
   });
 
   const isConfigValid = configForm.condominio_id && (
@@ -222,7 +241,6 @@ export default function Quotas() {
       const creditosSelecionados = selecionadas.filter(q => q.valor < 0);
       const debitosSelecionados = selecionadas.filter(q => q.valor > 0);
 
-      // Fila de Prioridade: Dívidas externas primeiro, depois antiguidade da data_vencimento
       const debitosOrdenados = [...debitosSelecionados].sort((a, b) => {
         if (a.tipo === 'linha_faturacao_divida' && b.tipo !== 'linha_faturacao_divida') return -1;
         if (a.tipo !== 'linha_faturacao_divida' && b.tipo === 'linha_faturacao_divida') return 1;
@@ -233,9 +251,9 @@ export default function Quotas() {
 
       let creditosDisponiveis = Math.abs(creditosSelecionados.reduce((acc, q) => acc + q.valor, 0));
       let dinheiroManualDisponivel = valorManual;
-      
+
       const splitMovimentos = {};
-      const quotasToUpdate = []; // Vamos guardar as intenções de update em vez de executar já
+      const quotasToUpdate = [];
 
       for (const c of creditosSelecionados) {
         quotasToUpdate.push({ id: c.id, payload: { estado: 'pago', data_pagamento: dataPagamentoForm } });
@@ -270,33 +288,34 @@ export default function Quotas() {
 
       const quotasToCreate = [];
       if (dinheiroManualDisponivel > 0.005 && idFracao) {
-         const targetCondId = primeiraQuota?.condominio_id || selectedCondominioId;
-         const existingCredit = quotas.find(q => q.fracao_id === idFracao && q.tipo === 'linha_faturacao_credito' && q.estado === 'pendente' && !quotasSelecionadas.includes(q.id));
-         
-         if (existingCredit) {
-            quotasToUpdate.push({ id: existingCredit.id, payload: { valor: existingCredit.valor - dinheiroManualDisponivel, data_pagamento: dataPagamentoForm } });
-         } else {
-            quotasToCreate.push({
-                condominio_id: targetCondId, fracao_id: idFracao, tipo: 'linha_faturacao_credito',
-                descricao: 'Crédito (Pagamento Não Alocado)', valor: -dinheiroManualDisponivel,
-                mes: null, ano: null, data_emissao: dataPagamentoForm, data_pagamento: dataPagamentoForm, data_vencimento: null, estado: 'pendente'
-            });
-         }
+        const targetCondId = primeiraQuota?.condominio_id || selectedCondominioId;
+        const existingCredit = quotas.find(q => q.fracao_id === idFracao && q.tipo === 'linha_faturacao_credito' && q.estado === 'pendente' && !quotasSelecionadas.includes(q.id));
 
-         if (!splitMovimentos[targetCondId]) splitMovimentos[targetCondId] = {};
-         splitMovimentos[targetCondId]['linha_faturacao_credito'] = (splitMovimentos[targetCondId]['linha_faturacao_credito'] || 0) + dinheiroManualDisponivel;
+        if (existingCredit) {
+          quotasToUpdate.push({ id: existingCredit.id, payload: { valor: existingCredit.valor - dinheiroManualDisponivel, data_pagamento: dataPagamentoForm } });
+        } else {
+          quotasToCreate.push({
+            condominio_id: targetCondId, fracao_id: idFracao, tipo: 'linha_faturacao_credito',
+            descricao: 'Crédito (Pagamento Não Alocado)', valor: -dinheiroManualDisponivel,
+            mes: null, ano: null, data_emissao: dataPagamentoForm, data_pagamento: dataPagamentoForm, data_vencimento: null, estado: 'pendente'
+          });
+        }
+
+        if (!splitMovimentos[targetCondId]) splitMovimentos[targetCondId] = {};
+        splitMovimentos[targetCondId]['linha_faturacao_credito'] = (splitMovimentos[targetCondId]['linha_faturacao_credito'] || 0) + dinheiroManualDisponivel;
       }
 
       // ====================================================================
       // 1. CRIAR OS MOVIMENTOS PRIMEIRO E GUARDAR OS IDs
       // ====================================================================
       const novosMovimentosIds = [];
-      
+      const novaMockUrl = `https://exemplo.com/recibo_${Date.now()}.pdf`; // URL Fictícia a ser substituída no futuro pelo PDF real
+
       if (valorManual > 0) {
         for (const [condId, dataTipos] of Object.entries(splitMovimentos)) {
           const fracaoObj = fracoes.find(f => f.id === idFracao);
           const condObj = condominios.find(c => c.id === condId);
-          
+
           let nomePagador = 'Desconhecido';
           if (pagamentoFiltro === 'condomino') {
             nomePagador = pessoas.find(p => p.id === pagamentoAlvoId)?.nome || 'Desconhecido';
@@ -324,7 +343,7 @@ export default function Quotas() {
             });
             novosMovimentosIds.push(novoMov.id);
           }
-          
+
           const condToUpdate = condominios.find(c => c.id === condId);
           if (condToUpdate) {
             const field = contaDestino === 'banco' ? 'saldo_banco' : 'saldo_caixa';
@@ -334,30 +353,29 @@ export default function Quotas() {
       }
 
       // ====================================================================
-      // 2. ATUALIZAR AS QUOTAS COM OS IDs GERADOS
+      // 2. ATUALIZAR AS QUOTAS COM OS IDs GERADOS E ARRAY DE RECIBOS
       // ====================================================================
-      const getMovIdsArray = (quotaIdsStr) => {
-         if (!quotaIdsStr) return [];
-         if (Array.isArray(quotaIdsStr)) return quotaIdsStr;
-         try { return JSON.parse(quotaIdsStr); } catch { return [quotaIdsStr]; }
-      };
-
       const promisesUpdates = quotasToUpdate.map(q => {
-         const originalQuota = pendentesReais.find(x => x.id === q.id) || quotas.find(x => x.id === q.id);
-         const idsAtuais = getMovIdsArray(originalQuota?.movimento_id);
-         const idsFinais = [...new Set([...idsAtuais, ...novosMovimentosIds])]; // Junta sem duplicar
+        const originalQuota = pendentesReais.find(x => x.id === q.id) || quotas.find(x => x.id === q.id);
+        const idsAtuais = parseJsonArray(originalQuota?.movimento_id);
+        const idsFinais = [...new Set([...idsAtuais, ...novosMovimentosIds])];
 
-         return agenciaAvenida.entities.Quota.update(q.id, { 
-            ...q.payload,
-            movimento_id: idsFinais.length > 0 ? idsFinais : null
-         });
+        const recibosAtuais = parseJsonArray(originalQuota?.recibo_url);
+        const recibosFinais = [...recibosAtuais, novaMockUrl];
+
+        return agenciaAvenida.entities.Quota.update(q.id, {
+          ...q.payload,
+          movimento_id: idsFinais.length > 0 ? idsFinais : null,
+          recibo_url: recibosFinais
+        });
       });
 
       const promisesCreates = quotasToCreate.map(qc => {
-         return agenciaAvenida.entities.Quota.create({
-             ...qc,
-             movimento_id: novosMovimentosIds.length > 0 ? novosMovimentosIds : null
-         });
+        return agenciaAvenida.entities.Quota.create({
+          ...qc,
+          movimento_id: novosMovimentosIds.length > 0 ? novosMovimentosIds : null,
+          recibo_url: [novaMockUrl]
+        });
       });
 
       await Promise.all([...promisesUpdates, ...promisesCreates]);
@@ -365,14 +383,24 @@ export default function Quotas() {
       return { wasManual: valorManual > 0 };
     },
     onSuccess: (result) => {
+      // 1. Descobrir quem é o titular ANTES de limpar os filtros
+      let idParaEmail = null;
+      if (pagamentoFiltro === 'condomino') {
+        idParaEmail = pagamentoAlvoId;
+      } else if (pagamentoFiltro === 'fracao') {
+        const f = fracoes.find(x => x.id === pagamentoAlvoId);
+        idParaEmail = getOwners(f)?.[0];
+      }
+
       qc.invalidateQueries({ queryKey: ['quotas'] });
       qc.invalidateQueries({ queryKey: ['movimentos'] });
       qc.invalidateQueries({ queryKey: ['condominios'] });
 
       toast.success('PROCESSAMENTO CONCLUÍDO COM SUCESSO');
-      handleClosePagamento();
-      
-      setOpenRecibo({ isMulti: true, wasManual: result.wasManual });
+      handleClosePagamento(); // Isto limpa o ecrã, mas já guardámos o ID acima!
+
+      // Passamos o ID do titular para o popup do recibo
+      setOpenRecibo({ isMulti: true, wasManual: result.wasManual, titular_id: idParaEmail });
     },
     onError: (error) => toast.error('ERRO NO PROCESSAMENTO: ' + (error?.message || 'ERRO DESCONHECIDO').toUpperCase())
   });
@@ -383,14 +411,14 @@ export default function Quotas() {
 
   const handleOpenConfig = () => { setConfigForm({ ...emptyConfig, condominio_id: selectedCondominioId !== 'all' ? selectedCondominioId : '' }); setOpenConfig(true); };
   const handleOpenNova = () => { setQuotaForm({ ...emptyQuota, condominio_id: selectedCondominioId !== 'all' ? selectedCondominioId : '' }); setOpenNova(true); };
-  const handleClosePagamento = () => { 
-    setOpenPagamento(false); 
-    setPagamentoFiltro('fracao'); 
-    setPagamentoAlvoId(''); 
-    setQuotasSelecionadas([]); 
-    setTipoLiquidacao('total'); 
-    setValorPagoManual("0.00"); 
-    setDataPagamentoForm(format(new Date(), 'yyyy-MM-dd')); 
+  const handleClosePagamento = () => {
+    setOpenPagamento(false);
+    setPagamentoFiltro('fracao');
+    setPagamentoAlvoId('');
+    setQuotasSelecionadas([]);
+    setTipoLiquidacao('total');
+    setValorPagoManual("0.00");
+    setDataPagamentoForm(format(new Date(), 'yyyy-MM-dd'));
   };
 
   const handleSelectFracaoDivida = (fracaoId) => {
@@ -431,6 +459,26 @@ export default function Quotas() {
   useEffect(() => {
     setValorPagoManual(totalSelecionado.toFixed(2));
   }, [totalSelecionado]);
+
+  // Lógica para auto-preencher o e-mail no popup do Recibo
+  let emailRecibo = '';
+  if (openRecibo) {
+    let idTitular = null;
+    if (!openRecibo.isMulti && openRecibo.fracao_id) {
+      // Se abriu pela tabela (Quota única)
+      const fracaoDoRecibo = fracoes.find(f => f.id === openRecibo.fracao_id);
+      idTitular = getOwners(fracaoDoRecibo)?.[0];
+    } else if (openRecibo.isMulti && openRecibo.titular_id) {
+      // Se abriu após efetuar um pagamento
+      idTitular = openRecibo.titular_id;
+    }
+
+    if (idTitular) {
+      emailRecibo = pessoas.find(p => p.id === idTitular)?.email || '';
+    }
+  }
+
+  const arrayRecibosAtual = (!openRecibo?.isMulti && openRecibo) ? parseJsonArray(openRecibo.recibo_url) : [];
 
   return (
     <div className="space-y-6 relative z-10">
@@ -509,12 +557,14 @@ export default function Quotas() {
                 quotasFiltradas.map(q => {
                   const fracao = fracoes.find(f => f.id === q.fracao_id);
                   const descBase = q.tipo === 'mensal' ? 'Quota + FCR' : (q.descricao || 'Quota');
-                  const descFinal = (q.tipo === 'mensal' && q.mes) ? `${descBase} (${mesesExtenso[q.mes-1]} ${q.ano})` : descBase;
+                  const descFinal = (q.tipo === 'mensal' && q.mes) ? `${descBase} (${mesesExtenso[q.mes - 1]} ${q.ano})` : descBase;
                   const displayVencimento = q.data_vencimento || (q.mes ? `${String(q.mes).padStart(2, '0')}/${q.ano}` : 'Sem Limite');
 
                   const diffMinutes = q.created_at ? (new Date() - new Date(q.created_at)) / 60000 : 0;
                   const podeEliminarLinha = q.estado === 'pendente' && q.tipo === 'mensal' && diffMinutes < 10;
-                  const hasReceipt = q.estado === 'pago' || q.valor_pago > 0;
+
+                  const recibosDaQuota = parseJsonArray(q.recibo_url);
+                  const temReciboGuardado = recibosDaQuota.length > 0;
 
                   return (
                     <tr key={q.id} className="hover:bg-muted/30 transition-colors">
@@ -546,17 +596,17 @@ export default function Quotas() {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex justify-center gap-1">
-                          {hasReceipt && (
+                          {temReciboGuardado && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50 cursor-pointer relative z-20" onClick={() => setOpenRecibo(q)} title="Consultar Recibo">
                               <FileText className="w-4 h-4" />
                             </Button>
                           )}
                           {podeEliminarLinha && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-red-500 hover:bg-red-50 cursor-pointer relative z-20" 
-                              onClick={(e) => { e.stopPropagation(); setOpenDelete(q); }} 
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-red-500 hover:bg-red-50 cursor-pointer relative z-20"
+                              onClick={(e) => { e.stopPropagation(); setOpenDelete(q); }}
                               title="Eliminar"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -835,13 +885,13 @@ export default function Quotas() {
             </div>
           </div>
           <DialogFooter className="mt-5 pt-4 border-t border-border gap-2 sm:gap-0">
-             <Button variant="outline" onClick={() => setOpenNova(false)} disabled={lancarLinha.isPending}>Cancelar</Button>
-             <Button 
-                disabled={!quotaForm.condominio_id || !quotaForm.fracao_id || parseFloat(quotaForm.valor || 0) <= 0 || lancarLinha.isPending} 
-                onClick={() => lancarLinha.mutate(quotaForm)}
-             >
-               {lancarLinha.isPending ? 'A Lançar...' : 'Lançar Linha'}
-             </Button>
+            <Button variant="outline" onClick={() => setOpenNova(false)} disabled={lancarLinha.isPending}>Cancelar</Button>
+            <Button
+              disabled={!quotaForm.condominio_id || !quotaForm.fracao_id || parseFloat(quotaForm.valor || 0) <= 0 || lancarLinha.isPending}
+              onClick={() => lancarLinha.mutate(quotaForm)}
+            >
+              {lancarLinha.isPending ? 'A Lançar...' : 'Lançar Linha'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -909,7 +959,7 @@ export default function Quotas() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-muted/20 p-4 rounded-xl border">
               <div>
                 <Label className="text-xs font-bold uppercase tracking-wider">Conta de Destino</Label>
-                <Select value={contaDestino} onValueChange={v => { setContaDestino(v); if(v==='caixa') setMetodoEscolhido('numerario'); else setMetodoEscolhido('transferencia'); }} disabled={!pagamentoAlvoId}>
+                <Select value={contaDestino} onValueChange={v => { setContaDestino(v); if (v === 'caixa') setMetodoEscolhido('numerario'); else setMetodoEscolhido('transferencia'); }} disabled={!pagamentoAlvoId}>
                   <SelectTrigger className="mt-1 bg-background"><SelectValue /></SelectTrigger>
                   <SelectContent className="z-[210]">
                     <SelectItem value="banco">Banco</SelectItem>
@@ -972,7 +1022,7 @@ export default function Quotas() {
                               )}
                               {q.descricao || (q.tipo === 'mensal' ? 'Quota Mensal' : 'Dívida')}
                             </td>
-                            <td className="p-3 text-muted-foreground text-xs">{q.mes ? `${mesesExtenso[q.mes-1]} ${q.ano}` : 'Transitada'}</td>
+                            <td className="p-3 text-muted-foreground text-xs">{q.mes ? `${mesesExtenso[q.mes - 1]} ${q.ano}` : 'Transitada'}</td>
                             <td className={cn("p-3 text-right font-bold", valorEmFalta < 0 ? 'text-blue-600' : '')}>€{valorEmFalta.toFixed(2)}</td>
                           </tr>
                         );
@@ -995,8 +1045,8 @@ export default function Quotas() {
                 <span className="text-xs text-muted-foreground font-medium block mb-1">A Pagar (Valor Final)</span>
                 <div className="flex items-center justify-center sm:justify-start gap-1 text-2xl font-black text-emerald-600">
                   <span>€</span>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     step="0.01"
                     min="0"
                     disabled={!pagamentoAlvoId}
@@ -1021,9 +1071,9 @@ export default function Quotas() {
               </div>
               <div className="flex gap-2 w-full sm:w-auto mt-3 sm:mt-0">
                 <Button variant="outline" className="flex-1 sm:flex-none" onClick={handleClosePagamento} disabled={registarPagamento.isPending}>Cancelar</Button>
-                <Button 
-                  disabled={!pagamentoAlvoId || registarPagamento.isPending || (quotasSelecionadas.length === 0 && (parseFloat(valorPagoManual) || 0) <= 0)} 
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none gap-2" 
+                <Button
+                  disabled={!pagamentoAlvoId || registarPagamento.isPending || (quotasSelecionadas.length === 0 && (parseFloat(valorPagoManual) || 0) <= 0)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none gap-2"
                   onClick={() => registarPagamento.mutate()}
                 >
                   {registarPagamento.isPending ? 'A Processar...' : <><Check className="w-4 h-4" /> Confirmar & Emitir</>}
@@ -1039,49 +1089,42 @@ export default function Quotas() {
         <DialogContent className="w-[92vw] sm:max-w-md max-h-[85vh] overflow-y-auto no-scrollbar rounded-xl p-5 z-[200]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-blue-600" /> Histórico de Recibos / Quitação
+              <FileText className="w-5 h-5 text-blue-600" /> Recibos Associados (Quota)
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 mt-2">
             {openRecibo?.isMulti ? (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground leading-relaxed">Transação concluída. Pretende efetuar o download do documento PDF consolidado desta operação?</p>
-                <Button variant="outline" className="w-full gap-2" onClick={() => { gerarReciboTeste(); toast.success('DOWNLOAD DO RECIBO UNIFICADO CONCLUÍDO'); setOpenRecibo(null); }}>
+                <Button variant="outline" className="w-full gap-2 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100" onClick={() => { gerarReciboTeste(); toast.success('DOWNLOAD DO RECIBO UNIFICADO CONCLUÍDO'); setOpenRecibo(null); }}>
                   <Download className="w-4 h-4" /> Descarregar Recibo Geral
+                </Button>
+              </div>
+            ) : arrayRecibosAtual.length === 1 ? (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">Esta quota possui um recibo de pagamento associado.</p>
+                <Button variant="outline" className="w-full justify-between text-left h-auto py-2.5 px-3 border bg-card" onClick={() => { gerarReciboTeste(); toast.success('DOWNLOAD DO RECIBO INICIADO'); }}>
+                  <div className="flex flex-col">
+                    <span className="text-l font-bold text-foreground">Recibo de Pagamento</span>
+                  </div>
+                  <Download className="w-4 h-4 text-muted-foreground" />
                 </Button>
               </div>
             ) : (
               <div className="space-y-3">
-                 <p className="text-xs text-muted-foreground">Esta faturação possui tranches ou amortizações registadas. Escolha o documento associado:</p>
-                 
-                 <div className="flex flex-col gap-2">
-                   <Button variant="outline" className="w-full justify-between text-left h-auto py-2.5 px-3 border bg-card" onClick={() => { gerarReciboTeste(); toast.success('DOWNLOAD DO RECIBO GERAL UNIFICADO INICIADO'); }}>
+                <p className="text-xs text-muted-foreground">Esta faturação possui pagamentos fracionados ou múltiplos recibos. Escolha o documento associado:</p>
+                <div className="flex flex-col gap-2">
+                  {arrayRecibosAtual.map((url, index) => (
+                    <Button key={index} variant="outline" className="w-full justify-between text-left h-auto py-2.5 px-3 border border-dashed" onClick={() => { gerarReciboTeste(); toast.success(`DOWNLOAD DO RECIBO #${index + 1} INICIADO`); }}>
                       <div className="flex flex-col">
-                        <span className="text-xs font-bold text-foreground">Recibo Geral Unificado (Total)</span>
-                        <span className="text-[10px] text-muted-foreground">Quitação total de €{(openRecibo?.valor || 0).toFixed(2)}</span>
-                      </div>
-                      <Download className="w-4 h-4 text-muted-foreground" />
-                   </Button>
-
-                   <Button variant="outline" className="w-full justify-between text-left h-auto py-2.5 px-3 border border-dashed" onClick={() => { gerarReciboTeste(); toast.success('DOWNLOAD DO RECIBO DA TRANCHE #1 INICIADO'); }}>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-medium text-emerald-700">Recibo Parcial - Tranche #1</span>
-                        <span className="text-[10px] text-muted-foreground">Liquidação inicial de fundos</span>
+                        <span className="text-xs font-medium text-emerald-700">Recibo Parcial #{index + 1}</span>
+                        <span className="text-[10px] text-muted-foreground">Liquidação / Tranche</span>
                       </div>
                       <Download className="w-4 h-4 text-emerald-600" />
-                   </Button>
-
-                   {openRecibo?.valor_pago > 0 && (
-                     <Button variant="outline" className="w-full justify-between text-left h-auto py-2.5 px-3 border border-dashed" onClick={() => { gerarReciboTeste(); toast.success('DOWNLOAD DO RECIBO DA TRANCHE #2 INICIADO'); }}>
-                        <div className="flex flex-col">
-                          <span className="text-xs font-medium text-amber-700">Recibo Parcial - Tranche #2 (Amortização)</span>
-                          <span className="text-[10px] text-muted-foreground">Abatimento corrente na conta-corrente</span>
-                        </div>
-                        <Download className="w-4 h-4 text-amber-600" />
-                     </Button>
-                   )}
-                 </div>
+                    </Button>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -1094,7 +1137,7 @@ export default function Quotas() {
             <div>
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Disponibilizar por Email</Label>
               <div className="flex gap-2 mt-1">
-                <Input defaultValue="condomino@email.com" placeholder="Email do destinatário..." />
+                <Input defaultValue={emailRecibo} placeholder="Inserir e-mail..." />
                 <Button variant="secondary" size="icon" onClick={() => { setOpenRecibo(null); toast.success('DOCUMENTAÇÃO ENVIADA POR E-MAIL'); }}>
                   <Mail className="w-4 h-4" />
                 </Button>
