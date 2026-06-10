@@ -54,11 +54,11 @@ export default function CondominioTopBar({ module }) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const paginasGlobais = ['/pessoas', '/configuracoes', '/condominios/lista'];
+  const paginasGlobais = ['/pessoas', '/configuracoes', '/condominios/lista', "/condominios/assembleias"];
   const mostrarSeletor = module === 'condominios' && !paginasGlobais.includes(location.pathname);
 
   // Visibilidade exclusiva do Ano
-  const paginasComSeletorAno = ['/condominios/quotas', '/condominios/movimentos', '/condominios/ocorrencias', '/condominios/documentos', '/condominios/processos-judiciais', '/condominios/assembleias'];
+  const paginasComSeletorAno = ['/condominios/quotas', '/condominios/movimentos', '/condominios/ocorrencias', '/condominios/documentos', '/condominios/processos-judiciais'];
   const mostrarSeletorAno = module === 'condominios' && paginasComSeletorAno.includes(location.pathname);
 
   // Opções de Anos

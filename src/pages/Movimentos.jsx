@@ -667,7 +667,7 @@ export default function Movimentos() {
             <div className="bg-muted/40 border border-border p-4 rounded-xl flex justify-between items-center">
               <div>
                 <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Saldo Transitado do Ano Anterior</p>
-                <p className="text-xs text-muted-foreground">Saldo à data de 31 de dezembro do ano anterior.</p>
+                <p className="text-xs text-muted-foreground">Contabiliza movimentos cuja data de pagamento seja até 31/12 do ano anterior.</p>
               </div>
               <div className="flex items-center gap-1">
                 <span className="text-lg font-bold">€</span>

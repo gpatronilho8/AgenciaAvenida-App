@@ -200,7 +200,7 @@ export default function Fracoes() {
 
   return (
     <div>
-      <PageHeader title="Frações" subtitle="Gestão de apartamentos e unidades" action={
+      <PageHeader title="Frações" subtitle="Gestão dos apartamentos e outras unidades do condomínio." action={
         <div className="flex items-center gap-4">
            {selectedCondominioId !== 'all' && (
              <div className="bg-muted/50 px-4 py-2 rounded-lg border border-border">

@@ -208,7 +208,7 @@ export default function Pessoas() {
 
   return (
     <div>
-      <PageHeader title="Entidades" subtitle="Gestão global de todas as entidades" action={
+      <PageHeader title="Entidades" subtitle="Gestão global de todas as entidades." action={
         <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />Nova Entidade</Button>
       } />
 

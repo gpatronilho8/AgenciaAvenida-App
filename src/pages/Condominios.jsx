@@ -337,7 +337,7 @@ export default function Condominios() {
 
   return (
     <div>
-      <PageHeader title="Condomínios" subtitle="Condomínios geridos pela Agência Avenida" action={
+      <PageHeader title="Condomínios" subtitle="Gestão de todos os condomínios geridos pela Agência Avenida." action={
         <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />Novo Condomínio</Button>
       } />
 

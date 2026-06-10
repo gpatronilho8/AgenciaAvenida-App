@@ -23,7 +23,9 @@ const tiposOcorrencia = {
   manutencao: 'Manutenção',
   limpeza: 'Limpeza',
   seguranca: 'Segurança',
-  duvidas_faturacao: 'Dúvidas Faturação'
+  duvidas_faturacao: 'Dúvidas Faturação',
+  atualizacao_dados: 'Atualização de Dados',
+  associar_dados: 'Associar Dados Portal Condómino'
 };
 
 const empty = {
@@ -88,7 +90,7 @@ function OcorrenciaPreview({ ocorrencia, condominios, fracoes, pessoas, users, o
     mutationFn: (novasNotas) => agenciaAvenida.entities.Ocorrencia.update(ocorrencia.id, { observacoes: novasNotas }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['ocorrencias'] });
-      toast.success('NOTAS INTERNAS ATUALIZADAS');
+      toast.success('NOTAS INTERNAS ATUALIZADAS COM SUCESSO');
       onClose();
     }
   });
@@ -379,8 +381,8 @@ export default function Ocorrencias() {
 
   return (
     <div className="space-y-6 relative z-10">
-      <PageHeader title="Ocorrências & Contactos" subtitle="Tratamento de ocorrências e apoio ao condómino" action={
-        <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />Nova Ocorrência</Button>
+      <PageHeader title="Ocorrências & Pedidos" subtitle="Tratamento de ocorrências e apoio ao condómino." action={
+        <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />Registar Ocorrência / Pedido</Button>
       } />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -508,7 +510,7 @@ export default function Ocorrencias() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="w-[94vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto no-scrollbar rounded-xl p-6 z-[200]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-amber-500" /> {editing ? 'Editar Ocorrência' : 'Nova Ocorrência'}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-amber-500" /> {editing ? 'Editar Ocorrência / Pedido' : 'Registar Ocorrência / Pedido'}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
 
@@ -525,7 +527,7 @@ export default function Ocorrencias() {
                 <PopoverContent className="p-0 w-[--radix-popover-trigger-width] z-[210]" align="start">
                   <Command>
                     <CommandInput placeholder="Pesquisar condomínio..." />
-                    <CommandEmpty>Condomínio não encontrado.</CommandEmpty>
+                    <CommandEmpty>Condomínio Não Encontrado</CommandEmpty>
                     <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
                       {condominiosAtivos.map(c => (
                         <CommandItem key={c.id} value={`${c.nome} ${c.codigo || ''}`} onSelect={() => { upd('condominio_id', c.id); upd('fracao_id', '__area_comum__'); setComboCondominioOpen(false); }}>
@@ -562,7 +564,7 @@ export default function Ocorrencias() {
                 <PopoverTrigger asChild>
                   <Button variant="outline" role="combobox" aria-expanded={comboReportadaOpen} className="w-full justify-between font-normal bg-background mt-1 text-left">
                     <span className="truncate">
-                      {form.reportada_por ? pessoas.find(p => p.id === form.reportada_por)?.nome : "Administração / Equipa Interna"}
+                      {form.reportada_por ? pessoas.find(p => p.id === form.reportada_por)?.nome : "Agência Avenida"}
                     </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -570,11 +572,11 @@ export default function Ocorrencias() {
                 <PopoverContent className="p-0 w-[--radix-popover-trigger-width] z-[210]" align="start">
                   <Command>
                     <CommandInput placeholder="Pesquisar condómino..." />
-                    <CommandEmpty>Condómino não encontrado.</CommandEmpty>
+                    <CommandEmpty>Condómino Não Encontrado</CommandEmpty>
                     <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
-                      <CommandItem value="Administração / Equipa Interna" onSelect={() => { upd('reportada_por', null); setComboReportadaOpen(false); }}>
+                      <CommandItem value="Agência Avenida" onSelect={() => { upd('reportada_por', null); setComboReportadaOpen(false); }}>
                         <Check className={cn("mr-2 h-4 w-4", !form.reportada_por ? "opacity-100" : "opacity-0")} />
-                        Administração / Equipa Interna
+                        Agência Avenida
                       </CommandItem>
                       {condominosAtivos.map(p => (
                         <CommandItem key={p.id} value={p.nome} onSelect={() => { upd('reportada_por', p.id); setComboReportadaOpen(false); }}>
@@ -697,7 +699,7 @@ export default function Ocorrencias() {
                 <PopoverContent className="p-0 w-[--radix-popover-trigger-width] z-[210]" align="start">
                   <Command>
                     <CommandInput placeholder="Pesquisar fornecedor..." />
-                    <CommandEmpty>Fornecedor não encontrado.</CommandEmpty>
+                    <CommandEmpty>Fornecedor Não Encontrado</CommandEmpty>
                     <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
                       <CommandItem value="" onSelect={() => { upd('fornecedor_id', ''); setComboFornecedorOpen(false); }}>
                         <Check className={cn("mr-2 h-4 w-4", !form.fornecedor_id ? "opacity-100" : "opacity-0")} />
@@ -755,7 +757,7 @@ export default function Ocorrencias() {
           <DialogFooter className="mt-6 pt-4 border-t border-border">
             <Button variant="outline" type="button" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button type="button" onClick={() => save.mutate(form)} disabled={save.isPending || uploading || !form.condominio_id || !form.titulo}>
-              {save.isPending ? 'A guardar...' : 'Guardar Ocorrência'}
+              {save.isPending ? 'A guardar...' : 'Guardar Ocorrência / Pedido'}
             </Button>
           </DialogFooter>
         </DialogContent>
