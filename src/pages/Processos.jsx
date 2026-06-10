@@ -514,7 +514,7 @@ export default function Processos() {
                 <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
                   <Command>
                     <CommandInput placeholder="Pesquisar por nome ou NIF..." />
-                    <CommandEmpty className="py-4 text-center text-sm text-muted-foreground">Cliente não encontrado.</CommandEmpty>
+                    <CommandEmpty className="py-4 text-center text-sm text-muted-foreground">Cliente </CommandEmpty>
                     <CommandGroup className="max-h-48 overflow-y-auto">
                       {clientesList.map((pes) => (
                         <CommandItem key={pes.id} value={`${pes.nome} ${pes.nif || ''}`} onSelect={() => { upd('pessoa_id', pes.id); setOpenCombo(false); }}>

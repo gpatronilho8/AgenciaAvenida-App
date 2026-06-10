@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
-import { Plus, Search, FileText, Download, Trash2, Upload, Printer, Pencil, X, ExternalLink, Check, ChevronsUpDown } from 'lucide-react';
+import { Plus, Search, FileText, Download, Trash2, Upload, Printer, Pencil, X, ExternalLink, Check, ChevronsUpDown, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useCondominio } from '@/lib/CondominioContext';
@@ -36,74 +36,102 @@ const tipoColors = {
   outro: 'bg-muted text-muted-foreground border-border' 
 };
 
-function DocumentoPreview({ doc, condNome, onClose, onEdit }) {
+function DocumentoPreview({ doc, condNome, onClose, onEdit, onDelete }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   const isPdf = doc.ficheiro_url?.toLowerCase().endsWith('.pdf');
   const fileNameRaw = doc.ficheiro_url?.split('/').pop() || '';
   const displayFileName = decodeURIComponent(fileNameRaw.substring(fileNameRaw.indexOf('-') + 1)) || 'Documento Anexo';
 
   return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl no-scrollbar rounded-xl">
-        <div className="flex items-start justify-between mb-4 print:hidden pr-8">
-          <div>
-            <h2 className="text-xl font-bold">{doc.titulo}</h2>
-            <p className="text-sm text-muted-foreground">{condNome} · {doc.data}</p>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            <Button size="sm" variant="outline" className="gap-1" onClick={() => window.print()}>
-              <Printer className="w-3.5 h-3.5" />Imprimir
-            </Button>
-            <Button size="sm" onClick={() => { onClose(); onEdit(doc); }} className="gap-1">
-              <Pencil className="w-3.5 h-3.5" />Editar
-            </Button>
-          </div>
-        </div>
-
-        <div className="bg-muted/40 border border-border rounded-lg p-5 mb-6 space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-primary/10 rounded-xl"><FileText className="w-6 h-6 text-primary" /></div>
+    <>
+      <Dialog open onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl no-scrollbar rounded-xl z-[200]">
+          <div className="flex items-start justify-between mb-4 print:hidden pr-8">
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${tipoColors[doc.tipo] || 'bg-gray-100 text-gray-700'}`}>
-                  {tipoLabels[doc.tipo] || doc.tipo}
-                </span>
-                {doc.publico && <span className="text-xs bg-green-50 text-green-600 border border-green-200 px-2 py-0.5 rounded-full font-semibold">Visível Portal Condóminos</span>}
-              </div>
-              <h3 className="text-lg font-bold text-foreground leading-tight">{doc.titulo}</h3>
+              <h2 className="text-xl font-bold">{doc.titulo}</h2>
+              <p className="text-sm text-muted-foreground">{condNome} · {doc.data}</p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button size="sm" variant="outline" className="gap-1" onClick={() => window.print()}>
+                <Printer className="w-3.5 h-3.5" />Imprimir
+              </Button>
+              <Button size="sm" onClick={() => { onClose(); onEdit(doc); }} className="gap-1">
+                <Pencil className="w-3.5 h-3.5" />Editar
+              </Button>
+              <Button size="sm" variant="destructive" onClick={() => setShowDeleteConfirm(true)} className="gap-1">
+                <Trash2 className="w-3.5 h-3.5" />Eliminar
+              </Button>
             </div>
           </div>
-        </div>
 
-        {doc.descricao && (
-          <div className="mb-6 bg-background border border-border rounded-lg p-4 shadow-sm">
-            <p className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-2">Descrição / Resumo</p>
-            <p className="text-sm text-foreground whitespace-pre-wrap">{doc.descricao}</p>
-          </div>
-        )}
-
-        {doc.ficheiro_url && (
-          <div>
-            <p className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-2">Ficheiro Anexo</p>
-            <a 
-              href={doc.ficheiro_url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-muted/50 transition-colors group"
-            >
-              <div className="flex items-center gap-3 overflow-hidden">
-                {isPdf ? <FileText className="w-8 h-8 text-red-500 shrink-0" /> : <FileText className="w-8 h-8 text-primary shrink-0" />}
-                <span className="text-sm font-medium text-primary group-hover:underline truncate" title={displayFileName}>
-                  {displayFileName}
-                </span>
+          <div className="bg-muted/40 border border-border rounded-lg p-5 mb-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-primary/10 rounded-xl"><FileText className="w-6 h-6 text-primary" /></div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${tipoColors[doc.tipo] || 'bg-gray-100 text-gray-700'}`}>
+                    {tipoLabels[doc.tipo] || doc.tipo}
+                  </span>
+                  {doc.publico && <span className="text-xs bg-green-50 text-green-600 border border-green-200 px-2 py-0.5 rounded-full font-semibold">Visível Portal Condóminos</span>}
+                </div>
+                <h3 className="text-lg font-bold text-foreground leading-tight">{doc.titulo}</h3>
               </div>
-              <Button size="sm" variant="secondary" className="shrink-0 gap-1.5 ml-2 pointer-events-none">
-                <Download className="w-3.5 h-3.5" /> Descarregar
-              </Button>
-            </a>
+            </div>
           </div>
-        )}
-      </DialogContent>
-    </Dialog>
+
+          {doc.descricao && (
+            <div className="mb-6 bg-background border border-border rounded-lg p-4 shadow-sm">
+              <p className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-2">Descrição / Resumo</p>
+              <p className="text-sm text-foreground whitespace-pre-wrap">{doc.descricao}</p>
+            </div>
+          )}
+
+          {doc.ficheiro_url && (
+            <div>
+              <p className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-2">Ficheiro Anexo</p>
+              <a 
+                href={doc.ficheiro_url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-muted/50 transition-colors group"
+              >
+                <div className="flex items-center gap-3 overflow-hidden">
+                  {isPdf ? <FileText className="w-8 h-8 text-red-500 shrink-0" /> : <FileText className="w-8 h-8 text-primary shrink-0" />}
+                  <span className="text-sm font-medium text-primary group-hover:underline truncate" title={displayFileName}>
+                    {displayFileName}
+                  </span>
+                </div>
+                <Button size="sm" variant="secondary" className="shrink-0 gap-1.5 ml-2 pointer-events-none">
+                  <Download className="w-3.5 h-3.5" /> Descarregar
+                </Button>
+              </a>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* POPUP DE CONFIRMAÇÃO DE ELIMINAÇÃO (Dentro do Preview) */}
+      {showDeleteConfirm && (
+        <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <DialogContent className="max-w-md z-[300]">
+            <DialogHeader>
+              <DialogTitle className="text-red-600 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" /> Confirmar Eliminação
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-2">
+              <p className="text-sm text-foreground">Tem a certeza que deseja eliminar este documento?</p>
+              <p className="text-sm text-muted-foreground mt-2">Esta ação apagará permanentemente o documento do sistema e o ficheiro anexo deixará de estar acessível. <strong>Esta ação é irreversível.</strong></p>
+            </div>
+            <DialogFooter className="mt-4">
+              <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>Cancelar</Button>
+              <Button variant="destructive" onClick={() => { setShowDeleteConfirm(false); onClose(); onDelete(doc.id); }}>Eliminar Definitivamente</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 }
 
@@ -113,6 +141,8 @@ export default function Documentos() {
   const [preview, setPreview] = useState(null);
   const [form, setForm] = useState(empty);
   const [editing, setEditing] = useState(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null); // Estado para a eliminação na lista
+
   const { selectedCondominioId, selectedAno } = useCondominio();
   const [search, setSearch] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -134,7 +164,11 @@ export default function Documentos() {
   });
 
   const openNew = () => { 
-    setForm({ ...empty, condominio_id: selectedCondominioId === 'all' ? '' : selectedCondominioId }); 
+    setForm({ 
+      ...empty, 
+      condominio_id: selectedCondominioId === 'all' ? '' : selectedCondominioId,
+      data: format(new Date(), 'yyyy-MM-dd')
+    }); 
     setEditing(null); 
     setOpen(true); 
   };
@@ -206,7 +240,7 @@ export default function Documentos() {
                   <button onClick={() => openEdit(d)} className="p-1.5 hover:bg-muted rounded transition-colors" title="Editar">
                     <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
                   </button>
-                  <button onClick={() => del.mutate(d.id)} className="p-1.5 hover:bg-red-50 rounded transition-colors">
+                  <button onClick={() => setDeleteConfirmId(d.id)} className="p-1.5 hover:bg-red-50 rounded transition-colors">
                     <Trash2 className="w-3.5 h-3.5 text-red-400" />
                   </button>
                 </div>
@@ -228,7 +262,15 @@ export default function Documentos() {
         )}
       </div>
 
-      {preview && <DocumentoPreview doc={preview} condNome={getCondName(preview.condominio_id)} onClose={() => setPreview(null)} onEdit={(d) => { setPreview(null); openEdit(d); }} />}
+      {preview && (
+        <DocumentoPreview 
+          doc={preview} 
+          condNome={getCondName(preview.condominio_id)} 
+          onClose={() => setPreview(null)} 
+          onEdit={(d) => { setPreview(null); openEdit(d); }} 
+          onDelete={(id) => { setPreview(null); del.mutate(id); }}
+        />
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto no-scrollbar rounded-xl">
@@ -251,7 +293,7 @@ export default function Documentos() {
                 <PopoverContent className="p-0 w-[--radix-popover-trigger-width] z-[210]" align="start">
                   <Command>
                     <CommandInput placeholder="Pesquisar condomínio..." />
-                    <CommandEmpty>Condomínio não encontrado.</CommandEmpty>
+                    <CommandEmpty>Condomínio Não Encontrado</CommandEmpty>
                     <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
                       {condominiosAtivos.map(c => (
                         <CommandItem key={c.id} value={`${c.nome} ${c.codigo || ''}`} onSelect={() => { upd('condominio_id', c.id); setComboCondominioOpen(false); }}>
@@ -334,6 +376,27 @@ export default function Documentos() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* POPUP DE CONFIRMAÇÃO DE ELIMINAÇÃO (VISTA DE LISTA) */}
+      {deleteConfirmId && (
+        <Dialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+          <DialogContent className="max-w-md z-[300]">
+            <DialogHeader>
+              <DialogTitle className="text-red-600 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" /> Confirmar Eliminação
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-2">
+              <p className="text-sm text-foreground">Tem a certeza que deseja eliminar este documento?</p>
+              <p className="text-sm text-muted-foreground mt-2">Esta ação apagará permanentemente o documento do sistema e o ficheiro anexo deixará de estar acessível. <strong>Esta ação é irreversível.</strong></p>
+            </div>
+            <DialogFooter className="mt-4">
+              <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>Cancelar</Button>
+              <Button variant="destructive" onClick={() => { del.mutate(deleteConfirmId); setDeleteConfirmId(null); }}>Eliminar Definitivamente</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

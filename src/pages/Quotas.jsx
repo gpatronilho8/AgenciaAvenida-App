@@ -233,11 +233,12 @@ export default function Quotas() {
 
       let creditosDisponiveis = Math.abs(creditosSelecionados.reduce((acc, q) => acc + q.valor, 0));
       let dinheiroManualDisponivel = valorManual;
-      const promises = [];
+      
       const splitMovimentos = {};
+      const quotasToUpdate = []; // Vamos guardar as intenções de update em vez de executar já
 
       for (const c of creditosSelecionados) {
-        promises.push(agenciaAvenida.entities.Quota.update(c.id, { estado: 'pago', data_pagamento: dataPagamentoForm }));
+        quotasToUpdate.push({ id: c.id, payload: { estado: 'pago', data_pagamento: dataPagamentoForm } });
       }
 
       for (const d of debitosOrdenados) {
@@ -261,36 +262,38 @@ export default function Quotas() {
 
         const valorPagoAcumulado = d.valor - emFalta;
         if (emFalta <= 0.005) {
-          promises.push(agenciaAvenida.entities.Quota.update(d.id, { estado: 'pago', valor_pago: d.valor, data_pagamento: dataPagamentoForm }));
+          quotasToUpdate.push({ id: d.id, payload: { estado: 'pago', valor_pago: d.valor, data_pagamento: dataPagamentoForm } });
         } else {
-          promises.push(agenciaAvenida.entities.Quota.update(d.id, { valor_pago: valorPagoAcumulado, data_pagamento: dataPagamentoForm }));
+          quotasToUpdate.push({ id: d.id, payload: { valor_pago: valorPagoAcumulado, data_pagamento: dataPagamentoForm } });
         }
       }
 
+      const quotasToCreate = [];
       if (dinheiroManualDisponivel > 0.005 && idFracao) {
          const targetCondId = primeiraQuota?.condominio_id || selectedCondominioId;
          const existingCredit = quotas.find(q => q.fracao_id === idFracao && q.tipo === 'linha_faturacao_credito' && q.estado === 'pendente' && !quotasSelecionadas.includes(q.id));
          
          if (existingCredit) {
-            promises.push(agenciaAvenida.entities.Quota.update(existingCredit.id, { valor: existingCredit.valor - dinheiroManualDisponivel, data_pagamento: dataPagamentoForm }));
+            quotasToUpdate.push({ id: existingCredit.id, payload: { valor: existingCredit.valor - dinheiroManualDisponivel, data_pagamento: dataPagamentoForm } });
          } else {
-            promises.push(agenciaAvenida.entities.Quota.create({
+            quotasToCreate.push({
                 condominio_id: targetCondId, fracao_id: idFracao, tipo: 'linha_faturacao_credito',
                 descricao: 'Crédito (Pagamento Não Alocado)', valor: -dinheiroManualDisponivel,
                 mes: null, ano: null, data_emissao: dataPagamentoForm, data_pagamento: dataPagamentoForm, data_vencimento: null, estado: 'pendente'
-            }));
+            });
          }
 
          if (!splitMovimentos[targetCondId]) splitMovimentos[targetCondId] = {};
          splitMovimentos[targetCondId]['linha_faturacao_credito'] = (splitMovimentos[targetCondId]['linha_faturacao_credito'] || 0) + dinheiroManualDisponivel;
       }
 
-      await Promise.all(promises);
-
-      // Injeção Multi-Condomínio em Tesouraria baseada na data escolhida
+      // ====================================================================
+      // 1. CRIAR OS MOVIMENTOS PRIMEIRO E GUARDAR OS IDs
+      // ====================================================================
+      const novosMovimentosIds = [];
+      
       if (valorManual > 0) {
         for (const [condId, dataTipos] of Object.entries(splitMovimentos)) {
-          
           const fracaoObj = fracoes.find(f => f.id === idFracao);
           const condObj = condominios.find(c => c.id === condId);
           
@@ -299,9 +302,7 @@ export default function Quotas() {
             nomePagador = pessoas.find(p => p.id === pagamentoAlvoId)?.nome || 'Desconhecido';
           } else if (fracaoObj) {
             const ownerIds = getOwners(fracaoObj);
-            if (ownerIds.length > 0) {
-              nomePagador = pessoas.find(p => p.id === ownerIds[0])?.nome || 'Desconhecido';
-            }
+            if (ownerIds.length > 0) nomePagador = pessoas.find(p => p.id === ownerIds[0])?.nome || 'Desconhecido';
           }
 
           const textoFracao = fracaoObj ? formatFracao(fracaoObj) : 'N/A';
@@ -315,17 +316,13 @@ export default function Quotas() {
             else if (tipoFaturacao === 'linha_faturacao_divida') { catMov = 'recuperacao_divida'; descMov = 'Pagamento de Dívidas'; }
             else if (tipoFaturacao === 'linha_faturacao_credito') { catMov = 'acerto_contabilistico'; descMov = 'Pagamento Não Alocado'; }
 
-            await agenciaAvenida.entities.Movimento.create({
-              condominio_id: condId,
-              tipo: 'receita', 
-              categoria: catMov,
-              descricao: descMov,
-              valor: montanteReal,
-              data: dataPagamentoForm, 
-              conta: contaDestino,
+            const novoMov = await agenciaAvenida.entities.Movimento.create({
+              condominio_id: condId, tipo: 'receita', categoria: catMov, descricao: descMov,
+              valor: montanteReal, data: dataPagamentoForm, conta: contaDestino,
               metodo_pagamento: metodoEscolhido,
               observacoes: `Fração: ${textoFracao} · Condomínio: ${textoCondominio} · Pagador: ${nomePagador}`
             });
+            novosMovimentosIds.push(novoMov.id);
           }
           
           const condToUpdate = condominios.find(c => c.id === condId);
@@ -335,6 +332,36 @@ export default function Quotas() {
           }
         }
       }
+
+      // ====================================================================
+      // 2. ATUALIZAR AS QUOTAS COM OS IDs GERADOS
+      // ====================================================================
+      const getMovIdsArray = (quotaIdsStr) => {
+         if (!quotaIdsStr) return [];
+         if (Array.isArray(quotaIdsStr)) return quotaIdsStr;
+         try { return JSON.parse(quotaIdsStr); } catch { return [quotaIdsStr]; }
+      };
+
+      const promisesUpdates = quotasToUpdate.map(q => {
+         const originalQuota = pendentesReais.find(x => x.id === q.id) || quotas.find(x => x.id === q.id);
+         const idsAtuais = getMovIdsArray(originalQuota?.movimento_id);
+         const idsFinais = [...new Set([...idsAtuais, ...novosMovimentosIds])]; // Junta sem duplicar
+
+         return agenciaAvenida.entities.Quota.update(q.id, { 
+            ...q.payload,
+            movimento_id: idsFinais.length > 0 ? idsFinais : null
+         });
+      });
+
+      const promisesCreates = quotasToCreate.map(qc => {
+         return agenciaAvenida.entities.Quota.create({
+             ...qc,
+             movimento_id: novosMovimentosIds.length > 0 ? novosMovimentosIds : null
+         });
+      });
+
+      await Promise.all([...promisesUpdates, ...promisesCreates]);
+
       return { wasManual: valorManual > 0 };
     },
     onSuccess: (result) => {
@@ -619,7 +646,7 @@ export default function Quotas() {
                 <PopoverContent className="p-0 w-[--radix-popover-trigger-width] z-[210]" align="start">
                   <Command>
                     <CommandInput placeholder="Pesquisar condomínio..." />
-                    <CommandEmpty>Condomínio não encontrado.</CommandEmpty>
+                    <CommandEmpty>Condomínio Não Encontrado</CommandEmpty>
                     <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
                       {condominiosAtivos.map(c => (
                         <CommandItem key={c.id} value={`${c.nome} ${c.codigo || ''}`} onSelect={() => { updConfig('condominio_id', c.id); setComboCondominioOpen(false); }}>

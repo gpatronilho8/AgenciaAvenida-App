@@ -143,8 +143,10 @@ export default function Movimentos() {
 
   const executarEstorno = useMutation({
     mutationFn: async (mov) => {
+      // 1. Elimina o movimento
       await agenciaAvenida.entities.Movimento.delete(mov.id);
 
+      // 2. Repõe o saldo na conta do condomínio
       const cond = condominios.find(c => c.id === mov.condominio_id);
       if (cond) {
         const saldoField = mov.conta === 'banco' ? 'saldo_banco' : 'saldo_caixa';
@@ -152,30 +154,53 @@ export default function Movimentos() {
         await agenciaAvenida.entities.Condominio.update(cond.id, { [saldoField]: (cond[saldoField] || 0) + change });
       }
 
+      // 3. Estorno cirúrgico das Quotas com JSONB
       if (mov.tipo === 'receita') {
         const allQuotas = await agenciaAvenida.entities.Quota.list();
-        const quotasAEstornar = allQuotas.filter(q =>
-          q.condominio_id === mov.condominio_id &&
-          (q.estado === 'pago' || q.valor_pago > 0)
-        );
+        
+        // Helper para garantir que lemos sempre um array, mesmo que o campo esteja vazio
+        const getMovIds = (quota) => {
+          if (!quota.movimento_id) return [];
+          if (Array.isArray(quota.movimento_id)) return quota.movimento_id;
+          try { return JSON.parse(quota.movimento_id); } catch { return [quota.movimento_id]; }
+        };
+
+        // Encontra EXATAMENTE as quotas onde este movimento está incluído na lista de pagamentos
+        const quotasAEstornar = allQuotas.filter(q => getMovIds(q).includes(mov.id));
 
         const promises = quotasAEstornar.map(q => {
           if (q.tipo === 'linha_faturacao_credito') {
             return agenciaAvenida.entities.Quota.delete(q.id);
           }
 
-          let novoEstado = 'pendente';
-          if (q.tipo === 'linha_faturacao_divida') {
-            novoEstado = 'vencida';
-          } else if (q.data_vencimento) {
-            const dataVenc = new Date(q.data_vencimento);
-            const hoje = new Date();
-            hoje.setHours(0, 0, 0, 0);
-            if (dataVenc < hoje) {
+          const currentMovIds = getMovIds(q);
+          // Remove apenas o ID do movimento que estamos a anular
+          const updatedMovIds = currentMovIds.filter(id => id !== mov.id);
+
+          // Subtrai o valor deste movimento específico ao total pago da quota (evitando valores negativos)
+          const novoValorPago = Math.max(0, (q.valor_pago || 0) - (mov.valor || 0));
+
+          let novoEstado = q.estado;
+
+          // Se, após remover este movimento, a quota ficar sem pagamentos associados, reverte para pendente/vencida
+          if (updatedMovIds.length === 0 || novoValorPago === 0) {
+            novoEstado = 'pendente';
+            if (q.tipo === 'linha_faturacao_divida') {
               novoEstado = 'vencida';
+            } else if (q.data_vencimento) {
+              const dataVenc = new Date(q.data_vencimento);
+              const hoje = new Date();
+              hoje.setHours(0, 0, 0, 0);
+              if (dataVenc < hoje) novoEstado = 'vencida';
             }
           }
-          return agenciaAvenida.entities.Quota.update(q.id, { estado: novoEstado, valor_pago: 0 });
+
+          // Atualiza a quota com a nova lista limpa e os valores corrigidos
+          return agenciaAvenida.entities.Quota.update(q.id, { 
+            estado: novoEstado, 
+            valor_pago: novoValorPago,
+            movimento_id: updatedMovIds 
+          });
         });
 
         await Promise.all(promises);
@@ -186,9 +211,9 @@ export default function Movimentos() {
       qc.invalidateQueries({ queryKey: ['condominios'] });
       qc.invalidateQueries({ queryKey: ['quotas'] });
       setOpenEstorno(null);
-      toast.success('MOVIMENTO ELIMINADO E CONTAS RESTAURADAS COM SUCESSO.');
+      toast.success('PAGAMENTO ANULADO E QUOTAS RESTAURADAS COM SUCESSO.');
     },
-    onError: (e) => toast.error('ERRO NO ESTORNO ' + (e?.message || 'ERRO DESCONHECIDO').toUpperCase())
+    onError: (e) => toast.error('ERRO NO ESTORNO: ' + (e?.message || 'ERRO DESCONHECIDO').toUpperCase())
   });
 
   const upd = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -519,7 +544,7 @@ export default function Movimentos() {
                 <PopoverContent className="p-0 w-[--radix-popover-trigger-width] z-[210]" align="start">
                   <Command>
                     <CommandInput placeholder="Pesquisar condomínio por nome ou CXX..." />
-                    <CommandEmpty>Condomínio não encontrado.</CommandEmpty>
+                    <CommandEmpty>Condomínio Não Encontrado</CommandEmpty>
                     <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
                       {condominiosAtivos.map(c => (
                         <CommandItem key={c.id} value={`${c.nome} ${c.codigo || ''}`} onSelect={() => { upd('condominio_id', c.id); setComboCondominioOpen(false); }}>

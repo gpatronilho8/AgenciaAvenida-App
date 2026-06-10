@@ -36,7 +36,6 @@ const empty = {
 const estadoColors = {
   agendada: 'bg-blue-100 text-blue-700 border-blue-200',
   realizada: 'bg-green-100 text-green-700 border-green-200',
-  cancelada: 'bg-red-100 text-red-700 border-red-200',
 };
 
 // ==============================================================================
@@ -91,7 +90,7 @@ function AssembleiaPreview({ assembleia, condNome, onClose, onEdit, onDelete, on
                   <span className="text-xs bg-muted text-muted-foreground border border-border px-2 py-0.5 rounded-full font-semibold capitalize">
                     {assembleia.tipo}
                   </span>
-                  {assembleia.portal_visivel && <span className="text-xs bg-green-50 text-green-600 border border-green-200 px-2 py-0.5 rounded-full font-semibold">Visível no Portal</span>}
+                  {assembleia.portal_visivel && <span className="text-xs bg-green-50 text-green-600 border border-green-200 px-2 py-0.5 rounded-full font-semibold">Visível em Portal Condóminos</span>}
                 </div>
                 <h3 className="text-lg font-bold text-foreground leading-tight">{assembleia.titulo}</h3>
               </div>
@@ -187,7 +186,7 @@ function AssembleiaPreview({ assembleia, condNome, onClose, onEdit, onDelete, on
         </DialogContent>
       </Dialog>
 
-      {/* POPUP DE CONFIRMAÇÃO DE ELIMINAÇÃO */}
+      {/* POPUP DE CONFIRMAÇÃO DE ELIMINAÇÃO (Dentro da Preview) */}
       {showDeleteConfirm && (
         <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
           <DialogContent className="max-w-md">
@@ -234,7 +233,7 @@ function PrepararAtaModal({ assembleia, onClose }) {
       } else {
         toast.success('RASCUNHO GUARDADO COM SUCESSO');
       }
-      onClose(); // Navega de volta para o Preview
+      onClose(); 
     },
     onError: (e) => toast.error('ERRO: ' + (e?.message || 'ERRO DESCONHECIDO').toUpperCase())
   });
@@ -271,14 +270,14 @@ function PrepararAtaModal({ assembleia, onClose }) {
       const urlAssinaturas = await processAssinaturasUpload();
 
       toast.info('A COMPILAR DOCUMENTO FINAL...');
-      await new Promise(r => setTimeout(r, 1000)); // Delay falso para UI
+      await new Promise(r => setTimeout(r, 1000)); 
       const dummyAtaPdf = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
 
       saveAta.mutate({
         ata_texto: texto,
         assinaturas_url: urlAssinaturas,
         ata_pdf_url: dummyAtaPdf,
-        estado: 'realizada' // Conclui a assembleia
+        estado: 'realizada' 
       });
     } catch (error) {
       console.error(error);
@@ -296,7 +295,7 @@ function PrepararAtaModal({ assembleia, onClose }) {
 
         <div className="space-y-4 mt-2">
           <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm px-4 py-3 rounded-xl mb-2">
-            <p>Pode <strong>gravar como rascunho</strong> em qualquer altura. Apenas quando clicar em "Compilar e Gerar Ata" o PDF oficial será criado e a assembleia passará ao estado "Realizada".</p>
+            <p>Pode <strong>gravar como rascunho</strong> em qualquer altura. Apenas quando clicar em "Compilar e Gerar Ata" o documento será criado e a assembleia passará ao estado "Realizada".</p>
           </div>
 
           <div>
@@ -312,7 +311,7 @@ function PrepararAtaModal({ assembleia, onClose }) {
           <div className="border border-border rounded-xl p-4 bg-muted/20">
             <div className="flex items-center gap-2 mb-3">
               <input type="checkbox" id="anexar_ass" checked={anexarAssinaturas} onChange={e => setAnexarAssinaturas(e.target.checked)} className="rounded text-primary focus:ring-primary w-4 h-4 cursor-pointer" />
-              <Label htmlFor="anexar_ass" className="font-bold cursor-pointer">Anexar folha de presenças / assinaturas digitalizada?</Label>
+              <Label htmlFor="anexar_ass" className="font-bold cursor-pointer">Anexar folha de assinaturas digitalizada?</Label>
             </div>
 
             {anexarAssinaturas && (
@@ -341,10 +340,10 @@ function PrepararAtaModal({ assembleia, onClose }) {
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Button variant="secondary" onClick={handleGravarRascunho} disabled={isGenerating || isSavingDraft} className="gap-2 font-semibold">
               {isSavingDraft ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              GRAVAR RASCUNHO
+              Gravar Rascunho
             </Button>
             <Button onClick={handleGerarAta} disabled={isGenerating || isSavingDraft || (anexarAssinaturas && !assinaturasFile) || !texto}>
-              {isGenerating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> A GERAR PDF...</> : 'COMPILAR E GERAR ATA'}
+              {isGenerating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> A gerar documento...</> : 'Compilar e Gerar Ata'}
             </Button>
           </div>
         </DialogFooter>
@@ -365,6 +364,7 @@ export default function Assembleias() {
 
   const [previewId, setPreviewId] = useState(null);
   const [ataProcId, setAtaProcId] = useState(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null); // ESTADO PARA VISTA LISTA
 
   const [search, setSearch] = useState('');
   const [triggerToday, setTriggerToday] = useState(0);
@@ -405,15 +405,14 @@ export default function Assembleias() {
     onError: (e) => toast.error('ERRO AO ELIMINAR: ' + (e?.message || 'ERRO DESCONHECIDO').toUpperCase())
   });
 
+  const getCondName = (id) => condominios.find(c => c.id === id)?.nome || '-';
+
   const filtered = useMemo(() => assembleias.filter(a => {
-    const matchSearch = !search || a.titulo?.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = !search || a.titulo?.toLowerCase().includes(search.toLowerCase()) || getCondName(a.condominio_id)?.toLowerCase().includes(search.toLowerCase());
     return matchSearch;
   }), [assembleias, search]);
 
-  const getCondName = (id) => condominios.find(c => c.id === id)?.nome || '-';
-
   const openNew = (dataSelecionada) => {
-    // Se vier uma data do calendário, usa-a. Senão, usa a data de hoje.
     const dataInicial = (dataSelecionada && dataSelecionada instanceof Date)
       ? format(dataSelecionada, 'yyyy-MM-dd')
       : format(new Date(), 'yyyy-MM-dd');
@@ -483,7 +482,7 @@ export default function Assembleias() {
       <div className="bg-card rounded-xl border border-border shadow-sm p-4 flex mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input className="pl-9 bg-background w-full" placeholder="Pesquisar assembleia por título em toda a agência..." value={search} onChange={e => setSearch(e.target.value)} />
+          <Input className="pl-9 bg-background w-full" placeholder="Pesquisar assembleia por título ou condomínio..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
       </div>
 
@@ -507,6 +506,15 @@ export default function Assembleias() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="p-2.5 bg-primary/10 rounded-xl shrink-0">
                     <Users className="w-5 h-5 text-primary" />
+                  </div>
+                  {/* ALTERAÇÃO: BOTÕES DA VISTA DE LISTA */}
+                  <div className="flex gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => openEdit(a)} className="p-1.5 hover:bg-muted rounded transition-colors">
+                      <Edit className="w-3.5 h-3.5 text-muted-foreground" />
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(a.id); }} className="p-1.5 hover:bg-red-50 rounded transition-colors">
+                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                    </button>
                   </div>
                 </div>
 
@@ -668,13 +676,13 @@ export default function Assembleias() {
               </div>
               <div className="flex items-center gap-2 mt-7">
                 <input type="checkbox" id="publico" checked={form.portal_visivel} onChange={e => upd('portal_visivel', e.target.checked)} className="rounded text-primary focus:ring-primary w-4 h-4 cursor-pointer" />
-                <Label htmlFor="publico" className="cursor-pointer">Visível no portal dos condóminos</Label>
+                <Label htmlFor="publico" className="cursor-pointer">Visível em Portal Condóminos</Label>
               </div>
             </div>
 
             <div>
               <Label>Notas Internas (Privado)</Label>
-              <textarea className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-y" placeholder="Anotações para a equipa..." value={form.notas || ''} onChange={e => upd('notas', e.target.value)} />
+              <textarea className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-y" placeholder="Escreva ou edite anotações exclusivas para a equipa..." value={form.notas || ''} onChange={e => upd('notas', e.target.value)} />
             </div>
 
           </div>
@@ -692,6 +700,27 @@ export default function Assembleias() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* POPUP DE CONFIRMAÇÃO DE ELIMINAÇÃO (LISTA) */}
+      {deleteConfirmId && (
+        <Dialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-red-600 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" /> Confirmar Eliminação
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-2">
+              <p className="text-sm text-foreground">Tem a certeza que deseja eliminar esta assembleia?</p>
+              <p className="text-sm text-muted-foreground mt-2">Esta ação irá apagar a respetiva convocatória, a ata (incluindo rascunhos) e qualquer conteúdo associado. Também irá eliminar a convocatória do Portal do Condómino (se estiver atualmente publicada). <strong>Esta ação é irreversível.</strong></p>
+            </div>
+            <DialogFooter className="mt-4">
+              <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>Cancelar</Button>
+              <Button variant="destructive" onClick={() => { del.mutate(deleteConfirmId); setDeleteConfirmId(null); }}>Eliminar Definitivamente</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

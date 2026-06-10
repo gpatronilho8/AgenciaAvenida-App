@@ -653,7 +653,7 @@ export default function Ocorrencias() {
             {/* SE CANAL PORTAL -> MOSTRA CAIXA RESPOSTA AO CLIENTE */}
             {form.canal_submissao === 'portal_condomino' && (
               <div className="sm:col-span-2 bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3 mt-2">
-                <Label className="text-blue-800 font-bold flex items-center gap-1.5"><Send className="w-4 h-4" /> Resposta ao Condómino (Visível no Portal)</Label>
+                <Label className="text-blue-800 font-bold flex items-center gap-1.5"><Send className="w-4 h-4" /> Resposta ao Condómino (Visível em Portal Condóminos)</Label>
                 <textarea
                   className="w-full rounded-md border border-blue-300 bg-white px-3 py-2 text-sm min-h-[80px] resize-y focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   value={form.resposta_cliente || ''}
