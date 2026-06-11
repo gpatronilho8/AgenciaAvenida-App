@@ -12,20 +12,20 @@ import ModuleLayout from '@/components/layout/ModuleLayout';
 import Hub from '@/pages/Hub';
 
 // Condomínios module
-import CondominiosDashboard from '@/pages/condominios/CondominiosDashboard';
+import CondominiosDashboard from '@/pages/CondominiosDashboard';
 import Condominios from '@/pages/Condominios';
 import Fracoes from '@/pages/Fracoes';
 import Quotas from '@/pages/Quotas';
 import Ocorrencias from '@/pages/Ocorrencias';
 import Documentos from '@/pages/Documentos';
-import ProcessosJudiciais from '@/pages/condominios/ProcessosJudiciais';
+import ProcessosJudiciais from '@/pages/ProcessosJudiciais';
 import Movimentos from '@/pages/Movimentos';
-import Assembleias from '@/pages/condominios/Assembleias';
+import Assembleias from '@/pages/Assembleias';
 
 // Propriedades module
-import PropriedadesDashboard from '@/pages/propriedades/PropriedadesDashboard';
-import PropriedadesLista from '@/pages/propriedades/PropriedadesLista';
-import Rendas from '@/pages/propriedades/Rendas';
+import PropriedadesDashboard from '@/pages/PropriedadesDashboard';
+import PropriedadesLista from '@/pages/PropriedadesLista';
+import Rendas from '@/pages/Rendas';
 
 // Processos module
 import Processos from '@/pages/Processos';

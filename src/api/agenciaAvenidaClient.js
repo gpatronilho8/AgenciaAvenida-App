@@ -5,6 +5,8 @@ const tableMap = {
   Condominio: 'condominios',
   Assembleia: 'assembleias',
   ConfiguracaoQuota: 'configuracao_quotas',
+  ComunicacaoLog: 'comunicacoes_logs',
+  Versao: 'versoes',
   Despesa: 'despesas',
   DespesaPropriedade: 'despesas_propriedades', 
   Documento: 'documentos',
@@ -22,8 +24,16 @@ const tableMap = {
 
 // 2. O MOTOR AUTOMÁTICO (Faz as operações CRUD para qualquer tabela)
 const createEntityMethods = (tableName) => ({
-  list: async () => {
-    const { data, error } = await supabase.from(tableName).select('*');
+  // Adicionado suporte para ordernar (ex: list('-created_at'))
+  list: async (orderParams) => {
+    let query = supabase.from(tableName).select('*');
+    
+    // Se passarmos '-created_at', ele ordena de forma descendente
+    if (typeof orderParams === 'string' && orderParams.startsWith('-')) {
+      query = query.order(orderParams.substring(1), { ascending: false });
+    }
+    
+    const { data, error } = await query;
     if (error) { console.error(`Erro a carregar ${tableName}:`, error); return []; }
     return data || [];
   },
@@ -35,6 +45,12 @@ const createEntityMethods = (tableName) => ({
   findOne: async (id) => {
     const { data, error } = await supabase.from(tableName).select('*').eq('id', id).single();
     if (error) { console.error(`Erro a encontrar em ${tableName}:`, error); return null; }
+    return data;
+  },
+  // Alias 'get' para manter a compatibilidade com a sintaxe usada nas Configurações
+  get: async (id) => {
+    const { data, error } = await supabase.from(tableName).select('*').eq('id', id).single();
+    if (error) { console.error(`Erro a obter de ${tableName}:`, error); return null; }
     return data;
   },
   create: async (payload) => {

@@ -5,7 +5,7 @@ import {
   Receipt, AlertTriangle, FileText, Settings,
   Menu, X, ChevronLeft, HomeIcon, Layers, Scale, CalendarDays
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const LOGO_URL = "/aa_white.png";
 
@@ -44,8 +44,22 @@ export default function ModuleSidebar({ module }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const navItems = navByModule[module] || [];
-  const colors = moduleColors[module] || moduleColors.condominios;
+
+  // 1. Guarda na memória sempre que navegas num módulo central
+  useEffect(() => {
+    if (['condominios', 'propriedades', 'processos'].includes(module)) {
+      localStorage.setItem('lastActiveModule', module);
+    }
+  }, [module]);
+
+  // 2. Decide qual módulo exibir (Lê a memória se estivermos nas configurações)
+  const isSettings = location.pathname.startsWith('/configuracoes');
+  const displayModule = isSettings 
+    ? (localStorage.getItem('lastActiveModule') || 'condominios') 
+    : (module || 'condominios');
+
+  const navItems = navByModule[displayModule] || [];
+  const colors = moduleColors[displayModule] || moduleColors.condominios;
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -63,7 +77,7 @@ export default function ModuleSidebar({ module }) {
         </div>
       </div>
 
-      {/* Nav - AQUI ESTÁ A CLASSE no-scrollbar */}
+      {/* Nav */}
       <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto no-scrollbar">
         {navItems.map(({ label, icon: Icon, path }) => {
           const isActive = location.pathname === path;
@@ -97,9 +111,14 @@ export default function ModuleSidebar({ module }) {
         </button>
         <Link
           to="/configuracoes"
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all"
+          className={cn(
+            'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+            isSettings 
+              ? 'bg-sidebar-primary/20 text-sidebar-primary' 
+              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+          )}
         >
-          <Settings className="w-4 h-4" />
+          <Settings className={cn('w-4 h-4', isSettings ? 'text-sidebar-primary' : '')} />
           Configurações
         </Link>
       </div>
