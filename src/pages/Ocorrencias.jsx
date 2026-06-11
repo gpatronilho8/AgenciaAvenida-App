@@ -19,13 +19,14 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 const tiposOcorrencia = {
-  avaria: 'Avaria',
+  avaria: 'Avaria ou Reparação Técnica',
   manutencao: 'Manutenção',
   limpeza: 'Limpeza',
   seguranca: 'Segurança',
-  duvidas_faturacao: 'Dúvidas Faturação',
-  atualizacao_dados: 'Atualização de Dados',
-  associar_dados: 'Associar Dados Portal Condómino'
+  duvidas_faturacao: 'Dúvidas de Faturação',
+  atualizacao_dados: 'Atualização de Dados Fiscais/Gerais',
+  associar_dados: 'Associar Dados Portal Condómino',
+  outro: 'Outro Assunto',
 };
 
 const empty = {

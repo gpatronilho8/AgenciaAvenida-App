@@ -17,11 +17,11 @@ const CATEGORIAS = { reparacao: 'Reparação', manutencao: 'Manutenção', condo
 const parseJsonArray = (data) => {
   if (!data) return [];
   if (Array.isArray(data)) return data;
-  try { 
-    const parsed = JSON.parse(data); 
-    return Array.isArray(parsed) ? parsed : [data]; 
-  } catch { 
-    return [data]; 
+  try {
+    const parsed = JSON.parse(data);
+    return Array.isArray(parsed) ? parsed : [data];
+  } catch {
+    return [data];
   }
 };
 
@@ -52,9 +52,9 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onFecho })
   const [pagamentoForm, setPagamentoForm] = useState({ data: format(new Date(), 'yyyy-MM-dd'), valor: 0 });
 
   const [showFecho, setShowFecho] = useState(false);
-  
+
   // Modals Overlay States (Evitar Fecho TV)
-  const [showPessoa, setShowPessoa] = useState(null); 
+  const [showPessoa, setShowPessoa] = useState(null);
   const [showPessoaModal, setShowPessoaModal] = useState(false);
   const [showReciboOptions, setShowReciboOptions] = useState(false);
 
@@ -77,16 +77,16 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onFecho })
   const totalDespesas = despesasMes.filter(d => d.desconta_proprietario !== false).reduce((s, d) => s + (d.valor || 0), 0);
   const totalEncargos = encargosMes.reduce((s, e) => s + (e.valor || 0), 0);
   const totalPagamentos = pagamentosMes.reduce((s, p) => s + (p.valor || 0), 0);
-  
+
   const totalArrendatario = (renda.valor_renda || 0) + totalEncargos;
   const faltaPagar = totalArrendatario - totalPagamentos;
   const estaPaga = faltaPagar <= 0.005 && totalPagamentos > 0;
 
   const comissaoValor = fechoConfig.comissao_percentagem
-    ? (renda.valor_renda * fechoConfig.comissao_agencia / 100)
+    ? (totalArrendatario * fechoConfig.comissao_agencia / 100)
     : fechoConfig.comissao_agencia;
 
-  const valorTransferencia = (renda.valor_renda || 0) - comissaoValor - fechoConfig.custo_recibo - fechoConfig.custo_sepa - totalDespesas;
+  const valorTransferencia = totalArrendatario - comissaoValor - fechoConfig.custo_recibo - fechoConfig.custo_sepa - totalDespesas;
 
   // Helpers de Mutação Genérica
   const updateRenda = useMutation({
@@ -113,7 +113,7 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onFecho })
   const handleAddPagamento = () => {
     const val = parseFloat(pagamentoForm.valor);
     if (val > faltaPagar + 0.005) { toast.error("O pagamento excede o valor em dívida."); return; }
-    
+
     const arr = [...pagamentosMes, { id: Math.random().toString(36).substr(2, 9), ...pagamentoForm }];
     const novoFaltaPagar = totalArrendatario - arr.reduce((s, p) => s + p.valor, 0);
     updateRenda.mutate({ pagamentos: arr, estado: novoFaltaPagar <= 0.005 ? 'recebida' : 'pendente' });
@@ -151,7 +151,7 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onFecho })
   const inquilinoIds = parseJsonArray(prop?.inquilino_id);
   const proprietarioIds = parseJsonArray(prop?.proprietario_id);
   const mesLabel = MESES[(renda.mes || 1) - 1];
-  
+
   const pessoaParaMostrar = pessoas.find(p => p.id === showPessoa);
 
   const getPrimeiroEmailInquilino = () => {
@@ -166,7 +166,7 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onFecho })
     // Correção: fechar apenas ao clicar estritamente no background escuro
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto no-scrollbar relative flex flex-col" onClick={e => e.stopPropagation()}>
-        
+
         {/* HEADER */}
         <div className="sticky top-0 bg-card z-10 flex items-center justify-between px-6 py-5 border-b border-border shadow-sm">
           <h2 className="font-black text-xl text-foreground tracking-wider">{prop?.morada} — {mesLabel} {renda.ano}</h2>
@@ -186,13 +186,13 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onFecho })
         </div>
 
         <div className="p-6 space-y-8 flex-1">
-          
+
           {/* SECCÃO: ENTIDADES */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="border border-border rounded-xl p-4 bg-muted/10">
               <p className="text-[13px] font-black text-muted-foreground tracking-widest mb-3">Proprietários (Locadores)</p>
               <div className="flex flex-col gap-2">
-                {proprietarioIds.length === 0 ? <span className="text-sm italic text-muted-foreground">Nenhum</span> : 
+                {proprietarioIds.length === 0 ? <span className="text-sm italic text-muted-foreground">Nenhum</span> :
                   proprietarioIds.map(id => (
                     <span key={id} className="text-sm font-semibold text-primary hover:underline cursor-pointer w-fit" onClick={() => { setShowPessoa(id); setShowPessoaModal(true); }}>
                       {pessoas.find(p => p.id === id)?.nome || '—'}
@@ -204,7 +204,7 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onFecho })
             <div className="border border-border rounded-xl p-4 bg-muted/10">
               <p className="text-[13px] font-black text-muted-foreground tracking-widest mb-3">Inquilinos (Arrendatários)</p>
               <div className="flex flex-col gap-2">
-                {inquilinoIds.length === 0 ? <span className="text-sm italic text-muted-foreground">Nenhum</span> : 
+                {inquilinoIds.length === 0 ? <span className="text-sm italic text-muted-foreground">Nenhum</span> :
                   inquilinoIds.map(id => (
                     <span key={id} className="text-sm font-semibold text-primary hover:underline cursor-pointer w-fit" onClick={() => { setShowPessoa(id); setShowPessoaModal(true); }}>
                       {pessoas.find(p => p.id === id)?.nome || '—'}
@@ -219,25 +219,25 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onFecho })
 
           {/* SECCÃO: A COBRAR VS PAGAMENTOS */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-            
+
             {/* LADO ESQUERDO: COBRANÇA */}
             <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-5 flex flex-col h-full">
               <h3 className="font-black text-base uppercase tracking-wider text-amber-700 mb-4">Valores a Cobrar</h3>
-              
+
               <div className="flex-1 flex flex-col">
                 <div className="flex justify-between items-center pb-3 border-b border-amber-200 border-dashed mb-3">
                   <span className="text-sm font-bold text-amber-900">Renda Base</span>
                   <span className="font-black text-lg text-amber-700">€{(renda.valor_renda || 0).toFixed(2)}</span>
                 </div>
-                
+
                 <div className="space-y-3">
                   {encargosMes.map(e => (
                     <div key={e.id} className="flex justify-between items-center text-sm">
                       <span className="font-medium text-amber-800 flex items-center gap-2">
-                        {e.descricao} 
+                        {e.descricao}
                         {(!renda.fechada && !estaPaga) && (
                           <button onClick={() => handleRemove('encargo', e.id)} className="text-muted-foreground/40 hover:text-red-500 transition-colors" title="Remover Encargo">
-                            <Trash2 className="w-3.5 h-3.5"/>
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </span>
@@ -257,8 +257,8 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onFecho })
                         <Input placeholder="Motivo (ex: Taxa Atraso)..." className="h-8 text-xs bg-white w-full" value={encargoForm.descricao} onChange={e => setEncargoForm(f => ({ ...f, descricao: e.target.value }))} />
                         <div className="flex gap-1 shrink-0">
                           <Input type="number" placeholder="€" className="h-8 text-xs bg-white w-24" value={encargoForm.valor || ''} onChange={e => setEncargoForm(f => ({ ...f, valor: parseFloat(e.target.value) || 0 }))} />
-                          <Button size="icon" className="h-8 w-8 bg-amber-600 hover:bg-amber-700 shrink-0" onClick={handleAddEncargo} disabled={!encargoForm.descricao || encargoForm.valor <= 0}><CheckCircle className="w-4 h-4"/></Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground shrink-0" onClick={() => setShowEncargosForm(false)}><X className="w-4 h-4"/></Button>
+                          <Button size="icon" className="h-8 w-8 bg-amber-600 hover:bg-amber-700 shrink-0" onClick={handleAddEncargo} disabled={!encargoForm.descricao || encargoForm.valor <= 0}><CheckCircle className="w-4 h-4" /></Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground shrink-0" onClick={() => setShowEncargosForm(false)}><X className="w-4 h-4" /></Button>
                         </div>
                       </div>
                     )}
@@ -279,7 +279,7 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onFecho })
 
               <div className="flex-1 flex flex-col">
                 {pagamentosMes.length === 0 && <p className="text-xs text-center font-bold text-emerald-800/50 py-2 tracking-wider">Sem Pagamentos Registados</p>}
-                
+
                 <div className="space-y-3">
                   {pagamentosMes.map(p => (
                     <div key={p.id} className="flex justify-between items-center text-sm pb-2 border-b border-emerald-100 border-dashed last:border-0 last:pb-0">
@@ -287,7 +287,7 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onFecho })
                         {format(new Date(p.data), 'dd/MM/yyyy')}
                         {!renda.fechada && (
                           <button onClick={() => handleRemove('pagamento', p.id)} className="text-muted-foreground/40 hover:text-red-500 transition-colors" title="Remover Pagamento">
-                            <Trash2 className="w-3.5 h-3.5"/>
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </span>
@@ -299,7 +299,7 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onFecho })
                 {!renda.fechada && faltaPagar > 0.005 && (
                   <div className="mt-4 mb-4">
                     {!showPagamentoForm ? (
-                      <Button size="sm" className="w-full text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm" onClick={() => { setPagamentoForm(f => ({...f, valor: faltaPagar})); setShowPagamentoForm(true); }}>
+                      <Button size="sm" className="w-full text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm" onClick={() => { setPagamentoForm(f => ({ ...f, valor: faltaPagar })); setShowPagamentoForm(true); }}>
                         <Plus className="w-3.5 h-3.5 mr-1" /> Registar Pagamento
                       </Button>
                     ) : (
@@ -307,8 +307,8 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onFecho })
                         <Input type="date" className="h-8 text-xs bg-white w-full" value={pagamentoForm.data} onChange={e => setPagamentoForm(f => ({ ...f, data: e.target.value }))} />
                         <div className="flex gap-1 shrink-0">
                           <Input type="number" step="0.01" max={faltaPagar} className="h-8 text-xs bg-white font-bold text-emerald-700 w-24" value={pagamentoForm.valor || ''} onChange={e => setPagamentoForm(f => ({ ...f, valor: parseFloat(e.target.value) || 0 }))} />
-                          <Button size="icon" className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700 shrink-0" onClick={handleAddPagamento} disabled={pagamentoForm.valor <= 0 || pagamentoForm.valor > faltaPagar + 0.005}><CheckCircle className="w-4 h-4"/></Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground shrink-0" onClick={() => setShowPagamentoForm(false)}><X className="w-4 h-4"/></Button>
+                          <Button size="icon" className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700 shrink-0" onClick={handleAddPagamento} disabled={pagamentoForm.valor <= 0 || pagamentoForm.valor > faltaPagar + 0.005}><CheckCircle className="w-4 h-4" /></Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground shrink-0" onClick={() => setShowPagamentoForm(false)}><X className="w-4 h-4" /></Button>
                         </div>
                         {pagamentoForm.valor > faltaPagar + 0.005 && <p className="col-span-full text-[10px] text-red-600 font-bold mt-1">O valor não pode exceder €{faltaPagar.toFixed(2)}</p>}
                       </div>
@@ -387,19 +387,19 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onFecho })
                 <h3 className="font-black text-2xl uppercase tracking-wider text-foreground">Fecho do Mês</h3>
                 <p className="text-sm text-muted-foreground font-medium mt-1">Cálculo de repasse ao proprietário e encerramento administrativo.</p>
               </div>
-              <Button size="lg" className={cn("gap-2 shadow-sm font-bold text-base h-12", renda.fechada ? "bg-emerald-600 hover:bg-emerald-700" : "bg-primary")} 
+              <Button size="lg" className={cn("gap-2 shadow-sm font-bold text-base h-12", renda.fechada ? "bg-emerald-600 hover:bg-emerald-700" : "bg-primary")}
                 onClick={() => {
                   setShowFecho(v => !v);
                   setTimeout(() => fechoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
                 }}
               >
-                {renda.fechada ? <><CheckCircle className="w-5 h-5"/> Ver Fecho Concluído</> : <><FileDown className="w-5 h-5" /> Configurar & Fechar</>}
+                {renda.fechada ? <><CheckCircle className="w-5 h-5" /> Ver Fecho Concluído</> : <><FileDown className="w-5 h-5" /> Configurar & Fechar</>}
               </Button>
             </div>
 
             {showFecho && (
               <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6 mt-6 space-y-6">
-                
+
                 {!renda.fechada && !estaPaga && (
                   <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl text-sm font-bold text-center uppercase tracking-wider">
                     <strong>Aviso:</strong> O inquilino ainda não pagou a totalidade da renda
@@ -431,7 +431,7 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onFecho })
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6">
                   <p className="text-xs font-black uppercase tracking-wider text-emerald-800 mb-4">Conta-Corrente do Proprietário</p>
                   <div className="space-y-3 text-base font-medium">
-                    <div className="flex justify-between items-center"><span className="text-muted-foreground">Renda Base (Encargos Não Repassam)</span><span className="font-bold text-foreground">€{(renda.valor_renda || 0).toFixed(2)}</span></div>
+                  <div className="flex justify-between items-center"><span className="text-muted-foreground">Valor Cobrado (Renda + Encargos)</span><span className="font-bold text-foreground">€{totalArrendatario.toFixed(2)}</span></div>
                     <div className="flex justify-between items-center text-red-600"><span>Comissão da Agência</span><span>-€{comissaoValor.toFixed(2)}</span></div>
                     <div className="flex justify-between items-center text-red-600"><span>Emissão de Recibo</span><span>-€{fechoConfig.custo_recibo.toFixed(2)}</span></div>
                     <div className="flex justify-between items-center text-red-600"><span>Transferência SEPA</span><span>-€{fechoConfig.custo_sepa.toFixed(2)}</span></div>
@@ -470,7 +470,7 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onFecho })
           </div>
         </div>
       </div>
-      
+
       {/* POPUP SELEÇÃO DE DESCARGA / EMAIL (Comprovativo) */}
       <Dialog open={showReciboOptions} onOpenChange={setShowReciboOptions}>
         <DialogContent className="max-w-md rounded-xl z-[200]">
