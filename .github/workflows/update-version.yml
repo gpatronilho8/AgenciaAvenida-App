@@ -20,7 +20,7 @@ jobs:
           echo "Mensagem do commit: $COMMIT_MSG"
 
           # 2. Ir ao Supabase ler a versão atual do sistema
-          RESPONSE=$(curl -s -X GET "${{ secrets.SUPA_URL }}/rest/v1/versoes?id=eq.511ffa08-c5f2-44fd-9172-5618ccff68a4&select=versao" \
+          RESPONSE=$(curl -s -X GET "${{ secrets.SUPA_URL }}/rest/v1/versao?id=eq.511ffa08-c5f2-44fd-9172-5618ccff68a4&select=versao" \
             -H "apikey: ${{ secrets.SUPA_SERVICE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPA_SERVICE_KEY }}")
           
@@ -54,7 +54,7 @@ jobs:
           echo "A atualizar Supabase para a nova versão: $NEW_VERSION"
 
           # 5. Enviar a nova versão para o Supabase
-          curl -s -X PATCH "${{ secrets.SUPA_URL }}/rest/v1/versoes?id=eq.511ffa08-c5f2-44fd-9172-5618ccff68a4" \
+          curl -s -X PATCH "${{ secrets.SUPA_URL }}/rest/v1/versao?id=eq.511ffa08-c5f2-44fd-9172-5618ccff68a4" \
             -H "apikey: ${{ secrets.SUPA_SERVICE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPA_SERVICE_KEY }}" \
             -H "Content-Type: application/json" \
