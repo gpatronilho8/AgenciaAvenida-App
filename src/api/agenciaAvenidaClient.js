@@ -6,6 +6,7 @@ const tableMap = {
   Assembleia: 'assembleias',
   ConfiguracaoQuota: 'configuracao_quotas',
   ComunicacaoLog: 'comunicacoes_logs',
+  ConfiguracaoSistema: 'configuracoes_sistema',
   Versao: 'versao',
   Despesa: 'despesas',
   DespesaPropriedade: 'despesas_propriedades', 

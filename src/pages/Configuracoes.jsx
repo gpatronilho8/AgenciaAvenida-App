@@ -21,9 +21,6 @@ export default function Configuracoes() {
   const qc = useQueryClient();
   const hoje = new Date();
 
-  // --- ESTADOS DAS CONFIGURAÇÕES GLOBAIS ---
-  const [autoRendas, setLancamentoAutoRendas] = useState(true);
-
   // --- QUERIES BASE (SUPABASE) ---
   const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas-config'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
   const { data: condominios = [] } = useQuery({ queryKey: ['condominios-config'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
@@ -38,6 +35,13 @@ export default function Configuracoes() {
       return res?.versao || '1.0.0';
     }
   });
+
+  // Query estado atual das configurações do sistema
+  const { data: configSys } = useQuery({
+    queryKey: ['config-sistema'],
+    queryFn: () => agenciaAvenida.entities.ConfiguracaoSistema.get(1)
+  });
+  const autoRendas = configSys?.auto_rendas ?? true;
 
   // Query real do histórico de comunicações
   const { data: historicoLogs = [] } = useQuery({
@@ -195,7 +199,15 @@ export default function Configuracoes() {
               <p className="text-sm font-semibold text-foreground">Alerta de incumprimento técnico</p>
               <p className="text-xs text-muted-foreground">Envia avisos automáticos por e-mail quando expira o prazo de tolerância da quota.</p>
             </div>
-            <Switch checked={false} disabled={true} />
+            <Switch
+              checked={autoRendas}
+              onCheckedChange={async (valor) => {
+                // Atualiza imediatamente na base de dados
+                await agenciaAvenida.entities.ConfiguracaoSistema.update(1, { auto_rendas: valor });
+                qc.invalidateQueries({ queryKey: ['config-sistema'] });
+                toast.success(valor ? 'Automação de rendas ativada.' : 'Automação de rendas suspensa.');
+              }}
+            />
           </div>
         </div>
       </div>

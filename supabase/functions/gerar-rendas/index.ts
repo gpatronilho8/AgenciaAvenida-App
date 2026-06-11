@@ -13,6 +13,20 @@ serve(async () => {
     const mes = hoje.getMonth() + 1; // getMonth é zero-indexed (Janeiro = 0)
     const ano = hoje.getFullYear();
 
+    // 0. VERIFICAR SE A AUTOMAÇÃO ESTÁ LIGADA
+    const { data: config } = await supabase
+      .from('configuracoes_sistema')
+      .select('auto_rendas')
+      .eq('id', 1)
+      .single();
+
+    if (config && config.auto_rendas === false) {
+      return new Response(
+        JSON.stringify({ success: true, message: 'Automação desligada nas configurações. Nenhuma renda gerada.' }), 
+        { headers: { "Content-Type": "application/json" } }
+      );
+    }
+
     // 1. Obter todas as propriedades ativas
     const { data: propriedades, error: propError } = await supabase
       .from('propriedades')
