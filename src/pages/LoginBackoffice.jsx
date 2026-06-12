@@ -28,7 +28,7 @@ export default function LoginBackoffice() {
             if (role === 'backoffice' || role === 'global') {
                 const protocol = window.location.protocol;
                 const port = window.location.port ? `:${window.location.port}` : '';
-                const baseDomain = window.location.hostname.replace(/^(cliente\.|backoffice\.)/, '');
+                const baseDomain = window.location.hostname.replace(/^(clientes\.|backoffice\.)/, '');
                 
                 window.location.href = `${protocol}//backoffice.${baseDomain}${port}/hub`;
             }
@@ -63,7 +63,7 @@ export default function LoginBackoffice() {
         setShowRgpd(false);
         const protocol = window.location.protocol;
         const port = window.location.port ? `:${window.location.port}` : '';
-        const baseDomain = window.location.hostname.replace(/^(cliente\.|backoffice\.)/, '');
+        const baseDomain = window.location.hostname.replace(/^(clientes\.|backoffice\.)/, '');
         
         window.location.href = `${protocol}//backoffice.${baseDomain}${port}/hub`;
     };

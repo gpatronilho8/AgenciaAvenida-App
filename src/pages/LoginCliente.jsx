@@ -31,9 +31,9 @@ export default function LoginCliente() {
         // Lógica de Subdomínio em vez de navigate simples
         const protocol = window.location.protocol;
         const port = window.location.port ? `:${window.location.port}` : '';
-        const baseDomain = window.location.hostname.replace(/^(cliente\.|backoffice\.)/, '');
+        const baseDomain = window.location.hostname.replace(/^(clientes\.|backoffice\.)/, '');
         
-        window.location.href = `${protocol}//cliente.${baseDomain}${port}/portal`;
+        window.location.href = `${protocol}//clientes.${baseDomain}${port}/portal`;
       }
     }
   }, [isAuthenticated, user, navigate]);
@@ -83,8 +83,8 @@ export default function LoginCliente() {
       // Lógica de Subdomínio ao terminar login com sucesso
       const protocol = window.location.protocol;
       const port = window.location.port ? `:${window.location.port}` : '';
-      const baseDomain = window.location.hostname.replace(/^(cliente\.|backoffice\.)/, '');
-      window.location.href = `${protocol}//cliente.${baseDomain}${port}/portal`;
+      const baseDomain = window.location.hostname.replace(/^(clientes\.|backoffice\.)/, '');
+      window.location.href = `${protocol}//clientes.${baseDomain}${port}/portal`;
 
     } catch (error) {
       toast.error('OCORREU UM ERRO AO AUTENTICAR');

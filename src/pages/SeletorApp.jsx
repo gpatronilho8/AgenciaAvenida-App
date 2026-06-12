@@ -33,7 +33,6 @@ export default function SeletorApp() {
     checkActiveSession();
   }, [navigate]);
 
-  // Adicionámos o parâmetro "subdominio" à função
   const handleNavigation = (targetPath, allowedRoles, subdominio) => {
     // Se o utilizador já estiver logado e tentar forçar uma app à qual não pertence
     if (userRole && !allowedRoles.includes(userRole) && userRole !== 'global') {
@@ -46,8 +45,14 @@ export default function SeletorApp() {
         // Em local, navega normalmente pelas rotas do React
         navigate(targetPath);
       } else {
-        // Em produção, força o redirecionamento absoluto para o subdomínio correspondente
-        window.location.href = `https://${subdominio}.agencia-avenida.pt${targetPath}`;
+        // Em produção, BLINDAMOS a construção do URL
+        const protocol = window.location.protocol;
+        const port = window.location.port ? `:${window.location.port}` : '';
+        // Remove 'clientes.' ou 'backoffice.' caso já lá estejam, para garantir uma base limpa
+        const baseDomain = window.location.hostname.replace(/^(clientes\.|backoffice\.)/, '');
+        
+        // Constrói o URL perfeitamente: https://clientes.agencia-avenida.pt/login-cliente
+        window.location.href = `${protocol}//${subdominio}.${baseDomain}${port}${targetPath}`;
       }
     }
   };
@@ -60,7 +65,6 @@ export default function SeletorApp() {
         
         {/* CARD 1: Plataforma de Gestão (Backoffice) */}
         <button
-          // Passamos 'backoffice' como o subdomínio desejado
           onClick={() => handleNavigation('/login', ['backoffice'], 'backoffice')}
           disabled={loading}
           className={`flex flex-col items-center justify-center bg-white border border-gray-200 rounded-xl p-8 transition-all duration-300 group shadow-sm relative ${
@@ -86,7 +90,6 @@ export default function SeletorApp() {
 
         {/* CARD 2: Área de Cliente (Portal do Condómino) */}
         <button
-          // Passamos 'clientes' como o subdomínio desejado
           onClick={() => handleNavigation('/login-cliente', ['cliente'], 'clientes')}
           disabled={loading}
           className={`flex flex-col items-center justify-center bg-white border border-gray-200 rounded-xl p-8 transition-all duration-300 group shadow-sm relative ${
