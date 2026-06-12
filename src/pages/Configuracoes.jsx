@@ -239,9 +239,12 @@ export default function Configuracoes() {
       {/* MODAL: COMPOR E-MAIL COM BUSCA COMBOBOX */}
       {/* ========================================================================= */}
       <Dialog open={activeModal === 'email'} onOpenChange={() => setActiveModal(null)}>
-        <DialogContent className="max-w-lg rounded-xl">
+        {/* Adicionado max-h-[90vh] e flex flex-col no DialogContent */}
+        <DialogContent className="max-w-lg rounded-xl max-h-[90vh] flex flex-col">
           <DialogHeader><DialogTitle className="font-black text-md uppercase tracking-wider">Criação de Mensagem via E-mail</DialogTitle></DialogHeader>
-          <div className="space-y-4 mt-4 overflow-visible">
+          
+          {/* Alterado de overflow-visible para flex-1 overflow-y-auto pr-1 pb-2 */}
+          <div className="space-y-4 mt-4 flex-1 overflow-y-auto pr-1 pb-2 no-scrollbar">
 
             <div className="space-y-1">
               <Label className="text-[10px] font-black uppercase tracking-wider">Filtro de Destinatários</Label>
@@ -285,13 +288,10 @@ export default function Configuracoes() {
                           .filter(c => c.ativo !== false)
                           .sort((a, b) => (a.codigo || '').localeCompare(b.codigo || '', 'pt', { numeric: true }))
                           .map((c) => {
-                            // Mantemos o labelStr simples para a pesquisa funcionar
                             const labelStr = `(${c.codigo || 'S/C'}) ${c.nome}`;
                             return (
                               <CommandItem key={c.id} value={labelStr} onSelect={() => { setEmailForm(p => ({ ...p, targetId: c.id })); setOpenComboCondo(false); }}>
                                 <Check className={cn("mr-2 h-4 w-4", emailForm.targetId === c.id ? "opacity-100" : "opacity-0")} />
-
-                                {/* Desenhamos a negrito apenas visualmente */}
                                 <span>
                                   <span className="font-bold">({c.codigo || 'S/C'})</span> {c.nome}
                                 </span>
@@ -361,6 +361,7 @@ export default function Configuracoes() {
               <textarea value={emailForm.descricao} onChange={e => setEmailForm(p => ({ ...p, descricao: e.target.value }))} className="w-full bg-background rounded-md border border-input min-h-[120px] p-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary" />
             </div>
 
+            {/* Este container empurra o botão para o fundo caso faças scroll */}
             <div className="flex justify-end gap-2 border-t pt-3 mt-4">
               <Button variant="outline" size="sm" className="font-bold text-xs uppercase" onClick={() => setActiveModal(null)}>Cancelar</Button>
               <Button size="sm" className="font-bold text-xs uppercase gap-1.5" disabled={!emailForm.assunto || !emailForm.descricao} onClick={() => { setConfirmAction(() => executarEnvioEmail); setShowConfirm(true); }}>
@@ -376,9 +377,13 @@ export default function Configuracoes() {
       {/* MODAL: GERAR CARTA POSTAL E CARREGAR MORADAS AUTOMÁTICAS */}
       {/* ========================================================================= */}
       <Dialog open={activeModal === 'carta'} onOpenChange={() => setActiveModal(null)}>
-        <DialogContent className="max-w-lg rounded-xl">
+        {/* Adicionado max-h-[90vh] e flex flex-col no DialogContent */}
+        <DialogContent className="max-w-lg rounded-xl max-h-[90vh] flex flex-col">
           <DialogHeader><DialogTitle className="font-black text-md uppercase tracking-wider">Processador de Carta Física</DialogTitle></DialogHeader>
-          <div className="space-y-4 mt-2 overflow-visible">
+          
+          {/* Alterado de overflow-visible para flex-1 overflow-y-auto pr-1 pb-2 */}
+          <div className="space-y-4 mt-2 flex-1 overflow-y-auto pr-1 pb-2 no-scrollbar">
+            
             <div className="flex gap-4 border-b pb-2">
               <button className={`text-xs font-black uppercase pb-1 tracking-wider ${cartaForm.modoOrigem === 'pesquisa' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`} onClick={() => setCartaForm(p => ({ ...p, modoOrigem: 'pesquisa', nomeManual: '' }))}>Consultar Base de Dados</button>
               <button className={`text-xs font-black uppercase pb-1 tracking-wider ${cartaForm.modoOrigem === 'manual' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`} onClick={() => setCartaForm(p => ({ ...p, modoOrigem: 'manual', entidadeId: '', morada: '', codigoPostal: '', localidade: '' }))}>Escrever Manualmente</button>
@@ -453,10 +458,12 @@ export default function Configuracoes() {
       {/* MODAL: HISTÓRICO REAL DE ARQUIVO COM REFRESH E EXPANSÃO DE CONTEÚDO */}
       {/* ========================================================================= */}
       <Dialog open={activeModal === 'historico'} onOpenChange={() => setActiveModal(null)}>
-        <DialogContent className="max-w-2xl rounded-xl">
+        {/* Adicionado max-h-[90vh] e flex flex-col no DialogContent */}
+        <DialogContent className="max-w-2xl rounded-xl max-h-[90vh] flex flex-col">
           <DialogHeader><DialogTitle className="font-black text-md uppercase tracking-wider">Histórico de Comunicações</DialogTitle></DialogHeader>
 
-          <div className="flex flex-col sm:flex-row items-center gap-3 mt-4 bg-muted/20 p-3 rounded-xl border">
+          {/* Secção de Filtros fica presa no topo do modal */}
+          <div className="flex flex-col sm:flex-row items-center gap-3 mt-4 bg-muted/20 p-3 rounded-xl border shrink-0">
             <div className="flex flex-1 items-center gap-2 w-full">
               <input type="date" className="bg-background border rounded-lg px-3 h-9 text-xs flex-1 cursor-pointer" value={dataInicio} onChange={e => setDataInicio(e.target.value)} />
               <span className="text-muted-foreground text-[10px] font-black uppercase tracking-widest px-1">até</span>
@@ -467,7 +474,8 @@ export default function Configuracoes() {
             </Button>
           </div>
 
-          <div className="space-y-2 mt-4 max-h-[320px] overflow-y-auto pr-1">
+          {/* Alterado para flex-1 (ocupa o resto do modal) e retirado o max-h fixo */}
+          <div className="space-y-2 mt-4 flex-1 overflow-y-auto pr-1 pb-2 no-scrollbar">
             {historicoLogs
               .filter(item => {
                 if (!item.created_at) return true;
@@ -516,7 +524,6 @@ export default function Configuracoes() {
         </DialogContent>
       </Dialog>
 
-
       {/* CONFIRMADOR DE ORDEM CENTRAL */}
       <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
         <DialogContent className="max-w-xs rounded-xl text-center p-6">
@@ -557,7 +564,14 @@ export default function Configuracoes() {
 
           <div className="flex flex-col gap-2.5">
             <span className="text-muted-foreground uppercase text-[9px] tracking-widest font-black">Estado Do Servidor</span>
-            <span className="text-emerald-600 font-black text-sm uppercase tracking-wider">Online</span>
+            <div className="flex items-center gap-2">
+              {/* Ponto animado com propagação de ondas */}
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+              </span>
+              <span className="text-emerald-600 font-black text-sm uppercase tracking-wider mt-0.5">Online</span>
+            </div>
           </div>
 
           <div className="flex flex-col gap-0.5">

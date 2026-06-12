@@ -16,7 +16,7 @@ export default function SemAcesso() {
         <h2 className="text-xl font-bold tracking-widest mb-3 uppercase text-white">ACESSO NEGADO</h2>
         
         <p className="text-red-200 text-sm leading-relaxed mb-8">
-          A sua conta de utilizador não possui permissões para explorar este módulo. Confirme as credenciais com os serviços da Agência Avenida.
+          A sua conta de utilizador não possui acesso a esta página. Em caso de dúvida, contacte os nossos serviços.
         </p>
         
         <button

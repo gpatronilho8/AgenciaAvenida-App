@@ -57,7 +57,7 @@ const AuthenticatedApp = () => {
 
   if (authError) {
     if (authError.type === 'user_not_registered') return <UserNotRegisteredError />;
-    if (authError.type === 'auth_required') { 
+    if (authError.type === 'auth_required') {
       return <Navigate to="/" replace />;
     }
   }
@@ -120,7 +120,7 @@ function App() {
               {/* Rotas 100% Públicas autónomas (Fora do ciclo de redirecionamento automático do Auth) */}
               <Route path="/" element={<SeletorApp />} />
               <Route path="/sem-acesso" element={<SemAcesso />} />
-              
+
               {/* Endereços de login compatíveis com a estrutura antiga e com o novo roteamento unificado */}
               <Route path="/login" element={<LoginBackoffice />} />
               <Route path="/backoffice/login" element={<LoginBackoffice />} />
@@ -133,9 +133,7 @@ function App() {
               <Route path="*" element={<AuthenticatedApp />} />
             </Routes>
           </Router>
-          <div style={{ border: '10px solid red', position: 'fixed', bottom: 10, right: 10, zIndex: 9999 }}>
-            <ToasterCustomizado />
-          </div>
+          <ToasterCustomizado />
         </CondominioProvider>
       </QueryClientProvider>
     </AuthProvider>

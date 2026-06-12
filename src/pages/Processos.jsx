@@ -23,15 +23,8 @@ const estadoColor = { pendente_inicio: 'bg-gray-100 text-gray-700 border border-
 const prioridadeColor = { normal: 'bg-blue-50 text-blue-600', urgente: 'bg-red-100 text-red-700 border border-red-200 shadow-sm' };
 const irsEstadoLabel = { recebida_documentacao: 'Recebida Documentação', submetido_at: 'Submetido AT (Prova Entrega)', comprovativo_irs: 'Comprovativo IRS', submetida_declaracao_substituicao: 'Submetida Declaração Substituição' };
 
-const empty = { tipo: 'renovacao_conducao', pessoa_id: '', descricao: '', estado: 'pendente_inicio', prioridade: 'normal', custo_servico: 0, pago: false, irs_campos: {}, irs_estado: 'recebida_documentacao', documentos: [], notas: '' };
+const empty = { tipo: 'renovacao_conducao', pessoa_id: '', atribuido_a: null, descricao: '', estado: 'pendente_inicio', prioridade: 'normal', custo_servico: 0, pago: false, irs_campos: {}, irs_estado: 'recebida_documentacao', documentos: [], notas: '' };
 const emptyClient = { nome: '', nif: '', telefone: '', email: '', tipo: ['cliente'] };
-
-const STAFF_MOCK = [
-  { id: 'usr-goncalo', nome: 'Gonçalo Patronilho' },
-  { id: 'usr-sonia', nome: 'Sónia Isidoro' },
-  { id: 'usr-daniel', nome: 'Daniel Isidoro' }
-];
-const MEU_USER_ID = 'usr-goncalo';
 
 const IRS_ANEXOS = [
   { id: 'anexo_a', label: 'Anexo A (Trabalho Dependente)' }, { id: 'anexo_b', label: 'Anexo B (Trabalho Independente)' }, { id: 'anexo_f', label: 'Anexo F (Rendas)' }, { id: 'anexo_g', label: 'Anexo G (Mais-Valias)' }, { id: 'anexo_h', label: 'Anexo H (Benefícios Fiscais)' }, { id: 'incapacidade', label: 'Incapacidade' }, { id: 'solteiro_1', label: 'Solteiro 1 Titular' }, { id: 'solteiro_2', label: 'Solteiro 2 Titulares' }, { id: 'casado', label: 'Casado' }, { id: 'irs_jovem', label: 'IRS Jovem' }, { id: 'declaracao_substituicao', label: 'Declaração Substituição' },
@@ -116,7 +109,7 @@ function FichaClienteModal({ pessoa, onClose }) {
               </div>
             </div>
           )}
-    </div>
+        </div>
       </div >
     </div >
   );
@@ -146,7 +139,7 @@ function ProcessoPreview({ processo, pessoa, onClose, onEdit, onQuickAction, onU
             <button onClick={onClose} className="p-1 hover:bg-muted rounded"><X className="w-5 h-5 text-muted-foreground" /></button>
           </div>
         </div>
-        <div className="px-6 pt-8 pb-10 space-y-4 print:py-8 max-h-[80vh] overflow-y-auto">
+        <div className="px-6 pt-8 pb-10 no-scrollbar space-y-4 print:py-8 max-h-[80vh] overflow-y-auto">
           <div>
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${estadoColor[processo.estado] || 'bg-gray-100 text-gray-700'}`}>
@@ -278,10 +271,25 @@ export default function Processos() {
 
   const [uploadingDoc, setUploadingDoc] = useState(false);
 
+  // ✅ OS TEUS QUERIES ORIGINAIS
   const { data: processos = [], isLoading: loadProc } = useQuery({ queryKey: ['processos'], queryFn: () => agenciaAvenida.entities.Processo.list() });
   const { data: pessoas = [], isLoading: loadPes } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
 
+  // ✅ COLA AQUI O QUERY DA EQUIPA (DENTRO DA FUNÇÃO!)
+  const { data: staffList = [], isLoading: isLoadingStaff } = useQuery({
+    queryKey: ['equipa-backoffice'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_equipa_interna');
+      if (error) throw error;
+      return data;
+    }
+  });
+
   const [filterMe, setFilterMe] = useState(false);
+  // O meu_user_id tem de vir do teu contexto de autenticação!
+  const { user } = useAuth();
+  const MEU_USER_ID = user?.id;
+
   const clientesList = pessoas.filter(p => normalizeTipoPessoa(p.tipo).includes('cliente'));
 
   const save = useMutation({
@@ -607,12 +615,23 @@ export default function Processos() {
 
             <div>
               <Label>Responsável</Label>
-              <Select value={form.atribuido_a || ''} onValueChange={v => upd('atribuido_a', v)}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Sem Atribuição" /></SelectTrigger>
+              {/* Se for null na BD, o Select assume 'sem_atribuicao' visualmente */}
+              <Select
+                value={form.atribuido_a || 'sem_atribuicao'}
+                onValueChange={v => upd('atribuido_a', v === 'sem_atribuicao' ? null : v)}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder={isLoadingStaff ? "A carregar equipa..." : "Sem Atribuição"} />
+                </SelectTrigger>
                 <SelectContent className="no-scrollbar">
-                  <SelectItem value="sem_atribuicao" className="italic text-muted-foreground">Sem Atribuição</SelectItem>
-                  {STAFF_MOCK.map(staff => (
-                    <SelectItem key={staff.id} value={staff.id}>{staff.nome}</SelectItem>
+                  <SelectItem value="sem_atribuicao" className="italic text-muted-foreground">
+                    Sem Atribuição
+                  </SelectItem>
+
+                  {staffList.map(staff => (
+                    <SelectItem key={staff.id} value={staff.id}>
+                      {staff.nome || 'Utilizador sem nome'}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

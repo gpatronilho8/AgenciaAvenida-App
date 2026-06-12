@@ -21,6 +21,9 @@ export default function LoginBackoffice() {
 
     // AUTO-LOGIN SEGURO E CONFIGURAÇÃO DO TÍTULO DA ABA
     useEffect(() => {
+
+        document.title = "BACKOFFICE AGÊNCIA AVENIDA";
+
         if (isAuthenticated && user && !loginSubmetidoAgora) {
             const role = user.user_metadata?.role;
             if (role === 'backoffice' || role === 'global') {
