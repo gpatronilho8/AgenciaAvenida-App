@@ -33,6 +33,26 @@ export default function LoginCliente() {
     }
   }, [isAuthenticated, user, navigate]);
 
+  // NOVA LÓGICA: RECUPERAÇÃO DE PASSWORD
+  const handleRecuperarPassword = async () => {
+    if (!email) {
+      toast.error('POR FAVOR, PREENCHA O CAMPO DE E-MAIL PRIMEIRO');
+      return;
+    }
+    
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'https://clientes.agencia-avenida.pt/atualizar-password',
+    });
+    
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success('E-MAIL DE RECUPERAÇÃO ENVIADO COM SUCESSO');
+    }
+    setLoading(false);
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -67,7 +87,7 @@ export default function LoginCliente() {
     setLoading(true);
 
     try {
-      // 1. Chamar a função RPC do Supabase para verificar se o e-mail está autorizado (Cliente/Condómino)
+      // 1. Chamar a função RPC do Supabase para verificar se o e-mail está autorizado
       const { data: isAutorizado, error: rpcError } = await supabase
         .rpc('validar_email_registo', { email_pesquisa: email });
 
@@ -85,7 +105,6 @@ export default function LoginCliente() {
         password,
         options: {
           data: { full_name: nome, role: 'cliente' },
-          // Força o link de confirmação do e-mail a apontar para o portal de clientes:
           emailRedirectTo: 'https://clientes.agencia-avenida.pt/portal'
         }
       });
@@ -104,8 +123,8 @@ export default function LoginCliente() {
   if (sucessoRegisto) {
     return (
       <div className="min-h-screen bg-muted/20 flex items-center justify-center p-4">
-        {/* Cartão de sucesso compactado */}
-        <div className="w-full max-w-lg text-center bg-card border p-6 rounded-xl shadow-sm space-y-3">
+        {/* Cartão de sucesso compactado para max-w-sm */}
+        <div className="w-full max-w-sm text-center bg-card border p-6 rounded-xl shadow-sm space-y-3">
           <div className="mx-auto w-10 h-10 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center border border-emerald-100">
             <CheckCircle2 className="w-5 h-5" />
           </div>
@@ -123,8 +142,8 @@ export default function LoginCliente() {
 
   return (
     <div className="min-h-screen bg-muted/10 flex items-center justify-center p-4">
-      {/* Cartão principal compactado: p-8 -> p-6, space-y-6 -> space-y-4 */}
-      <div className="w-full max-w-lg bg-card p-6 rounded-xl border border-border shadow-sm space-y-4">
+      {/* Cartão principal compactado: max-w-sm, p-6, space-y-4 */}
+      <div className="w-full max-w-sm bg-card p-6 rounded-xl border border-border shadow-sm space-y-4">
 
         {/* LOGOTIPO E CABEÇALHO DA ÁREA DE CLIENTE */}
         <div className="text-center space-y-1.5 pb-1">
@@ -151,13 +170,13 @@ export default function LoginCliente() {
             className={`text-[11px] font-black uppercase pb-1.5 tracking-wider transition-all text-center ${isLogin ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`}
             onClick={() => setIsLogin(true)}
           >
-            Aceder à Área de Cliente
+            Entrar
           </button>
           <button
             className={`text-[11px] font-black uppercase pb-1.5 tracking-wider transition-all text-center ${!isLogin ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`}
             onClick={() => setIsLogin(false)}
           >
-            Criar Nova Conta
+            Registar
           </button>
         </div>
 
@@ -174,16 +193,19 @@ export default function LoginCliente() {
             <div className="space-y-1">
               <div className="flex justify-between items-center">
                 <Label className="text-[9px] font-black uppercase tracking-wider">Palavra-passe</Label>
-                <button type="button" onClick={() => toast.info('Funcionalidade de recuperação enviada para o e-mail.')} className="text-[9px] font-bold text-primary hover:underline uppercase tracking-wider">Esqueci-me?</button>
+                {/* LIGAÇÃO DA FUNÇÃO DE RECUPERAÇÃO AQUI */}
+                <button type="button" onClick={handleRecuperarPassword} className="text-[9px] font-bold text-primary hover:underline uppercase tracking-wider">Esqueci-me?</button>
               </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                 <Input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="pl-9 h-9 bg-background text-sm" placeholder="••••••••" />
               </div>
             </div>
-            <Button type="submit" disabled={loading} className="w-full h-9.5 font-black uppercase text-[11px] tracking-wider rounded-lg mt-3">
-              {loading ? 'A autenticar...' : 'Entrar na Minha Área'}
-            </Button>
+            <div className="pt-3">
+              <Button type="submit" disabled={loading} className="w-full h-9.5 font-black uppercase text-[11px] tracking-wider rounded-lg">
+                {loading ? 'A autenticar...' : 'Entrar na Minha Área'}
+              </Button>
+            </div>
           </form>
         ) : (
           /* FORMULÁRIO DE REGISTO AUTÓNOMO */
@@ -210,9 +232,11 @@ export default function LoginCliente() {
                 <Input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="pl-9 h-9 bg-background text-sm" placeholder="Insira uma palavra-chave..." />
               </div>
             </div>
-            <Button type="submit" disabled={loading} className="w-full h-9.5 font-black uppercase text-[11px] tracking-wider rounded-lg gap-2 mt-3">
-              {loading ? 'A validar entidade...' : 'Verificar e Registar'} <ArrowRight className="w-3.5 h-3.5" />
-            </Button>
+            <div className="pt-3">
+              <Button type="submit" disabled={loading} className="w-full h-9.5 font-black uppercase text-[11px] tracking-wider rounded-lg gap-2">
+                {loading ? 'A validar...' : 'Verificar e Registar'} <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+            </div>
           </form>
         )}
       </div>

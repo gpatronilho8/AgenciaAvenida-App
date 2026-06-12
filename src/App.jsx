@@ -1,4 +1,4 @@
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/meu-sonner";
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClientInstance } from '@/lib/query-client';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
@@ -14,6 +14,7 @@ import LoginBackoffice from '@/pages/LoginBackoffice';
 import LoginCliente from '@/pages/LoginCliente';
 import SeletorApp from '@/pages/SeletorApp';
 import SemAcesso from '@/pages/SemAcesso';
+import AtualizarPassword from '@/pages/AtualizarPassword';
 
 // Condomínios module
 import CondominiosDashboard from '@/pages/CondominiosDashboard';
@@ -126,11 +127,15 @@ function App() {
               <Route path="/login-cliente" element={<LoginCliente />} />
               <Route path="/cliente/login" element={<LoginCliente />} />
 
+              <Route path="/atualizar-password" element={<AtualizarPassword />} />
+
               {/* Filtro global de sessões ativas */}
               <Route path="*" element={<AuthenticatedApp />} />
             </Routes>
           </Router>
-          <Toaster />
+          <div style={{ border: '10px solid red', position: 'fixed', bottom: 10, right: 10, zIndex: 9999 }}>
+            <ToasterCustomizado />
+          </div>
         </CondominioProvider>
       </QueryClientProvider>
     </AuthProvider>
