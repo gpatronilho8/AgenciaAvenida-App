@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { toast } from 'sonner';
 import { ShieldAlert, Lock, Mail } from 'lucide-react';
 import { supabase } from '@/api/supabase.js';
+import { useState, useEffect } from 'react';
 
 export default function LoginBackoffice() {
     const navigate = useNavigate();
