@@ -176,7 +176,7 @@ export default function Configuracoes() {
 
   return (
     <div className="space-y-8 pb-12 max-w-4xl"> {/* <-- Retirado o mx-auto */}
-      <PageHeader title="Configurações de Operação" subtitle="Gestão de tarefas automatizadas em segundo plano e disparo de circulares." />
+      <PageHeader title="Configurações de Operação" subtitle="Configurações do sistema e envio de comunicações." />
 
       {/* 1. MÓDULO: AUTOMACÕES & NOTIFICAÇÕES */}
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm space-y-5">
@@ -188,16 +188,8 @@ export default function Configuracoes() {
         <div className="space-y-4">
           <div className="flex items-center justify-between py-2 border-b border-border border-dashed">
             <div>
-              <p className="text-sm font-semibold text-foreground">Gerar rendas do mês a dia 1</p>
-              <p className="text-xs text-muted-foreground">Executa o varrimento automático na base de dados e emite as faturas-recibo às 00:00 (Supabase Cron Task).</p>
-            </div>
-            <Switch checked={autoRendas} onCheckedChange={setLancamentoAutoRendas} />
-          </div>
-
-          <div className="flex items-center justify-between py-2 opacity-50 cursor-not-allowed">
-            <div>
-              <p className="text-sm font-semibold text-foreground">Alerta de incumprimento técnico</p>
-              <p className="text-xs text-muted-foreground">Envia avisos automáticos por e-mail quando expira o prazo de tolerância da quota.</p>
+              <p className="text-sm font-semibold text-foreground">Gerar Rendas Mensalmente</p>
+              <p className="text-xs text-muted-foreground">Executa lançamento automático das rendas no dia 01 de cada mês às 00h.</p>
             </div>
             <Switch
               checked={autoRendas}
@@ -209,6 +201,14 @@ export default function Configuracoes() {
               }}
             />
           </div>
+
+          <div className="flex items-center justify-between py-2 opacity-50 cursor-not-allowed">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Alerta Incumprimento</p>
+              <p className="text-xs text-muted-foreground">Envia avisos automáticos por e-mail quando uma quota ou renda passa ao estado "vencida".</p>
+            </div>
+            <Switch checked={false} disabled={true} />
+          </div>
         </div>
       </div>
 
@@ -216,21 +216,21 @@ export default function Configuracoes() {
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm space-y-4">
         <div className="flex items-center gap-2 border-b border-border pb-3">
           <Mail className="w-5 h-5 text-primary" />
-          <h2 className="font-black text-sm uppercase tracking-wider text-foreground">Comunicações com Clientes & Fornecedores</h2>
+          <h2 className="font-black text-sm uppercase tracking-wider text-foreground">Envio de Comunicações (E-mail & Carta)</h2>
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed">
           Selecione o canal pretendido para notificar os titulares das frações, agrupar e-mails por classes ou emitir minutas postais oficiais com arquivamento centralizado.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-          <Button variant="outline" className="h-14 font-black uppercase text-xs tracking-wider gap-2 rounded-xl border-dashed shadow-sm" onClick={() => { setEmailForm({ tipoDestinatario: 'individual', targetId: '', entidadeId: '', assunto: '', descricao: '' }); setActiveModal('email'); }}>
+          <Button variant="outline" className="h-14 text-md tracking-wider gap-2 rounded-xl border-dashed shadow-sm" onClick={() => { setEmailForm({ tipoDestinatario: 'individual', targetId: '', entidadeId: '', assunto: '', descricao: '' }); setActiveModal('email'); }}>
             <Mail className="w-4 h-4 text-primary" /> Enviar E-mail
           </Button>
-          <Button variant="outline" className="h-14 font-black uppercase text-xs tracking-wider gap-2 rounded-xl border-dashed shadow-sm" onClick={() => { setCartaForm({ modoOrigem: 'pesquisa', entidadeId: '', nomeManual: '', morada: '', codigoPostal: '', localidade: '', texto: '' }); setActiveModal('carta'); }}>
+          <Button variant="outline" className="h-14 text-md tracking-wider gap-2 rounded-xl border-dashed shadow-sm" onClick={() => { setCartaForm({ modoOrigem: 'pesquisa', entidadeId: '', nomeManual: '', morada: '', codigoPostal: '', localidade: '', texto: '' }); setActiveModal('carta'); }}>
             <FileText className="w-4 h-4 text-amber-600" /> Gerar Carta
           </Button>
-          <Button variant="outline" className="h-14 font-black uppercase text-xs tracking-wider gap-2 rounded-xl bg-muted/30" onClick={() => setActiveModal('historico')}>
-            <History className="w-4 h-4 text-muted-foreground" /> Histórico de Enviares
+          <Button variant="outline" className="h-14 text-md tracking-wider gap-2 rounded-xl bg-muted/30" onClick={() => setActiveModal('historico')}>
+            <History className="w-4 h-4 text-muted-foreground" /> Histórico
           </Button>
         </div>
       </div>
@@ -240,7 +240,7 @@ export default function Configuracoes() {
       {/* ========================================================================= */}
       <Dialog open={activeModal === 'email'} onOpenChange={() => setActiveModal(null)}>
         <DialogContent className="max-w-lg rounded-xl">
-          <DialogHeader><DialogTitle className="font-black text-base uppercase tracking-wider">Disparo Digital de E-mail</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="font-black text-md uppercase tracking-wider">Criação de Mensagem via E-mail</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-4 overflow-visible">
 
             <div className="space-y-1">
@@ -250,9 +250,9 @@ export default function Configuracoes() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="individual">Individual (Entidade Específica)</SelectItem>
+                  <SelectItem value="individual">Individual (Pessoa Específica)</SelectItem>
                   <SelectItem value="classe">Por Classe / Perfil</SelectItem>
-                  <SelectItem value="condominio">Titulares de Frações de um Condomínio</SelectItem>
+                  <SelectItem value="condominio">Titulares de Frações (Condomínio)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -319,7 +319,7 @@ export default function Configuracoes() {
                   <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
                     <Command>
                       <CommandInput placeholder="Pesquisar entidade..." />
-                      <CommandEmpty>Entidade não encontrada.</CommandEmpty>
+                      <CommandEmpty>Entidade Não Encontrada</CommandEmpty>
                       <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
                         {pessoas.map((p) => (
                           <CommandItem key={p.id} value={`${p.nome} ${p.email || ''}`} onSelect={() => { setEmailForm(prev => ({ ...prev, entidadeId: p.id })); setOpenComboPessoaEmail(false); }}>
@@ -339,13 +339,13 @@ export default function Configuracoes() {
                 <Label className="text-[10px] font-black uppercase tracking-wider">Escolha a Classe</Label>
                 <Select value={emailForm.targetId} onValueChange={v => setEmailForm(p => ({ ...p, targetId: v }))}>
                   <SelectTrigger className="bg-background">
-                    <SelectValue placeholder="-- Escolha uma opção --" />
+                    <SelectValue placeholder="Escolha uma opção..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="colaborador">Colaboradores / Administradores</SelectItem>
+                    <SelectItem value="colaborador">Colaboradores (Utilizadores do Sistema)</SelectItem>
                     <SelectItem value="fornecedor">Fornecedores & Técnicos</SelectItem>
-                    <SelectItem value="banco">Instituições de Banca</SelectItem>
-                    <SelectItem value="advogado">Advogados / Contencioso</SelectItem>
+                    <SelectItem value="banco">Instituições Bancárias</SelectItem>
+                    <SelectItem value="advogado">Advogados</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -364,7 +364,7 @@ export default function Configuracoes() {
             <div className="flex justify-end gap-2 border-t pt-3 mt-4">
               <Button variant="outline" size="sm" className="font-bold text-xs uppercase" onClick={() => setActiveModal(null)}>Cancelar</Button>
               <Button size="sm" className="font-bold text-xs uppercase gap-1.5" disabled={!emailForm.assunto || !emailForm.descricao} onClick={() => { setConfirmAction(() => executarEnvioEmail); setShowConfirm(true); }}>
-                <Send className="w-3.5 h-3.5" /> Enviar Mensagem
+                <Send className="w-3.5 h-3.5" /> Enviar E-mail
               </Button>
             </div>
           </div>
@@ -377,16 +377,16 @@ export default function Configuracoes() {
       {/* ========================================================================= */}
       <Dialog open={activeModal === 'carta'} onOpenChange={() => setActiveModal(null)}>
         <DialogContent className="max-w-lg rounded-xl">
-          <DialogHeader><DialogTitle className="font-black text-base uppercase tracking-wider">Processador de Carta Física</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="font-black text-md uppercase tracking-wider">Processador de Carta Física</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2 overflow-visible">
             <div className="flex gap-4 border-b pb-2">
-              <button className={`text-xs font-black uppercase pb-1 tracking-wider ${cartaForm.modoOrigem === 'pesquisa' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`} onClick={() => setCartaForm(p => ({ ...p, modoOrigem: 'pesquisa', nomeManual: '' }))}>Pesquisar nas Pessoas</button>
+              <button className={`text-xs font-black uppercase pb-1 tracking-wider ${cartaForm.modoOrigem === 'pesquisa' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`} onClick={() => setCartaForm(p => ({ ...p, modoOrigem: 'pesquisa', nomeManual: '' }))}>Consultar Base de Dados</button>
               <button className={`text-xs font-black uppercase pb-1 tracking-wider ${cartaForm.modoOrigem === 'manual' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`} onClick={() => setCartaForm(p => ({ ...p, modoOrigem: 'manual', entidadeId: '', morada: '', codigoPostal: '', localidade: '' }))}>Escrever Manualmente</button>
             </div>
 
             {cartaForm.modoOrigem === 'pesquisa' ? (
               <div className="flex flex-col gap-1.5">
-                <Label className="text-[10px] font-black uppercase tracking-wider">Filtrar Entidade (Recarrega morada automaticamente)</Label>
+                <Label className="text-[10px] font-black uppercase tracking-wider">Escolher Destinatário</Label>
                 <Popover open={openComboPessoaCarta} onOpenChange={setOpenComboPessoaCarta}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" role="combobox" aria-expanded={openComboPessoaCarta} className="w-full justify-between font-normal bg-background mt-1">
@@ -441,7 +441,7 @@ export default function Configuracoes() {
             <div className="flex justify-end gap-2 border-t pt-3 mt-4">
               <Button variant="outline" size="sm" className="font-bold text-xs uppercase" onClick={() => setActiveModal(null)}>Cancelar</Button>
               <Button size="sm" className="font-bold text-xs uppercase gap-1.5" disabled={!cartaForm.morada || !cartaForm.codigoPostal || !cartaForm.texto} onClick={() => { setConfirmAction(() => executarGerarCarta); setShowConfirm(true); }}>
-                <FileText className="w-3.5 h-3.5" /> Compilar & Registar
+                <FileText className="w-3.5 h-3.5" /> Gerar Carta
               </Button>
             </div>
           </div>
@@ -454,7 +454,7 @@ export default function Configuracoes() {
       {/* ========================================================================= */}
       <Dialog open={activeModal === 'historico'} onOpenChange={() => setActiveModal(null)}>
         <DialogContent className="max-w-2xl rounded-xl">
-          <DialogHeader><DialogTitle className="font-black text-base uppercase tracking-wider">Arquivo Técnico de Comunicações</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="font-black text-md uppercase tracking-wider">Histórico de Comunicações</DialogTitle></DialogHeader>
 
           <div className="flex flex-col sm:flex-row items-center gap-3 mt-4 bg-muted/20 p-3 rounded-xl border">
             <div className="flex flex-1 items-center gap-2 w-full">
@@ -543,21 +543,21 @@ export default function Configuracoes() {
       <footer className="bg-card rounded-xl border border-border p-6 shadow-sm space-y-4 mt-12 w-full">
         <div className="flex items-center gap-2 border-b border-border pb-3">
           <Shield className="w-5 h-5 text-primary" />
-          <h2 className="font-black text-sm uppercase tracking-wider text-foreground">Informações de Núcleo & Versão</h2>
+          <h2 className="font-black text-sm uppercase tracking-wider text-foreground">Informações Do Sistema</h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-xs font-medium">
           <div className="flex flex-col gap-0.5">
-            <span className="text-muted-foreground uppercase text-[9px] tracking-widest font-black">Aplicação Core</span>
-            <span className="font-bold text-foreground text-sm">Agência Avenida Engine</span>
+            <span className="text-muted-foreground uppercase text-[9px] tracking-widest font-black">Aplicação</span>
+            <span className="text-foreground text-sm">Agência Avenida - Plataforma de Gestão</span>
           </div>
           <div className="flex flex-col gap-0.5">
-            <span className="text-muted-foreground uppercase text-[9px] tracking-widest font-black">Pipeline do Sistema</span>
-            <span className="text-emerald-600 font-black text-sm uppercase tracking-wider">Production Active</span>
+            <span className="text-muted-foreground uppercase text-[9px] tracking-widest font-black">Estado Do Servidor</span>
+            <span className="text-emerald-600 font-black text-sm uppercase tracking-wider">Online</span>
           </div>
           <div className="flex flex-col gap-0.5">
-            <span className="text-muted-foreground uppercase text-[9px] tracking-widest font-black">Versão Controlada (Supabase API)</span>
+            <span className="text-muted-foreground uppercase text-[9px] tracking-widest font-black">Versão Em Produção</span>
             <span className="font-mono bg-muted text-foreground font-black px-2 py-1 rounded border border-border w-fit text-xs mt-0.5">
-              v{versaoSistema || '1.0.0'}
+              v {versaoSistema || '1.0.0'}
             </span>
           </div>
         </div>
