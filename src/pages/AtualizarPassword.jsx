@@ -45,7 +45,7 @@ export default function AtualizarPassword() {
       const protocol = window.location.protocol;
       const port = window.location.port ? `:${window.location.port}` : '';
       // Remove subdomínios caso já lá esteja, para ter o domínio base limpo
-      const baseDomain = window.location.hostname.replace(/^(clientes\.|backoffice\.)/, '');
+      const baseDomain = window.location.hostname.replace(/^(www\.|clientes\.|backoffice\.)+/gi, '');
 
       // Redirecionamento baseado na Role (mantém a sessão ativa!)
       setTimeout(() => {

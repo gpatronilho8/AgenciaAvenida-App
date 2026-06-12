@@ -49,7 +49,7 @@ export default function SeletorApp() {
         const protocol = window.location.protocol;
         const port = window.location.port ? `:${window.location.port}` : '';
         // Remove 'clientes.' ou 'backoffice.' caso já lá estejam, para garantir uma base limpa
-        const baseDomain = window.location.hostname.replace(/^(clientes\.|backoffice\.)/, '');
+        const baseDomain = window.location.hostname.replace(/^(www\.|clientes\.|backoffice\.)+/gi, '');
         
         // Constrói o URL perfeitamente: https://clientes.agencia-avenida.pt/login-cliente
         window.location.href = `${protocol}//${subdominio}.${baseDomain}${port}${targetPath}`;

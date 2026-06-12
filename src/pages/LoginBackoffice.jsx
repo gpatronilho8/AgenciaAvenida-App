@@ -28,7 +28,7 @@ export default function LoginBackoffice() {
             if (role === 'backoffice' || role === 'global') {
                 const protocol = window.location.protocol;
                 const port = window.location.port ? `:${window.location.port}` : '';
-                const baseDomain = window.location.hostname.replace(/^(clientes\.|backoffice\.)/, '');
+                const baseDomain = window.location.hostname.replace(/^(www\.|clientes\.|backoffice\.)+/gi, '');
                 
                 window.location.href = `${protocol}//backoffice.${baseDomain}${port}/hub`;
             }
