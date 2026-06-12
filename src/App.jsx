@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import { CondominioProvider } from '@/lib/CondominioContext';
 import ModuleLayout from '@/components/layout/ModuleLayout';
+import Hub from "@/pages/Hub";
 
 // Páginas de Autenticação (Novas)
 import LoginBackoffice from '@/pages/LoginBackoffice'; // Ajusta o caminho se necessário
@@ -43,22 +44,14 @@ const RotaInicialInteligente = () => {
   const { user } = useAuth();
   const dominio = window.location.hostname;
 
-  // 1. Se o utilizador estiver autenticado, a prioridade absoluta é o Role dele
-  if (user?.user_metadata?.role === 'cliente') {
+  // 1. Se for o cliente (verificado pelo metadado ou pelo domínio), atira para o portal
+  if (user?.user_metadata?.role === 'cliente' || dominio.includes('clientes')) {
     return <Navigate to="/portal" replace />;
   }
   
-  // Se for um utilizador do backoffice autenticado, vai para o Hub
-  if (user) {
-    return <Navigate to="/" replace />;
-  }
-
-  // 2. Se NÃO estiver autenticado, faz a triagem pelo subdomínio para saber qual ecrã de login mostrar
-  if (dominio.includes('clientes')) {
-    return <Navigate to="/portal" replace />;
-  }
-  
-  return <Navigate to="/" replace />;
+  // 2. Caso contrário (é a equipa do Backoffice), mostra logo o ecrã do Hub!
+  // Certifica-te de que o componente Hub está importado no topo deste ficheiro.
+  return <Hub />; 
 };
 
 const AuthenticatedApp = () => {
