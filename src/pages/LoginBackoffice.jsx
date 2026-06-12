@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,51 +7,67 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { toast } from 'sonner';
 import { ShieldAlert, Lock, Mail } from 'lucide-react';
 import { supabase } from '@/api/supabase.js';
-import { useState, useEffect } from 'react';
+
+// 1. ADICIONADA A IMPORTAÇÃO DO CONTEXTO DE AUTENTICAÇÃO
+import { useAuth } from '@/lib/AuthContext';
 
 export default function LoginBackoffice() {
     const navigate = useNavigate();
+    
+    // 2. EXTRAÍDO O ESTADO GLOBAL DE AUTENTICAÇÃO
+    const { isAuthenticated, user } = useAuth();
+    
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [showRgpd, setShowRgpd] = useState(false);
+    
+    // 3. FLAG PARA PROTEGER O MODAL DE RGPD
+    const [loginSubmetidoAgora, setLoginSubmetidoAgora] = useState(false);
 
+    // 4. AUTO-LOGIN SEGURO (Apenas para quem já tem sessão ativa e reabre a página)
     useEffect(() => {
-        if (isAuthenticated && user) {
-          const role = user.user_metadata?.role;
-          if (role === 'backoffice' || role === 'global') {
-            navigate('/hub', { replace: true });
-          }
+        if (isAuthenticated && user && !loginSubmetidoAgora) {
+            const role = user.user_metadata?.role;
+            if (role === 'backoffice' || role === 'global') {
+                navigate('/hub', { replace: true });
+            }
         }
-      }, [isAuthenticated, user, navigate]);
+    }, [isAuthenticated, user, loginSubmetidoAgora, navigate]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
         setLoading(true);
+    
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) throw error;
 
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-        if (error) {
-            setErrorMessage(error.message);
+            // Validação de segurança imediata das Permissões (Roles)
+            const role = data.user?.user_metadata?.role;
+            if (role !== 'backoffice' && role !== 'global') {
+                await supabase.auth.signOut();
+                navigate('/sem-acesso');
+                return;
+            }
+    
+            // Sucesso na autenticação -> Diz ao sistema para esperar pelo RGPD
+            setLoginSubmetidoAgora(true);
+            setShowRgpd(true);
+        } catch (error) {
+            toast.error(error.message || 'CREDENCIAIS INVÁLIDAS');
+        } finally {
             setLoading(false);
-            return;
         }
-
-        const role = data.user?.user_metadata?.role;
-
-        if (role !== 'backoffice' && role !== 'global') {
-            // CORREÇÃO DE SEGURANÇA: Destrói o token local gerado para limpar o estado da app
-            await supabase.auth.signOut();
-            navigate('/sem-acesso');
-            return;
-        }
-
     };
 
     const handleAceitarRgpd = () => {
         setShowRgpd(false);
-        //toast.success('ACESSO AUTORIZADO');
-        navigate('/'); // Redireciona para o painel principal
+        
+        // Como o utilizador demorou alguns segundos a ler e aceitar o RGPD,
+        // o AuthContext já teve tempo de sobra para atualizar o estado em segundo plano.
+        // O redirecionamento será suave e sem "piscar" e voltar atrás.
+        navigate('/hub', { replace: true });
     };
 
     return (
@@ -125,7 +142,7 @@ export default function LoginBackoffice() {
 
             {/* MODAL MANDATÓRIO: CUMPRIMENTO RGPD */}
             <Dialog open={showRgpd} onOpenChange={() => { }}>
-                <DialogContent className="max-w-lg rounded-xl p-6 [&>button]:hidden"> {/* Esconde o botão X de fechar */}
+                <DialogContent className="max-w-lg rounded-xl p-6 [&>button]:hidden">
                     <DialogHeader className="flex flex-col items-center text-center space-y-2">
                         <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center border border-blue-100">
                             <ShieldAlert className="w-6 h-6" />

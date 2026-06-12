@@ -1,12 +1,17 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Mail, Lock, User, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/api/supabase.js';
-import { useState, useEffect } from 'react';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function LoginCliente() {
+  const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
+
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [sucessoRegisto, setSucessoRegisto] = useState(false);
@@ -16,6 +21,7 @@ export default function LoginCliente() {
   const [password, setPassword] = useState('');
   const [nome, setNome] = useState('');
 
+  // REDIRECIONAMENTO INTELIGENTE (E AUTO-LOGIN)
   useEffect(() => {
     if (isAuthenticated && user) {
       const role = user.user_metadata?.role;
@@ -29,21 +35,28 @@ export default function LoginCliente() {
     e.preventDefault();
     setLoading(true);
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-    if (error) {
-      setErrorMessage(error.message);
+      if (error) {
+        toast.error(error.message || 'CREDENCIAIS INVÁLIDAS');
+        setLoading(false);
+        return;
+      }
+
+      const role = data.user?.user_metadata?.role;
+
+      if (role !== 'cliente' && role !== 'global') {
+        // CORREÇÃO DE SEGURANÇA: Destrói o token local gerado para limpar o estado da app
+        await supabase.auth.signOut();
+        navigate('/sem-acesso');
+        return;
+      }
+      
+      // Sem navigate('/portal') aqui! O useEffect lá em cima apanha a alteração de estado.
+    } catch (error) {
+      toast.error('OCORREU UM ERRO AO AUTENTICAR');
       setLoading(false);
-      return;
-    }
-
-    const role = data.user?.user_metadata?.role;
-
-    if (role !== 'cliente' && role !== 'global') {
-      // CORREÇÃO DE SEGURANÇA: Destrói o token local gerado para limpar o estado da app
-      await supabase.auth.signOut();
-      navigate('/sem-acesso');
-      return;
     }
   };
 
