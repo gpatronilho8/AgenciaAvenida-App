@@ -26,9 +26,9 @@ const TIPOS_DISPONIVEIS = [
 
 const normalizeTipo = (tipoData) => {
   if (!tipoData) return [];
-  
+
   let parsedArray = [];
-  
+
   if (Array.isArray(tipoData)) {
     parsedArray = tipoData;
   } else if (typeof tipoData === 'string') {
@@ -54,7 +54,7 @@ const normalizeTipo = (tipoData) => {
   parsedArray.forEach(item => {
     if (typeof item === 'string') {
       let clean = item.trim().replace(/^"|"$/g, '');
-      
+
       if (clean.startsWith('[') && clean.endsWith(']')) {
         try {
           const innerParsed = JSON.parse(clean);
@@ -62,9 +62,9 @@ const normalizeTipo = (tipoData) => {
             finalArray.push(...innerParsed);
             return;
           }
-        } catch(e) {}
+        } catch (e) { }
       }
-      
+
       clean = clean.replace(/"/g, '').trim();
       if (clean.includes(',')) {
         finalArray.push(...clean.split(',').map(s => s.trim()));
@@ -75,7 +75,7 @@ const normalizeTipo = (tipoData) => {
       finalArray.push(item);
     }
   });
-  
+
   return [...new Set(finalArray)].filter(Boolean);
 };
 
@@ -134,17 +134,17 @@ function PessoaPreview({ pessoa, onClose, onEdit }) {
           )}
 
           {isCliente && pessoa.senha_at && (
-             <div className="flex gap-3 text-sm items-center mt-2 bg-muted/30 p-2 rounded border border-border/50">
-               <span className="w-28 font-medium text-muted-foreground flex-shrink-0">Senha AT</span>
-               <div className="flex items-center gap-2 flex-1">
-                 <span className="text-foreground font-mono bg-background px-2 py-1 rounded border min-w-[100px] text-center">
-                   {showSenha ? pessoa.senha_at : '••••••••••'}
-                 </span>
-                 <button onClick={() => setShowSenha(!showSenha)} className="text-muted-foreground hover:text-foreground hover:bg-muted transition-colors p-1.5 rounded-md" title="Mostrar por 10s">
-                   {showSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                 </button>
-               </div>
-             </div>
+            <div className="flex gap-3 text-sm items-center mt-2 bg-muted/30 p-2 rounded border border-border/50">
+              <span className="w-28 font-medium text-muted-foreground flex-shrink-0">Senha AT</span>
+              <div className="flex items-center gap-2 flex-1">
+                <span className="text-foreground font-mono bg-background px-2 py-1 rounded border min-w-[100px] text-center">
+                  {showSenha ? pessoa.senha_at : '••••••••••'}
+                </span>
+                <button onClick={() => setShowSenha(!showSenha)} className="text-muted-foreground hover:text-foreground hover:bg-muted transition-colors p-1.5 rounded-md" title="Mostrar por 10s">
+                  {showSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
           )}
 
           {pessoa.observacoes && (
@@ -181,9 +181,9 @@ export default function Pessoas() {
   });
 
   const openNew = () => { setForm(empty); setEditing(null); setOpen(true); };
-  
+
   const openEdit = (p) => { setForm({ ...p, tipo: normalizeTipo(p.tipo) }); setEditing(p.id); setOpen(true); };
-  
+
   const upd = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const toggleTipo = (tipoId) => {
@@ -197,12 +197,19 @@ export default function Pessoas() {
     });
   };
 
-  const filtered = pessoas.filter(p => {
-    const matchSearch = !search || p.nome?.toLowerCase().includes(search.toLowerCase()) || p.email?.toLowerCase().includes(search.toLowerCase()) || p.nif?.includes(search);
-    const pTipos = normalizeTipo(p.tipo);
-    const matchTipo = filterTipo === 'all' || pTipos.includes(filterTipo);
-    return matchSearch && matchTipo;
-  });
+  const filtered = pessoas
+    .filter(p => {
+      const matchSearch = !search || p.nome?.toLowerCase().includes(search.toLowerCase()) || p.email?.toLowerCase().includes(search.toLowerCase()) || p.nif?.includes(search);
+      const pTipos = normalizeTipo(p.tipo);
+      const matchTipo = filterTipo === 'all' || pTipos.includes(filterTipo);
+      return matchSearch && matchTipo;
+    })
+    .sort((a, b) => {
+      // Ordenação alfabética rigorosa baseada no Nome da Pessoa/Entidade
+      const nomeA = String(a.nome || '').trim();
+      const nomeB = String(b.nome || '').trim();
+      return nomeA.localeCompare(nomeB, 'pt', { sensitivity: 'base' });
+    });
 
   const isClienteForm = normalizeTipo(form.tipo).includes('cliente');
 
@@ -236,8 +243,8 @@ export default function Pessoas() {
         {filtered.map(p => {
           const tiposArray = normalizeTipo(p.tipo);
           return (
-            <div 
-              key={p.id} 
+            <div
+              key={p.id}
               className="bg-card rounded-xl border border-border p-5 shadow-sm hover:shadow-md transition-all cursor-pointer relative group flex flex-col h-full"
               onClick={() => setPreview(p)}
             >
@@ -287,7 +294,7 @@ export default function Pessoas() {
             <DialogTitle>{editing ? 'Editar Entidade' : 'Nova Entidade'}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-            
+
             <div className="sm:col-span-2 bg-muted/30 p-4 rounded-lg border">
               <Label className="text-base font-semibold mb-3 block">Papéis / Tipos de Entidade *</Label>
               <div className="flex flex-wrap gap-4">
@@ -320,14 +327,14 @@ export default function Pessoas() {
             {isClienteForm && (
               <div>
                 <Label>Senha AT</Label>
-                <Input 
-                  className="mt-1 font-mono" 
-                  value={form.senha_at || ''} 
-                  onChange={e => upd('senha_at', e.target.value)} 
+                <Input
+                  className="mt-1 font-mono"
+                  value={form.senha_at || ''}
+                  onChange={e => upd('senha_at', e.target.value)}
                 />
               </div>
             )}
-            
+
             <div className="sm:col-span-2">
               <Label>Observações</Label>
               <textarea className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-y" value={form.observacoes || ''} onChange={e => upd('observacoes', e.target.value)} />

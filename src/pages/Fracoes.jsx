@@ -189,11 +189,18 @@ export default function Fracoes() {
 
   const getCondName = (id) => condominios.find(c => c.id === id)?.nome || '-';
 
-  const filtered = fracoes.filter(f => {
-    const matchSearch = !search || f.codigo_fracao?.toLowerCase().includes(search.toLowerCase()) || f.descricao_piso_lado?.toLowerCase().includes(search.toLowerCase());
-    const matchCond = selectedCondominioId === 'all' || f.condominio_id === selectedCondominioId;
-    return matchSearch && matchCond;
-  });
+  const filtered = fracoes
+    .filter(f => {
+      const matchSearch = !search || f.codigo_fracao?.toLowerCase().includes(search.toLowerCase()) || f.descricao_piso_lado?.toLowerCase().includes(search.toLowerCase());
+      const matchCond = selectedCondominioId === 'all' || f.condominio_id === selectedCondominioId;
+      return matchSearch && matchCond;
+    })
+    .sort((a, b) => {
+      // Ordenação alfabética rigorosa baseada na Letra da Fração (A, B, C...)
+      const codA = String(a.codigo_fracao || '').trim();
+      const codB = String(b.codigo_fracao || '').trim();
+      return codA.localeCompare(codB, 'pt', { numeric: true, sensitivity: 'base' });
+    });
 
   const totalPermilagem = filtered.reduce((acc, f) => acc + (parseFloat(f.permilagem) || 0), 0);
   const titularesList = normalizeArray(form.titulares);

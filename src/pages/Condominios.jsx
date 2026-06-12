@@ -264,8 +264,7 @@ export default function Condominios() {
     },
   });
 
-  const openNew = () => {
-    // CORREÇÃO: Não filtramos por ativo/inativo para descobrir o próximo número livre
+  const getNextAvailableCode = () => {
     const existingNumbers = condominios
       .filter(c => c)
       .map(c => String(c.codigo || ''))
@@ -283,10 +282,36 @@ export default function Condominios() {
         }
       }
     }
+    return nextNum.toString().padStart(2, '0');
+  };
 
-    setForm({ ...empty, codigo_num: nextNum.toString().padStart(2, '0') });
+  const openNew = () => {
+    setForm({ ...empty, codigo_num: getNextAvailableCode() });
     setEditing(null);
     setOpen(true);
+  };
+
+  const handleSaveCondominio = () => {
+    const proposedCode = `C${form.codigo_num.toString().padStart(2, '0')}`;
+
+    // Verifica se algum condomínio na BD já tem este código (ignorando o próprio se estivermos a editar)
+    const isOccupied = condominios.some(c => 
+      String(c.codigo).toUpperCase() === proposedCode.toUpperCase() && 
+      c.id !== editing
+    );
+
+    if (isOccupied) {
+      toast.error(`O código ${proposedCode} já se encontra ocupado!`);
+      
+      // Bloqueia e recalcula automaticamente o próximo livre
+      const nextFree = getNextAvailableCode();
+      f('codigo_num', nextFree);
+      toast.info(`Recalculado para o código livre: C${nextFree}`);
+      return; 
+    }
+
+    // Se estiver livre, avança para a mutação normal
+    save.mutate(form);
   };
 
   const openEdit = (c) => {
@@ -654,7 +679,7 @@ export default function Condominios() {
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.nome || !form.codigo_num}>
+              <Button onClick={handleSaveCondominio} disabled={save.isPending || !form.nome || !form.codigo_num}>
                 {save.isPending ? 'A guardar...' : 'Guardar Condomínio'}
               </Button>
             </div>

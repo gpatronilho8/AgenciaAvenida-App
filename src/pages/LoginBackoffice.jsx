@@ -21,13 +21,16 @@ export default function LoginBackoffice() {
 
     // AUTO-LOGIN SEGURO E CONFIGURAÇÃO DO TÍTULO DA ABA
     useEffect(() => {
-
         document.title = "BACKOFFICE AGÊNCIA AVENIDA";
 
         if (isAuthenticated && user && !loginSubmetidoAgora) {
             const role = user.user_metadata?.role;
             if (role === 'backoffice' || role === 'global') {
-                navigate('/hub', { replace: true });
+                const protocol = window.location.protocol;
+                const port = window.location.port ? `:${window.location.port}` : '';
+                const baseDomain = window.location.hostname.replace(/^(cliente\.|backoffice\.)/, '');
+                
+                window.location.href = `${protocol}//backoffice.${baseDomain}${port}/hub`;
             }
         }
     }, [isAuthenticated, user, loginSubmetidoAgora, navigate]);
@@ -58,7 +61,11 @@ export default function LoginBackoffice() {
 
     const handleAceitarRgpd = () => {
         setShowRgpd(false);
-        navigate('/hub', { replace: true });
+        const protocol = window.location.protocol;
+        const port = window.location.port ? `:${window.location.port}` : '';
+        const baseDomain = window.location.hostname.replace(/^(cliente\.|backoffice\.)/, '');
+        
+        window.location.href = `${protocol}//backoffice.${baseDomain}${port}/hub`;
     };
 
     return (

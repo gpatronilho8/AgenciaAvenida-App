@@ -11,18 +11,20 @@ export default function AtualizarPassword() {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [userRole, setUserRole] = useState(null);
 
   useEffect(() => {
     document.title = "DEFINIR NOVA PALAVRA-PASSE";
 
-    // BARREIRA ANTI-CURIOSOS: Verifica se o utilizador tem a sessão temporária do e-mail
     const verificarAcesso = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        // Se alguém entrou aqui digitando o URL manualmente (sem token), é expulso!
-        toast.error('LINK INVÁLIDO OU EXPIRADO. SOLICITE UMA NOVA RECUPERAÇÃO.');
-        navigate('/login-cliente', { replace: true });
+        // Se não houver token/sessão, envia para o ecrã de Sem Acesso
+        navigate('/sem-acesso', { replace: true });
+      } else {
+        // Guarda a role para sabermos para onde o atirar no final
+        setUserRole(session.user.user_metadata?.role);
       }
     };
 
@@ -34,16 +36,30 @@ export default function AtualizarPassword() {
     setLoading(true);
 
     try {
-      // O Supabase usa a sessão temporária para autorizar esta alteração
       const { error } = await supabase.auth.updateUser({ password: password });
-      
       if (error) throw error;
 
-      toast.success('PALAVRA-PASSE ATUALIZADA COM SUCESSO');
+      toast.success('PALAVRA-PASSE ATUALIZADA COM SUCESSO!');
       
-      // Destrói a sessão temporária e manda o utilizador fazer login com a chave nova
-      await supabase.auth.signOut();
-      navigate('/login-cliente', { replace: true });
+      // Construtor dinâmico de URLs (funciona em localhost e em produção)
+      const protocol = window.location.protocol;
+      const port = window.location.port ? `:${window.location.port}` : '';
+      // Remove subdomínios caso já lá esteja, para ter o domínio base limpo
+      const baseDomain = window.location.hostname.replace(/^(cliente\.|backoffice\.)/, '');
+
+      // Redirecionamento baseado na Role (mantém a sessão ativa!)
+      setTimeout(() => {
+        if (userRole === 'cliente') {
+          window.location.href = `${protocol}//cliente.${baseDomain}${port}/portal`;
+        } else if (userRole === 'backoffice') {
+          window.location.href = `${protocol}//backoffice.${baseDomain}${port}/hub`;
+        } else if (userRole === 'global') {
+          window.location.href = `${protocol}//${baseDomain}${port}/`;
+        } else {
+          navigate('/', { replace: true });
+        }
+      }, 1500); // 1.5s de atraso para o utilizador conseguir ler o Toast verde
+
     } catch (error) {
       toast.error(error.message || 'ERRO AO ATUALIZAR A PALAVRA-PASSE');
     } finally {
@@ -86,7 +102,6 @@ export default function AtualizarPassword() {
             </Button>
           </div>
         </form>
-
       </div>
     </div>
   );

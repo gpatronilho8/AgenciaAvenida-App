@@ -127,12 +127,19 @@ export default function PortalCondomino() {
     });
   };
 
-  const fracoesUser = fracoes.filter(f => {
-    if (!entidadeAtual) return false;
-    const targetId = String(entidadeAtual.id);
-    const titulares = extractIds(f.titulares);
-    return titulares.includes(targetId);
-  });
+  const fracoesUser = fracoes
+    .filter(f => {
+      if (!entidadeAtual) return false;
+      const targetId = String(entidadeAtual.id);
+      const titulares = extractIds(f.titulares);
+      return titulares.includes(targetId);
+    })
+    .sort((a, b) => {
+      // Ordenação rigorosa alfabética das frações no dropdown do Portal
+      const codA = String(a.codigo_fracao || '').trim();
+      const codB = String(b.codigo_fracao || '').trim();
+      return codA.localeCompare(codB, 'pt', { numeric: true, sensitivity: 'base' });
+    });
 
   const condominiosUser = condominios.filter(c => fracoesUser.some(f => String(f.condominio_id) === String(c.id)));
 

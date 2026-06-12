@@ -28,7 +28,12 @@ export default function LoginCliente() {
     if (isAuthenticated && user) {
       const role = user.user_metadata?.role;
       if (role === 'cliente' || role === 'global') {
-        navigate('/portal', { replace: true });
+        // Lógica de Subdomínio em vez de navigate simples
+        const protocol = window.location.protocol;
+        const port = window.location.port ? `:${window.location.port}` : '';
+        const baseDomain = window.location.hostname.replace(/^(cliente\.|backoffice\.)/, '');
+        
+        window.location.href = `${protocol}//cliente.${baseDomain}${port}/portal`;
       }
     }
   }, [isAuthenticated, user, navigate]);
@@ -75,7 +80,12 @@ export default function LoginCliente() {
         return;
       }
       
-      // Sem navigate('/portal') aqui! O useEffect lá em cima apanha a alteração de estado.
+      // Lógica de Subdomínio ao terminar login com sucesso
+      const protocol = window.location.protocol;
+      const port = window.location.port ? `:${window.location.port}` : '';
+      const baseDomain = window.location.hostname.replace(/^(cliente\.|backoffice\.)/, '');
+      window.location.href = `${protocol}//cliente.${baseDomain}${port}/portal`;
+
     } catch (error) {
       toast.error('OCORREU UM ERRO AO AUTENTICAR');
       setLoading(false);
