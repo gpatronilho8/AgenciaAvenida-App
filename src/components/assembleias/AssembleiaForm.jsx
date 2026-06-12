@@ -28,7 +28,7 @@ export default function AssembleiaForm({ open, onClose, assembleia, condominios 
       : agenciaAvenida.entities.Assembleia.create(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['assembleias'] });
-      toast.success('Assembleia guardada');
+      toast.success('ASSEMBLEIA GUARDADA COM SUCESSO');
       onClose();
     }
   });

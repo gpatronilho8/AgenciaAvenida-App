@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/lib/AuthContext';
 
 const LOGO_WHITE = "/aa_white.png";
 
@@ -68,17 +69,13 @@ function OcorrenciaPreviewDialog({ ocorrencia, onClose }) {
 
 export default function Hub() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
   const [previewOcorrencia, setPreviewOcorrencia] = useState(null);
+  const { user } = useAuth();
 
   const { data: ocorrencias = [] } = useQuery({ 
     queryKey: ['ocorrencias-hub'], 
     queryFn: () => agenciaAvenida.entities.Ocorrencia.filter({ estado: 'aberta' }, '-data_abertura', 5) 
   });
-
-  useEffect(() => {
-    agenciaAvenida.auth.me().then(setUser).catch(() => {});
-  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col">

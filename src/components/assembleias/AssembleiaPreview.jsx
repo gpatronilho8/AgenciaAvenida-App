@@ -123,12 +123,12 @@ export default function AssembleiaPreview({ open, onClose, assembleia, condomini
       const file = new File([blob], `convocatoria_${assembleia.id}.pdf`, { type: 'application/pdf' });
       const { file_url } = await agenciaAvenida.integrations.Core.UploadFile({ file });
       await saveUrl.mutateAsync({ field: 'convocatoria_pdf_url', url: file_url });
-      toast.success('Convocatória gerada e guardada');
+      toast.success('CONVOCATÓRIA GERADA COM SUCESSO');
     }
   };
 
   const handleAta = async (action) => {
-    if (!assembleia.ata_texto) { toast.error('Escreva o texto da ata primeiro'); return; }
+    if (!assembleia.ata_texto) { toast.error('ESCREVA O TEXTO DA ATA PRIMEIRO'); return; }
     const doc = gerarAtaPDF(assembleia, condNome);
     if (action === 'download') {
       doc.save(`ata_${assembleia.ata_numero || assembleia.data}.pdf`);
@@ -137,7 +137,7 @@ export default function AssembleiaPreview({ open, onClose, assembleia, condomini
       const file = new File([blob], `ata_${assembleia.id}.pdf`, { type: 'application/pdf' });
       const { file_url } = await agenciaAvenida.integrations.Core.UploadFile({ file });
       await saveUrl.mutateAsync({ field: 'ata_pdf_url', url: file_url });
-      toast.success('Ata gerada e guardada');
+      toast.success('ATA GERADA COM SUCESSO');
     }
   };
 
@@ -151,7 +151,7 @@ export default function AssembleiaPreview({ open, onClose, assembleia, condomini
     // Simular envio (integração real exigiria backend)
     await agenciaAvenida.entities.Assembleia.update(assembleia.id, { email_enviado: true });
     qc.invalidateQueries({ queryKey: ['assembleias'] });
-    toast.success('Email de convocatória enviado aos condóminos');
+    toast.success('EMAIL DE CONVOCATÓRIA ENVIADO AOS CONDÓMINOS');
     setSending(false);
   };
 

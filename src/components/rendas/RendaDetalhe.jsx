@@ -112,7 +112,7 @@ export default function RendaDetalhe({ renda, prop, pessoas, onClose, onFecho })
 
   const handleAddPagamento = () => {
     const val = parseFloat(pagamentoForm.valor);
-    if (val > faltaPagar + 0.005) { toast.error("O pagamento excede o valor em dívida."); return; }
+    if (val > faltaPagar + 0.005) { toast.error("O PAGAMENTO EXCEDE O VALOR EM DÍVIDA"); return; }
 
     const arr = [...pagamentosMes, { id: Math.random().toString(36).substr(2, 9), ...pagamentoForm }];
     const novoFaltaPagar = totalArrendatario - arr.reduce((s, p) => s + p.valor, 0);

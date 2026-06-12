@@ -1,12 +1,16 @@
 import { Toaster } from "@/components/ui/sonner";
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import { CondominioProvider } from '@/lib/CondominioContext';
 import ModuleLayout from '@/components/layout/ModuleLayout';
+
+// Páginas de Autenticação (Novas)
+import LoginBackoffice from '@/pages/LoginBackoffice'; // Ajusta o caminho se necessário
+import LoginCliente from '@/pages/LoginCliente';       // Ajusta o caminho se necessário
 
 // Hub
 import Hub from '@/pages/Hub';
@@ -51,13 +55,17 @@ const AuthenticatedApp = () => {
 
   if (authError) {
     if (authError.type === 'user_not_registered') return <UserNotRegisteredError />;
-    else if (authError.type === 'auth_required') { navigateToLogin(); return null; }
+    if (authError.type === 'auth_required') { 
+      navigateToLogin(); // Certifica-te que no teu AuthContext isto redireciona para '/login'
+      return null; 
+    }
   }
 
   return (
     <Routes>
-      {/* Hub — página inicial */}
+      {/* Hub — página inicial autenticada */}
       <Route path="/" element={<Hub />} />
+      <Route path="/" element={<Navigate to="/hub" replace />} />
 
       {/* Portal do Condómino */}
       <Route path="/portal" element={<PortalCondomino />} />
@@ -102,7 +110,14 @@ function App() {
       <QueryClientProvider client={queryClientInstance}>
         <CondominioProvider>
           <Router>
-            <AuthenticatedApp />
+            <Routes>
+              {/* Rotas 100% Públicas - Ficam fora da verificação de autenticação */}
+              <Route path="/login" element={<LoginBackoffice />} />
+              <Route path="/login-cliente" element={<LoginCliente />} />
+
+              {/* Todas as outras rotas passam pelo filtro do AuthenticatedApp */}
+              <Route path="*" element={<AuthenticatedApp />} />
+            </Routes>
           </Router>
           <Toaster />
         </CondominioProvider>
@@ -111,4 +126,4 @@ function App() {
   )
 }
 
-export default App
+export default App;

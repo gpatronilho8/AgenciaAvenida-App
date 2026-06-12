@@ -121,7 +121,7 @@ export default function Configuracoes() {
     }
 
     if (listaEmails.length === 0) {
-      toast.error('Nenhum e-mail localizado para os parâmetros escolhidos.');
+      toast.error('NENHUM E-MAIL ENCONTRADO PARA OS PARÂMETROS SELECIONADOS');
       return;
     }
 
@@ -133,7 +133,7 @@ export default function Configuracoes() {
       data: format(new Date(), 'yyyy-MM-dd')
     });
 
-    toast.success(`E-mail disparado em BCC para ${listaEmails.length} destinatários.`);
+    toast.success(`E-MAIL ENVIADO PARA ${listaEmails.length} DESTINATÁRIOS.`);
     qc.invalidateQueries({ queryKey: ['comunicacoes-logs'] });
     setActiveModal(null);
   };
@@ -163,7 +163,7 @@ export default function Configuracoes() {
       ficheiro_url: nomeFicheiro
     });
 
-    toast.success('Carta impressa descarregada e arquivada no bucket de comunicações.');
+    toast.success('CARTA IMPRESSA DESCARREGADA E ARQUIVADA COM SUCESSO');
     qc.invalidateQueries({ queryKey: ['comunicacoes-logs'] });
     setActiveModal(null);
   };
@@ -171,7 +171,7 @@ export default function Configuracoes() {
   const limparFiltrosHistorico = () => {
     setDataInicio(format(startOfMonth(hoje), 'yyyy-MM-dd'));
     setDataFim(format(endOfMonth(hoje), 'yyyy-MM-dd'));
-    toast.success('Filtros repostos para o mês corrente.');
+    toast.success('FILTROS REPOSTOS PARA O MÊS CORRENTE');
   };
 
   return (
@@ -197,7 +197,7 @@ export default function Configuracoes() {
                 // Atualiza imediatamente na base de dados
                 await agenciaAvenida.entities.ConfiguracaoSistema.update(1, { auto_rendas: valor });
                 qc.invalidateQueries({ queryKey: ['config-sistema'] });
-                toast.success(valor ? 'Automação de rendas ativada.' : 'Automação de rendas suspensa.');
+                toast.success(valor ? 'AUTOMAÇÃO DE RENDAS ATIVADA' : 'AUTOMAÇÃO DE RENDAS SUSPENSA');
               }}
             />
           </div>
@@ -493,7 +493,7 @@ export default function Configuracoes() {
                         </Button>
                       ) : (
                         item.ficheiro_url && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 border rounded-lg border-dashed" title="Descarregar Cópia Oficial" onClick={() => toast.success(`A descarregar ${item.ficheiro_url}...`)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 border rounded-lg border-dashed" title="Descarregar Cópia Oficial" onClick={() => toast.success(`A DESCARREGAR FICHEIRO`)}>
                             <Download className="w-3.5 h-3.5 text-muted-foreground" />
                           </Button>
                         )

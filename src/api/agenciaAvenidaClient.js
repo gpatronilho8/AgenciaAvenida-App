@@ -74,10 +74,26 @@ const createEntityMethods = (tableName) => ({
 // 3. O CLIENTE EXPORTADO PARA A APLICAÇÃO
 export const agenciaAvenida = {
   auth: {
-    login: async () => ({ user: { name: "Administrador" }, token: "token" }),
-    logout: async () => console.log("Logout simulado"),
-    getCurrentUser: async () => ({ email: "admin@agencia-avenida.pt", full_name: "Gonçalo Patronilho" }),
-    me: async () => ({ email: "admin@agencia-avenida.pt", full_name: "Gonçalo Patronilho" }),
+    auth: {
+      login: async (email, password) => {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        return data.user;
+      },
+      logout: async () => {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+        return true;
+      },
+      getCurrentUser: async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        return user;
+      },
+      me: async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        return user;
+      },
+    },
   },
   
   entities: new Proxy({}, {

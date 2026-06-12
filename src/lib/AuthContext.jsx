@@ -1,31 +1,86 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import { supabase } from '@/api/supabase'; // Ajusta este caminho para o local onde inicializas o supabase no teu projeto
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  // Simulamos um administrador já ligado para poderes ver todas as páginas locais
-  const [user, setUser] = useState({ email: "admin@agencia-avenida.pt", name: "Administrador" });
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
-  
-  // Desativamos todas as barras de loading e verificações online
-  const [isLoadingAuth, setIsLoadingAuth] = useState(false);
-  const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(false);
+  // Estados reais de autenticação
+  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true); // Começa a true para mostrar o loading enquanto verifica a sessão
   const [authError, setAuthError] = useState(null);
-  const [authChecked, setAuthChecked] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
+  
+  // Estados mantidos para compatibilidade com a tua app
+  const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(false);
   const [appPublicSettings, setAppPublicSettings] = useState({ id: "agencia-avenida", public_settings: {} }); 
 
-  // Funções vazias para não quebrar botões que dependam delas
-  const checkAppState = async () => {};
-  const checkUserAuth = async () => {};
-  
-  const logout = () => {
-    console.log("Logout local executado.");
+  useEffect(() => {
+    // 1. Verificar a sessão inicial no arranque da aplicação
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        
+        if (session?.user) {
+          setUser(session.user);
+          setIsAuthenticated(true);
+          setAuthError(null);
+        } else {
+          setAuthError({ type: 'auth_required' });
+        }
+      } catch (error) {
+        console.error("Erro ao verificar sessão:", error);
+        setAuthError({ type: 'auth_required' });
+      } finally {
+        setIsLoadingAuth(false);
+        setAuthChecked(true);
+      }
+    };
+
+    checkSession();
+
+    // 2. Ouvir mudanças de estado em tempo real (ex: quando o LoginBackoffice faz signIn)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        setIsAuthenticated(true);
+        setAuthError(null);
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+        setAuthError({ type: 'auth_required' });
+      }
+      setIsLoadingAuth(false);
+    });
+
+    // Limpar o listener quando o componente for desmontado
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Funções reais de ação
+  const logout = async () => {
+    console.log("A executar logout no Supabase...");
+    setIsLoadingAuth(true);
+    await supabase.auth.signOut();
     setUser(null);
     setIsAuthenticated(false);
+    window.location.href = '/login';
   };
 
   const navigateToLogin = () => {
-    console.log("Navegação para Login solicitada.");
+    // Como o AuthProvider envolve o Router no teu App.jsx, usamos window.location
+    // para forçar o redirecionamento de forma limpa.
+    window.location.href = '/login';
+  };
+
+  const checkUserAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user || null;
+  };
+
+  const checkAppState = async () => {
+    return true; // Mantido para não quebrar chamadas legadas
   };
 
   return (

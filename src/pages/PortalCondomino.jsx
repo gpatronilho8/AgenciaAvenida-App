@@ -295,7 +295,7 @@ export default function PortalCondomino() {
     const recibosArr = parseJsonArray(quota.recibo_url);
     if (recibosArr.length === 1) window.open(recibosArr[0], '_blank');
     else if (recibosArr.length > 1) { setRecibosList(recibosArr); setRecibosModalOpen(true); }
-    else toast.error("Não existem ficheiros de recibo associados a esta quota.");
+    else toast.error("NÃO EXISTEM RECIBOS ASSOCIADOS A ESTA QUOTA");
   };
 
   const limparFiltrosDatas = () => {

@@ -23,10 +23,6 @@ export default function CondominioTopBar({ module }) {
   
   const location = useLocation();
 
-  useEffect(() => {
-    agenciaAvenida.auth.me().then(setUser).catch(() => {});
-  }, []);
-
   // FILTRO E ORDENAÇÃO: Apenas ativos e ordenados por CXX
   const activeCondominios = condominios
     .filter(c => c.ativo !== false)
