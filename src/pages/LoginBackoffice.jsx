@@ -7,25 +7,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { toast } from 'sonner';
 import { ShieldAlert, Lock, Mail } from 'lucide-react';
 import { supabase } from '@/api/supabase.js';
-
-// 1. ADICIONADA A IMPORTAÇÃO DO CONTEXTO DE AUTENTICAÇÃO
 import { useAuth } from '@/lib/AuthContext';
 
 export default function LoginBackoffice() {
     const navigate = useNavigate();
-    
-    // 2. EXTRAÍDO O ESTADO GLOBAL DE AUTENTICAÇÃO
     const { isAuthenticated, user } = useAuth();
     
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [showRgpd, setShowRgpd] = useState(false);
-    
-    // 3. FLAG PARA PROTEGER O MODAL DE RGPD
     const [loginSubmetidoAgora, setLoginSubmetidoAgora] = useState(false);
 
-    // 4. AUTO-LOGIN SEGURO (Apenas para quem já tem sessão ativa e reabre a página)
+    // AUTO-LOGIN SEGURO E CONFIGURAÇÃO DO TÍTULO DA ABA
     useEffect(() => {
         if (isAuthenticated && user && !loginSubmetidoAgora) {
             const role = user.user_metadata?.role;
@@ -43,7 +37,6 @@ export default function LoginBackoffice() {
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) throw error;
 
-            // Validação de segurança imediata das Permissões (Roles)
             const role = data.user?.user_metadata?.role;
             if (role !== 'backoffice' && role !== 'global') {
                 await supabase.auth.signOut();
@@ -51,7 +44,6 @@ export default function LoginBackoffice() {
                 return;
             }
     
-            // Sucesso na autenticação -> Diz ao sistema para esperar pelo RGPD
             setLoginSubmetidoAgora(true);
             setShowRgpd(true);
         } catch (error) {
@@ -63,20 +55,17 @@ export default function LoginBackoffice() {
 
     const handleAceitarRgpd = () => {
         setShowRgpd(false);
-        
-        // Como o utilizador demorou alguns segundos a ler e aceitar o RGPD,
-        // o AuthContext já teve tempo de sobra para atualizar o estado em segundo plano.
-        // O redirecionamento será suave e sem "piscar" e voltar atrás.
         navigate('/hub', { replace: true });
     };
 
     return (
         <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-            <div className="w-full max-w-md space-y-6 bg-card p-8 rounded-2xl border border-border shadow-sm">
+            {/* Otimizado: p-8 reduzido para p-6 e space-y-6 para space-y-4 */}
+            <div className="w-full max-w-md space-y-4 bg-card p-6 rounded-xl border border-border shadow-sm">
 
-                {/* LOGOTIPO E CABEÇALHO */}
-                <div className="text-center space-y-3">
-                    <div className="mx-auto w-24 h-24 flex items-center justify-center overflow-hidden rounded-xl">
+                {/* LOGOTIPO E CABEÇALHO - Tamanhos reduzidos para ganho vertical */}
+                <div className="text-center space-y-1.5">
+                    <div className="mx-auto w-16 h-16 flex items-center justify-center overflow-hidden rounded-lg">
                         <img
                             src="/aa_regular.jpg"
                             alt="Logotipo Agência Avenida"
@@ -84,80 +73,74 @@ export default function LoginBackoffice() {
                         />
                     </div>
                     <div>
-                        <h1 className="text-xl font-black uppercase tracking-wider text-foreground">
+                        <h1 className="text-lg font-black uppercase tracking-wider text-foreground">
                             Agência Avenida
                         </h1>
-                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest">
+                        <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-widest">
                             Plataforma de Gestão
                         </p>
                     </div>
                 </div>
 
-                {/* FORMULÁRIO */}
-                <form onSubmit={handleLogin} className="space-y-4 pt-2">
-                    <div className="space-y-1.5">
-                        <Label className="text-[10px] font-black uppercase tracking-wider">E-mail de Registo</Label>
+                {/* FORMULÁRIO - Espaçamento encolhido de space-y-4 para space-y-3 */}
+                <form onSubmit={handleLogin} className="space-y-3 pt-1">
+                    <div className="space-y-1">
+                        <Label className="text-[9px] font-black uppercase tracking-wider">E-mail de Registo</Label>
                         <div className="relative">
-                            <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Mail className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                             <Input
                                 type="email"
                                 required
                                 value={email}
                                 onChange={e => setEmail(e.target.value)}
-                                className="pl-9 bg-background"
+                                className="pl-9 h-9 bg-background text-sm"
                                 placeholder="nome@agencia-avenida.pt"
                             />
                         </div>
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                         <div className="flex justify-between items-center">
-                            <Label className="text-[10px] font-black uppercase tracking-wider">Palavra-passe</Label>
-                            <button
-                                type="button"
-                                onClick={() => toast.info('CONTACTE O ADMINISTRADOR DO SISTEMA PARA REDEFINIR A PASSWORD')}
-                                className="text-[10px] font-bold text-primary hover:underline uppercase tracking-wider"
-                            >
-                                Esqueci-me?
-                            </button>
+                            <Label className="text-[9px] font-black uppercase tracking-wider">Palavra-passe</Label>
                         </div>
                         <div className="relative">
-                            <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Lock className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                             <Input
                                 type="password"
                                 required
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
-                                className="pl-9 bg-background"
+                                className="pl-9 h-9 bg-background text-sm"
                                 placeholder="••••••••"
                             />
                         </div>
                     </div>
 
-                    <Button type="submit" disabled={loading} className="w-full h-11 font-black uppercase text-xs tracking-wider rounded-xl shadow-sm mt-2">
+                    {/* Botão passou de h-11 para h-9.5 */}
+                    <Button type="submit" disabled={loading} className="w-full h-9.5 font-black uppercase text-[11px] tracking-wider rounded-lg shadow-sm mt-3">
                         {loading ? 'A validar...' : 'Entrar no Sistema'}
                     </Button>
                 </form>
             </div>
 
-            {/* MODAL MANDATÓRIO: CUMPRIMENTO RGPD */}
+            {/* MODAL MANDATÓRIO: CUMPRIMENTO RGPD (Também compactado para ecrãs pequenos) */}
             <Dialog open={showRgpd} onOpenChange={() => { }}>
-                <DialogContent className="max-w-lg rounded-xl p-6 [&>button]:hidden">
-                    <DialogHeader className="flex flex-col items-center text-center space-y-2">
-                        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center border border-blue-100">
-                            <ShieldAlert className="w-6 h-6" />
+                <DialogContent className="max-w-lg rounded-xl p-5 [&>button]:hidden max-h-[90vh] overflow-y-auto no-scrollbar">
+                    <DialogHeader className="flex flex-col items-center text-center space-y-0.5">
+                        <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center border border-blue-100">
+                            <ShieldAlert className="w-5 h-5" />
                         </div>
-                        <DialogTitle className="font-black text-base uppercase tracking-wider text-foreground">
+                        <DialogTitle className="font-black text-sm uppercase tracking-wider text-foreground">
                             Cumprimento RGPD
                         </DialogTitle>
                     </DialogHeader>
 
-                    <p className="text-xs text-muted-foreground leading-relaxed text-justify bg-muted/30 p-4 rounded-xl border border-dashed">
+                    <p className="text-[11px] text-muted-foreground leading-relaxed text-justify bg-muted/30 p-3.5 rounded-lg border border-dashed my-2">
                         Está a aceder a um sistema da Agência Avenida, destinado exclusivamente a fins profissionais e reservado a utilizadores devidamente autorizados. Este sistema armazena dados pessoais que estão protegidos legalmente pelo Regulamento Geral da Proteção de Dados, pelo que o seu acesso, utilização e manipulação deve cumprir integralmente as políticas corporativas e os requisitos legais em vigor. É expressamente proibida a partilha de credenciais de acesso, incluindo palavras-passe, bem como qualquer utilização indevida dos sistemas ou dos dados neles contidos. Todos os utilizadores estão vinculados a obrigações de confidencialidade, sendo estritamente proibida a divulgação ou utilização não autorizada de informações protegidas. Ao prosseguir, está a indicar a compreensão e aceitação das condições estabelecidas acima.
                     </p>
 
-                    <div className="mt-4">
-                        <Button onClick={handleAceitarRgpd} className="w-full h-11 font-black uppercase text-xs tracking-wider rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-md">
+                    <div className="mt-1">
+                        <Button onClick={handleAceitarRgpd} className="w-full h-10 font-black uppercase text-xs tracking-wider rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-md">
                             Aceder ao Sistema
                         </Button>
                     </div>

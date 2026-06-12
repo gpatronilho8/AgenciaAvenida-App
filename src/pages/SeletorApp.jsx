@@ -72,10 +72,10 @@ export default function SeletorApp() {
           <img 
             src="/aa_favicon.png" 
             alt="Agência Avenida Logo" 
-            className="w-16 h-16 mb-4 object-contain transition-transform duration-300 group-hover:scale-105"
+            className="w-24 h-24 mb-4 object-contain transition-transform duration-300 group-hover:scale-105"
           />
-          <span className="text-[10px] tracking-widest text-gray-400 uppercase mb-1 font-bold">Agência Avenida</span>
-          <span className="text-sm font-black tracking-wide uppercase text-gray-900">Plataforma de Gestão</span>
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-widest mb-0.1">Agência Avenida</span>
+          <span className="text-xl font-black uppercase tracking-wider text-foreground">COLABORADORES</span>
           
           {userRole === 'cliente' && (
             <span className="absolute top-3 right-3 text-[9px] font-bold text-red-600 tracking-widest uppercase bg-red-50 px-2 py-1 rounded-md border border-red-100">
@@ -98,10 +98,10 @@ export default function SeletorApp() {
           <img 
             src="/aa_favicon.png" 
             alt="Agência Avenida Logo" 
-            className="w-16 h-16 mb-4 object-contain transition-transform duration-300 group-hover:scale-105"
+            className="w-24 h-24 mb-4 object-contain transition-transform duration-300 group-hover:scale-105"
           />
-          <span className="text-[10px] tracking-widest text-gray-400 uppercase mb-1 font-bold">Agência Avenida</span>
-          <span className="text-sm font-black tracking-wide uppercase text-gray-900">Área de Cliente</span>
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-widest mb-0.1">Agência Avenida</span>
+          <span className="text-xl font-black uppercase tracking-wider text-foreground">ÁREA DE CLIENTE</span>
           
           {userRole === 'backoffice' && (
             <span className="absolute top-3 right-3 text-[9px] font-bold text-red-600 tracking-widest uppercase bg-red-50 px-2 py-1 rounded-md border border-red-100">
