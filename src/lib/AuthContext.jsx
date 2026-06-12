@@ -58,15 +58,14 @@ export const AuthProvider = ({ children }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Funções reais de ação
   const logout = async () => {
     setIsLoadingAuth(true);
     await supabase.auth.signOut();
     setUser(null);
     setIsAuthenticated(false);
 
-    // Redirecionamento Inteligente no Logout
-    if (window.location.pathname.startsWith('/portal')) {
+    const dominio = window.location.hostname;
+    if (dominio.includes('cliente') || window.location.pathname.startsWith('/portal')) {
       window.location.href = '/login-cliente';
     } else {
       window.location.href = '/login';
@@ -74,8 +73,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const navigateToLogin = () => {
-    // Redirecionamento Inteligente de Segurança (quando o token expira)
-    if (window.location.pathname.startsWith('/portal')) {
+    const dominio = window.location.hostname;
+    if (dominio.includes('cliente') || window.location.pathname.startsWith('/portal')) {
       window.location.href = '/login-cliente';
     } else {
       window.location.href = '/login';
