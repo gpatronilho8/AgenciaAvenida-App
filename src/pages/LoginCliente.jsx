@@ -53,7 +53,9 @@ export default function LoginCliente() {
         email,
         password,
         options: {
-          data: { full_name: nome, role: 'cliente' }
+          data: { full_name: nome, role: 'cliente' },
+          // Força o link de confirmação do e-mail a apontar para o portal de clientes:
+          emailRedirectTo: 'https://clientes.agencia-avenida.pt/portal' 
         }
       });
 

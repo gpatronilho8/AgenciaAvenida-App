@@ -40,14 +40,24 @@ import Configuracoes from '@/pages/Configuracoes';
 import PortalCondomino from '@/pages/PortalCondomino';
 
 const RotaInicialInteligente = () => {
+  const { user } = useAuth();
   const dominio = window.location.hostname;
+
+  // 1. Se o utilizador estiver autenticado, a prioridade absoluta é o Role dele
+  if (user?.user_metadata?.role === 'cliente') {
+    return <Navigate to="/portal" replace />;
+  }
   
-  // Se for o subdomínio de clientes, atira para o portal
+  // Se for um utilizador do backoffice autenticado, vai para o Hub
+  if (user) {
+    return <Navigate to="/" replace />;
+  }
+
+  // 2. Se NÃO estiver autenticado, faz a triagem pelo subdomínio para saber qual ecrã de login mostrar
   if (dominio.includes('clientes')) {
     return <Navigate to="/portal" replace />;
   }
   
-  // Caso contrário (localhost ou backoffice), atira para o Hub
   return <Navigate to="/" replace />;
 };
 
