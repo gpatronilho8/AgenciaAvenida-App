@@ -1,4 +1,4 @@
-import { Toaster } from "@/components/ui/meu-sonner";
+import { ToasterCustomizado } from "@/components/ui/meu-sonner";
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClientInstance } from '@/lib/query-client';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
