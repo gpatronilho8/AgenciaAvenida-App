@@ -1,6 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
-import { QueryClientProvider } from '@tanstack/react-query'
-import { queryClientInstance } from '@/lib/query-client'
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClientInstance } from '@/lib/query-client';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
@@ -9,9 +9,11 @@ import { CondominioProvider } from '@/lib/CondominioContext';
 import ModuleLayout from '@/components/layout/ModuleLayout';
 import Hub from "@/pages/Hub";
 
-// Páginas de Autenticação (Novas)
-import LoginBackoffice from '@/pages/LoginBackoffice'; // Ajusta o caminho se necessário
-import LoginCliente from '@/pages/LoginCliente';       // Ajusta o caminho se necessário
+// Páginas de Autenticação e Barreiras de Acesso
+import LoginBackoffice from '@/pages/LoginBackoffice';
+import LoginCliente from '@/pages/LoginCliente';
+import SeletorApp from '@/pages/SeletorApp';
+import SemAcesso from '@/pages/SemAcesso';
 
 // Condomínios module
 import CondominiosDashboard from '@/pages/CondominiosDashboard';
@@ -37,22 +39,9 @@ import Pessoas from '@/pages/Pessoas';
 import Configuracoes from '@/pages/Configuracoes';
 import PortalCondomino from '@/pages/PortalCondomino';
 
-const RotaInicialInteligente = () => {
-  const { user } = useAuth();
-  const dominio = window.location.hostname;
-
-  // 1. Se for o cliente (verificado pelo metadado ou pelo domínio), atira para o portal
-  if (user?.user_metadata?.role === 'cliente' || dominio.includes('clientes')) {
-    return <Navigate to="/portal" replace />;
-  }
-  
-  // 2. Caso contrário (é a equipa do Backoffice), mostra logo o ecrã do Hub!
-  // Certifica-te de que o componente Hub está importado no topo deste ficheiro.
-  return <Hub />; 
-};
-
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { user, isLoadingAuth, isLoadingPublicSettings, authError } = useAuth();
+  const role = user?.user_metadata?.role;
 
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
@@ -68,21 +57,26 @@ const AuthenticatedApp = () => {
   if (authError) {
     if (authError.type === 'user_not_registered') return <UserNotRegisteredError />;
     if (authError.type === 'auth_required') { 
-      navigateToLogin(); // Certifica-te que no teu AuthContext isto redireciona para '/login'
-      return null; 
+      return <Navigate to="/" replace />;
     }
   }
 
+  // Definição booleana de permissões com suporte ao utilizador global
+  const isBackofficeAllowed = role === 'backoffice' || role === 'global';
+  const isClienteAllowed = role === 'cliente' || role === 'global';
+
   return (
     <Routes>
-      {/* Hub — página inicial autenticada */}
-      <Route path="/" element={<RotaInicialInteligente />} />
+      {/* Mapeamento de segurança do Hub Operacional para alinhar com os redirecionamentos dos logins */}
+      <Route path="/hub" element={isBackofficeAllowed ? <Hub /> : <Navigate to="/sem-acesso" replace />} />
+      <Route path="/backoffice/hub" element={isBackofficeAllowed ? <Hub /> : <Navigate to="/sem-acesso" replace />} />
 
-      {/* Portal do Condómino */}
-      <Route path="/portal" element={<PortalCondomino />} />
+      {/* Portal do Condómino / Área de Cliente */}
+      <Route path="/portal" element={isClienteAllowed ? <PortalCondomino /> : <Navigate to="/sem-acesso" replace />} />
+      <Route path="/cliente/dashboard" element={isClienteAllowed ? <PortalCondomino /> : <Navigate to="/sem-acesso" replace />} />
 
       {/* Módulo Condomínios */}
-      <Route element={<ModuleLayout module="condominios" />}>
+      <Route element={isBackofficeAllowed ? <ModuleLayout module="condominios" /> : <Navigate to="/sem-acesso" replace />}>
         <Route path="/condominios/dashboard" element={<CondominiosDashboard />} />
         <Route path="/condominios/lista" element={<Condominios />} />
         <Route path="/condominios/fracoes" element={<Fracoes />} />
@@ -97,7 +91,7 @@ const AuthenticatedApp = () => {
       </Route>
 
       {/* Módulo Propriedades */}
-      <Route element={<ModuleLayout module="propriedades" />}>
+      <Route element={isBackofficeAllowed ? <ModuleLayout module="propriedades" /> : <Navigate to="/sem-acesso" replace />}>
         <Route path="/propriedades/dashboard" element={<PropriedadesDashboard />} />
         <Route path="/propriedades/lista" element={<PropriedadesLista />} />
         <Route path="/propriedades/rendas" element={<Rendas />} />
@@ -105,7 +99,7 @@ const AuthenticatedApp = () => {
       </Route>
 
       {/* Módulo Processos */}
-      <Route element={<ModuleLayout module="processos" />}>
+      <Route element={isBackofficeAllowed ? <ModuleLayout module="processos" /> : <Navigate to="/sem-acesso" replace />}>
         <Route path="/processos" element={<Processos />} />
         <Route path="/processos/pessoas" element={<Pessoas />} />
       </Route>
@@ -122,11 +116,17 @@ function App() {
         <CondominioProvider>
           <Router>
             <Routes>
-              {/* Rotas 100% Públicas - Ficam fora da verificação de autenticação */}
+              {/* Rotas 100% Públicas autónomas (Fora do ciclo de redirecionamento automático do Auth) */}
+              <Route path="/" element={<SeletorApp />} />
+              <Route path="/sem-acesso" element={<SemAcesso />} />
+              
+              {/* Endereços de login compatíveis com a estrutura antiga e com o novo roteamento unificado */}
               <Route path="/login" element={<LoginBackoffice />} />
+              <Route path="/backoffice/login" element={<LoginBackoffice />} />
               <Route path="/login-cliente" element={<LoginCliente />} />
+              <Route path="/cliente/login" element={<LoginCliente />} />
 
-              {/* Todas as outras rotas passam pelo filtro do AuthenticatedApp */}
+              {/* Filtro global de sessões ativas */}
               <Route path="*" element={<AuthenticatedApp />} />
             </Routes>
           </Router>
@@ -134,7 +134,7 @@ function App() {
         </CondominioProvider>
       </QueryClientProvider>
     </AuthProvider>
-  )
+  );
 }
 
 export default App;
