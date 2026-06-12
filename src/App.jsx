@@ -13,9 +13,6 @@ import Hub from "@/pages/Hub";
 import LoginBackoffice from '@/pages/LoginBackoffice'; // Ajusta o caminho se necessário
 import LoginCliente from '@/pages/LoginCliente';       // Ajusta o caminho se necessário
 
-// Hub
-import Hub from '@/pages/Hub';
-
 // Condomínios module
 import CondominiosDashboard from '@/pages/CondominiosDashboard';
 import Condominios from '@/pages/Condominios';
