@@ -114,7 +114,7 @@ export default function LoginBackoffice() {
             <Dialog open={showRgpd} onOpenChange={() => { }}>
                 <DialogContent className="max-w-lg rounded-xl p-6 [&>button]:hidden"> {/* Esconde o botão X de fechar */}
                     <DialogHeader className="flex flex-col items-center text-center space-y-2">
-                        <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center border border-amber-100">
+                        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center border border-blue-100">
                             <ShieldAlert className="w-6 h-6" />
                         </div>
                         <DialogTitle className="font-black text-base uppercase tracking-wider text-foreground">
@@ -127,7 +127,7 @@ export default function LoginBackoffice() {
                     </p>
 
                     <div className="mt-4">
-                        <Button onClick={handleAceitarRgpd} className="w-full h-11 font-black uppercase text-xs tracking-wider rounded-xl bg-amber-600 hover:bg-amber-700 text-white shadow-md">
+                        <Button onClick={handleAceitarRgpd} className="w-full h-11 font-black uppercase text-xs tracking-wider rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-md">
                             Aceder ao Sistema
                         </Button>
                     </div>

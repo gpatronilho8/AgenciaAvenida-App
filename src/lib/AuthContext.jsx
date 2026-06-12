@@ -10,10 +10,10 @@ export const AuthProvider = ({ children }) => {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true); // Começa a true para mostrar o loading enquanto verifica a sessão
   const [authError, setAuthError] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
-  
+
   // Estados mantidos para compatibilidade com a tua app
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(false);
-  const [appPublicSettings, setAppPublicSettings] = useState({ id: "agencia-avenida", public_settings: {} }); 
+  const [appPublicSettings, setAppPublicSettings] = useState({ id: "agencia-avenida", public_settings: {} });
 
   useEffect(() => {
     // 1. Verificar a sessão inicial no arranque da aplicação
@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
-        
+
         if (session?.user) {
           setUser(session.user);
           setIsAuthenticated(true);
@@ -60,18 +60,26 @@ export const AuthProvider = ({ children }) => {
 
   // Funções reais de ação
   const logout = async () => {
-    console.log("A executar logout no Supabase...");
     setIsLoadingAuth(true);
     await supabase.auth.signOut();
     setUser(null);
     setIsAuthenticated(false);
-    window.location.href = '/login';
+
+    // Redirecionamento Inteligente no Logout
+    if (window.location.pathname.startsWith('/portal')) {
+      window.location.href = '/login-cliente';
+    } else {
+      window.location.href = '/login';
+    }
   };
 
   const navigateToLogin = () => {
-    // Como o AuthProvider envolve o Router no teu App.jsx, usamos window.location
-    // para forçar o redirecionamento de forma limpa.
-    window.location.href = '/login';
+    // Redirecionamento Inteligente de Segurança (quando o token expira)
+    if (window.location.pathname.startsWith('/portal')) {
+      window.location.href = '/login-cliente';
+    } else {
+      window.location.href = '/login';
+    }
   };
 
   const checkUserAuth = async () => {
@@ -84,9 +92,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isAuthenticated, 
+    <AuthContext.Provider value={{
+      user,
+      isAuthenticated,
       isLoadingAuth,
       isLoadingPublicSettings,
       authError,

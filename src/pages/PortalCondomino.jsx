@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
+import { useAuth } from '@/lib/AuthContext'; // <-- Importar o contexto
+import { supabase } from '@/api/supabase.js'; // <-- Importar o supabase para o logout específico
 import StatusBadge from '@/components/ui/StatusBadge';
-import { FileText, CreditCard, AlertTriangle, Download, CheckCircle, Clock, Plus, X, LogOut, RefreshCw, FileSpreadsheet, Calendar, Bell } from 'lucide-react';
+import { FileText, CreditCard, AlertTriangle, Download, CheckCircle, Clock, Plus, X, LogOut, RefreshCw, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -40,7 +42,9 @@ export default function PortalCondomino() {
   const qc = useQueryClient();
   const hoje = new Date();
 
-  const [user, setUser] = useState(null);
+  // 1. UTILIZADOR REAL DO CONTEXTO
+  const { user } = useAuth();
+
   const [tab, setTab] = useState('estado');
   const [showOcorrForm, setShowOcorrForm] = useState(false);
   const [ocorrForm, setOcorrForm] = useState({ titulo: '', descricao: '', tipo: 'avaria', prioridade: 'normal' });
@@ -58,14 +62,6 @@ export default function PortalCondomino() {
 
   const [showPessoa, setShowPessoa] = useState(null);
   const [showPessoaModal, setShowPessoaModal] = useState(false);
-
-  useEffect(() => {
-    // SIMULAÇÃO DE LOGIN:
-    setUser({
-      email: 'gpatronilho8@gmail.com',
-      full_name: 'Gonçalo Patronilho'
-    });
-  }, []);
 
   const { data: propriedades = [] } = useQuery({ queryKey: ['propriedades-portal'], queryFn: () => agenciaAvenida.entities.Propriedade.list() });
   const { data: rendas = [] } = useQuery({ queryKey: ['rendas-portal'], queryFn: () => agenciaAvenida.entities.RendaMensal.list() });
@@ -140,7 +136,6 @@ export default function PortalCondomino() {
 
   const condominiosUser = condominios.filter(c => fracoesUser.some(f => String(f.condominio_id) === String(c.id)));
 
-  // Auto-selecionar sempre a 1ª Fração (sem opção "todos")
   useEffect(() => {
     if (perfilSelecionado === 'condomino' && fracoesUser.length > 0) {
       if (!fracoesUser.some(f => String(f.id) === String(fracaoSelecionada))) {
@@ -149,7 +144,6 @@ export default function PortalCondomino() {
     }
   }, [perfilSelecionado, fracoesUser, fracaoSelecionada]);
 
-  // Filtro Direto (sem 'all')
   const quotasPerfil = quotas.filter(q => String(q.fracao_id) === String(fracaoSelecionada));
 
   const quotasOrdenadas = [...quotasPerfil].map(q => {
@@ -157,22 +151,17 @@ export default function PortalCondomino() {
     const titulares = fracao ? extractIds(fracao.titulares) : [];
     const divisor = titulares.length > 0 ? titulares.length : 1;
 
-    // 1. O valor individual que este utilizador tem de pagar
     const valorTeoricoIndividual = (q.valor || 0) / divisor;
 
-    // 2. Tenta obter os pagamentos filtrados pelo histórico detalhado
     const pagamentosDestaEntidade = parseJsonArray(q.pagamentos || q.historico_pagamentos)
       .filter(p => String(p.pessoa_id || p.entidade_id) === String(entidadeAtual.id));
 
     let valorPagoProp = pagamentosDestaEntidade.reduce((sum, p) => sum + (p.valor || 0), 0);
 
-    // 3. FALLBACK: Se não houver histórico detalhado mas existir um "valor_pago" direto na quota
     if (valorPagoProp === 0 && q.valor_pago > 0) {
-      // Se for apenas 1 titular, o valor pago é totalmente dele. Se forem mais, divide proporcionalmente.
       valorPagoProp = divisor === 1 ? q.valor_pago : (q.valor_pago / divisor);
     }
 
-    // 4. Determinar os estados de validação
     const pagoTotalmente = (valorTeoricoIndividual - valorPagoProp) <= 0.005 && valorPagoProp > 0;
     const pagamentoParcial = valorPagoProp > 0 && !pagoTotalmente && q.estado !== 'pago';
 
@@ -190,7 +179,6 @@ export default function PortalCondomino() {
     return new Date(b.data_emissao || b.created_at) - new Date(a.data_emissao || a.created_at);
   });
 
-  // Lógica de Incumprimento (Apenas "vencida" / "vencido")
   const pendentes = quotasOrdenadas.filter(q => q.estado === 'pendente' || q.estado === 'vencido' || q.estado === 'vencida');
   const emIncumprimentoQuotas = quotasOrdenadas.filter(q => q.estado === 'vencido' || q.estado === 'vencida');
   const totalDividaQuotas = emIncumprimentoQuotas.reduce((s, q) => s + q.valor_calculado, 0);
@@ -210,11 +198,9 @@ export default function PortalCondomino() {
 
   const documentosCondominio = documentos.filter(d => !condominioAtual || String(d.condominio_id) === String(condominioAtual.id));
 
-
   // --- CONTEXTO: PROPRIETÁRIO ---
   const propriedadesDono = propriedades.filter(p => entidadeAtual && parseJsonArray(p.proprietario_id).map(String).includes(String(entidadeAtual.id)));
 
-  // Auto-selecionar sempre a 1ª Propriedade (sem opção "todos")
   useEffect(() => {
     if (perfilSelecionado === 'proprietario' && propriedadesDono.length > 0) {
       if (!propriedadesDono.some(p => String(p.id) === String(propriedadeSelecionada))) {
@@ -223,7 +209,6 @@ export default function PortalCondomino() {
     }
   }, [perfilSelecionado, propriedadesDono, propriedadeSelecionada]);
 
-  // Filtro Direto (sem 'all')
   const propriedadesFiltradasDono = propriedadesDono.filter(p => String(p.id) === String(propriedadeSelecionada));
 
   const rendasDono = rendas.filter(r => propriedadesFiltradasDono.some(p => String(p.id) === String(r.propriedade_id))).filter(r => {
@@ -234,11 +219,9 @@ export default function PortalCondomino() {
     } catch { return true; }
   }).sort((a, b) => b.ano !== a.ano ? b.ano - a.ano : b.mes - a.mes);
 
-
   // --- CONTEXTO: INQUILINO ---
   const propriedadesInquilino = propriedades.filter(p => entidadeAtual && parseJsonArray(p.inquilino_id).map(String).includes(String(entidadeAtual.id)));
 
-  // Auto-selecionar sempre a 1ª Propriedade (sem opção "todos")
   useEffect(() => {
     if (perfilSelecionado === 'inquilino' && propriedadesInquilino.length > 0) {
       if (!propriedadesInquilino.some(p => String(p.id) === String(propriedadeSelecionada))) {
@@ -247,7 +230,6 @@ export default function PortalCondomino() {
     }
   }, [perfilSelecionado, propriedadesInquilino, propriedadeSelecionada]);
 
-  // Filtro Direto (sem 'all')
   const propriedadesFiltradasInq = propriedadesInquilino.filter(p => String(p.id) === String(propriedadeSelecionada));
 
   const calcularTotalEncargosRenda = (r) => parseJsonArray(r.encargos_associados).reduce((s, e) => s + (e.valor || 0), 0);
@@ -265,7 +247,6 @@ export default function PortalCondomino() {
       return isWithinInterval(dataRef, { start: parseISO(dataInicio), end: parseISO(dataFim) });
     } catch { return true; }
   }).sort((a, b) => b.ano !== a.ano ? b.ano - a.ano : b.mes - a.mes);
-
 
   // --- FUNÇÕES GERAIS ---
   const handleSubmitOcorrencia = async () => {
@@ -315,6 +296,16 @@ export default function PortalCondomino() {
     return '';
   };
 
+  // 2. FUNÇÃO DE LOGOUT ESPECÍFICA PARA A ÁREA DE CLIENTE
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      window.location.href = '/login-cliente';
+    } catch (error) {
+      toast.error('Erro ao terminar sessão.');
+    }
+  };
+
   const tabs = [
     { id: 'estado', label: perfilSelecionado === 'condomino' ? 'Estado da Conta' : 'Histórico Financeiro', icon: CreditCard },
     ...(perfilSelecionado === 'condomino' ? [{ id: 'documentos', label: 'Documentos', icon: FileText }] : []),
@@ -336,7 +327,7 @@ export default function PortalCondomino() {
             <img src={LOGO_URL} alt="Agência Avenida" className="h-12 w-auto object-contain rounded shadow-sm" />
             <div>
               <p className="font-black text-foreground text-xl tracking-wide leading-tight">{obterNomePortal()}</p>
-              <p className="text-s font-bold text-muted-foreground/80 mt-0.5">Agência Avenida</p>
+              <p className="text-sm font-bold text-muted-foreground/80 mt-0.5">Agência Avenida</p>
             </div>
           </div>
 
@@ -352,9 +343,8 @@ export default function PortalCondomino() {
               </Select>
             )}
 
-            {/* Seletor 2: Alternar Perfis Inteligentes da Entidade (Sempre visível) */}
             <Select value={perfilSelecionado} onValueChange={setPerfilSelecionado} disabled={totalPerfisVisiveis <= 1}>
-              <SelectTrigger className="w-40 h-10 text-s font-black tracking-wider bg-primary/5 text-primary border-primary/20 shadow-sm">
+              <SelectTrigger className="w-40 h-10 text-sm font-black tracking-wider bg-primary/5 text-primary border-primary/20 shadow-sm">
                 <SelectValue placeholder="Perfil" />
               </SelectTrigger>
               <SelectContent>
@@ -369,14 +359,16 @@ export default function PortalCondomino() {
               {user && (
                 <div className="flex items-center gap-3 pl-3 border-l border-border">
                   <div className="hidden sm:block text-right">
-                    <p className="text-sm font-semibold text-foreground leading-tight">{user.full_name}</p>
+                    {/* 3. LEITURA DOS METADADOS DE NOME */}
+                    <p className="text-sm font-semibold text-foreground leading-tight">{user.user_metadata?.full_name || 'Cliente'}</p>
                     <p className="text-xs text-muted-foreground">{user.email}</p>
                   </div>
-                  <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-sm border border-border flex-shrink-0">
-                    {user.full_name?.charAt(0)?.toUpperCase() || 'U'}
+                  <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-sm border border-border flex-shrink-0 uppercase">
+                    {/* 4. INICIAL DE SEGURANÇA */}
+                    {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || 'C'}
                   </div>
                   <button
-                    onClick={() => agenciaAvenida.auth.logout()}
+                    onClick={handleLogout} // <-- 5. VINCULAÇÃO DA FUNÇÃO NOVA
                     title="Sair"
                     className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
                   >
@@ -578,7 +570,7 @@ export default function PortalCondomino() {
                         </div>
                       </div>
                     ))}
-                    {pagasFiltradas.length === 0 && <div className="text-center text-muted-foreground py-8 text-s bg-muted/30 border border-dashed rounded-xl tracking-wider">Sem Pagamentos Registados</div>}
+                    {pagasFiltradas.length === 0 && <div className="text-center text-muted-foreground py-8 text-sm bg-muted/30 border border-dashed rounded-xl tracking-wider">Sem Pagamentos Registados</div>}
                   </div>
                 </div>
               </>

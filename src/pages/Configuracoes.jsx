@@ -545,21 +545,28 @@ export default function Configuracoes() {
           <Shield className="w-5 h-5 text-primary" />
           <h2 className="font-black text-sm uppercase tracking-wider text-foreground">Informações Do Sistema</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-xs font-medium">
-          <div className="flex flex-col gap-0.5">
+
+        {/* Alterado para grid-cols-4 */}
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-6 text-xs font-medium">
+
+          {/* Adicionado sm:col-span-2 para ocupar metade do ecrã e não quebrar a linha */}
+          <div className="flex flex-col gap-2.5 sm:col-span-2">
             <span className="text-muted-foreground uppercase text-[9px] tracking-widest font-black">Aplicação</span>
-            <span className="text-foreground text-sm">Agência Avenida - Plataforma de Gestão</span>
+            <span className="text-foreground text-sm truncate">Agência Avenida - Plataforma de Gestão</span>
           </div>
-          <div className="flex flex-col gap-0.5">
+
+          <div className="flex flex-col gap-2.5">
             <span className="text-muted-foreground uppercase text-[9px] tracking-widest font-black">Estado Do Servidor</span>
             <span className="text-emerald-600 font-black text-sm uppercase tracking-wider">Online</span>
           </div>
+
           <div className="flex flex-col gap-0.5">
             <span className="text-muted-foreground uppercase text-[9px] tracking-widest font-black">Versão Em Produção</span>
             <span className="font-mono bg-muted text-foreground font-black px-2 py-1 rounded border border-border w-fit text-xs mt-0.5">
               v {versaoSistema || '1.0.0'}
             </span>
           </div>
+
         </div>
       </footer>
 

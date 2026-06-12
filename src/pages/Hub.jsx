@@ -70,7 +70,9 @@ function OcorrenciaPreviewDialog({ ocorrencia, onClose }) {
 export default function Hub() {
   const navigate = useNavigate();
   const [previewOcorrencia, setPreviewOcorrencia] = useState(null);
-  const { user } = useAuth();
+  
+  // 1. EXTRAÍMOS O LOGOUT DIRETAMENTE DO CONTEXTO AQUI
+  const { user, logout } = useAuth();
 
   const { data: ocorrencias = [] } = useQuery({ 
     queryKey: ['ocorrencias-hub'], 
@@ -79,7 +81,6 @@ export default function Hub() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col">
-      {/* Header - Ajustado ligeiramente o preenchimento vertical (py-4 em vez de py-5) */}
       <header className="flex items-center justify-between px-8 py-4">
         <div className="flex items-center gap-4">
           <img src={LOGO_WHITE} alt="Agência Avenida" className="h-16 w-auto" />
@@ -91,14 +92,16 @@ export default function Hub() {
         {user && (
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <p className="text-white text-sm font-semibold">{user.full_name}</p>
+              {/* Leitura do nome ajustada para o padrão Supabase */}
+              <p className="text-white text-sm font-semibold">{user.user_metadata?.full_name}</p>
               <p className="text-slate-400 text-xs">{user.email}</p>
             </div>
-            <div className="w-9 h-9 rounded-full bg-slate-600 flex items-center justify-center text-white font-bold text-sm border border-slate-500">
-              {user.full_name?.charAt(0)?.toUpperCase() || 'U'}
+            <div className="w-9 h-9 rounded-full bg-slate-600 flex items-center justify-center text-white font-bold text-sm border border-slate-500 uppercase">
+              {/* Fallback de segurança para a inicial do nome ou email */}
+              {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
             </div>
             <button
-              onClick={() => agenciaAvenida.auth.logout()}
+              onClick={logout} // 2. LIGAÇÃO DIRETA À FUNÇÃO DO CONTEXTO
               title="Sair"
               className="ml-1 p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
             >
@@ -108,7 +111,6 @@ export default function Hub() {
         )}
       </header>
 
-      {/* Main - py-12 substituído por py-6 para juntar mais o conteúdo ao centro */}
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-5xl">
           {modules.map((mod) => {
@@ -117,14 +119,11 @@ export default function Hub() {
               <button
                 key={mod.id}
                 onClick={() => navigate(mod.path)}
-                // O padding principal passou de p-8 para p-6
                 className="group relative bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-2xl p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
               >
-                {/* Ícone e margem adaptados para ficarem mais compactos */}
                 <div className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${mod.color} mb-4 shadow-lg`}>
                   <Icon className="w-6 h-6 text-white" />
                 </div>
-                {/* Título mais pequeno (text-lg) com margem menor */}
                 <h3 className="text-white font-bold text-lg mb-3">{mod.label}</h3>
                 <div className="flex flex-wrap gap-2 mb-4">
                   {mod.stats.map(s => (
@@ -141,7 +140,6 @@ export default function Hub() {
         </div>
       </main>
 
-      {/* Footer com py-4 em vez de py-6 */}
       <footer className="text-center py-4 text-slate-600 text-xs">
         © {new Date().getFullYear()} Agência Avenida · Plataforma de Gestão
       </footer>

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { agenciaAvenida } from '@/api/agenciaAvenidaClient.js';
 import { useCondominio } from '@/lib/CondominioContext';
+import { useAuth } from '@/lib/AuthContext'; // IMPORT DO CONTEXTO DE AUTENTICAÇÃO
 import { Building2, ChevronDown, Search, LogOut } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -8,6 +9,8 @@ import NotificationBell from '@/components/NotificationBell';
 
 export default function CondominioTopBar({ module }) {
   const { selectedCondominioId, setSelectedCondominioId, selectedAno, setSelectedAno } = useCondominio();
+  const { user, logout } = useAuth(); // EXTRAIR USER E LOGOUT DIRETAMENTE
+
   const { data: condominios = [] } = useQuery({
     queryKey: ['condominios'],
     queryFn: () => agenciaAvenida.entities.Condominio.list(),
@@ -15,15 +18,13 @@ export default function CondominioTopBar({ module }) {
   
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [openAno, setOpenAno] = useState(false); // Estado para o dropdown do Ano
-  const [user, setUser] = useState(null);
+  const [openAno, setOpenAno] = useState(false); 
   
   const ref = useRef(null);
-  const refAno = useRef(null); // Ref para o dropdown do Ano detetar clique fora
+  const refAno = useRef(null); 
   
   const location = useLocation();
 
-  // FILTRO E ORDENAÇÃO: Apenas ativos e ordenados por CXX
   const activeCondominios = condominios
     .filter(c => c.ativo !== false)
     .sort((a, b) => (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true, sensitivity: 'base' }));
@@ -40,7 +41,6 @@ export default function CondominioTopBar({ module }) {
     return c.nome?.toLowerCase().includes(term) || c.codigo?.toLowerCase().includes(term);
   });
 
-  // Fecha os dropdowns ao clicar fora
   useEffect(() => {
     const handler = (e) => { 
       if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setSearch(''); }
@@ -53,11 +53,9 @@ export default function CondominioTopBar({ module }) {
   const paginasGlobais = ['/pessoas', '/configuracoes', '/condominios/lista', "/condominios/assembleias"];
   const mostrarSeletor = module === 'condominios' && !paginasGlobais.includes(location.pathname);
 
-  // Visibilidade exclusiva do Ano
   const paginasComSeletorAno = ['/condominios/quotas', '/condominios/movimentos', '/condominios/ocorrencias', '/condominios/documentos', '/condominios/processos-judiciais'];
   const mostrarSeletorAno = module === 'condominios' && paginasComSeletorAno.includes(location.pathname);
 
-  // Opções de Anos
   const opcoesAno = ['all', 2025, 2026, 2027, 2028];
   const anoLabel = selectedAno === 'all' ? 'Todos' : selectedAno;
 
@@ -65,7 +63,6 @@ export default function CondominioTopBar({ module }) {
     <div className="border-b border-border bg-background px-6 py-2.5 flex items-center gap-3 flex-shrink-0 min-h-[57px]">
       {mostrarSeletor && (
         <>
-          {/* SELETOR DE CONDOMÍNIO */}
           <Building2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden sm:inline-block">Condomínio:</span>
           <div className="relative" ref={ref}>
@@ -121,7 +118,6 @@ export default function CondominioTopBar({ module }) {
             )}
           </div>
 
-          {/* SELETOR DE ANO (Estilizado) */}
           {mostrarSeletorAno && (
             <>
               <div className="w-px h-5 bg-border mx-1 hidden sm:block"></div>
@@ -168,16 +164,20 @@ export default function CondominioTopBar({ module }) {
         {user && (
           <div className="flex items-center gap-3 pl-3 border-l border-border">
             <div className="hidden sm:block text-right">
-              <p className="text-sm font-semibold text-foreground leading-tight">{user.full_name}</p>
+              {/* Leitura corrigida para o Supabase Metadata */}
+              <p className="text-sm font-semibold text-foreground leading-tight">
+                {user.user_metadata?.full_name || 'Colaborador'}
+              </p>
               <p className="text-xs text-muted-foreground">{user.email}</p>
             </div>
-            <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-sm border border-border flex-shrink-0">
-              {user.full_name?.charAt(0)?.toUpperCase() || 'U'}
+            {/* Lógica da inicial corrigida */}
+            <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-sm border border-border flex-shrink-0 uppercase">
+              {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
             </div>
             <button
-              onClick={() => agenciaAvenida.auth.logout()}
+              onClick={logout}
               title="Sair"
-              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
             >
               <LogOut className="w-4 h-4" />
             </button>

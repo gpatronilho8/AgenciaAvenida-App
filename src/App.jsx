@@ -65,7 +65,6 @@ const AuthenticatedApp = () => {
     <Routes>
       {/* Hub — página inicial autenticada */}
       <Route path="/" element={<Hub />} />
-      <Route path="/" element={<Navigate to="/hub" replace />} />
 
       {/* Portal do Condómino */}
       <Route path="/portal" element={<PortalCondomino />} />
