@@ -16,6 +16,15 @@ export default function LoginCliente() {
   const [password, setPassword] = useState('');
   const [nome, setNome] = useState('');
 
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const role = user.user_metadata?.role;
+      if (role === 'cliente' || role === 'global') {
+        navigate('/portal', { replace: true });
+      }
+    }
+  }, [isAuthenticated, user, navigate]);
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -36,9 +45,6 @@ export default function LoginCliente() {
       navigate('/sem-acesso');
       return;
     }
-
-    // Permissão válida -> Segue para o Dashboard do Condómino
-    navigate('/cliente/dashboard');
   };
 
   const handleRegisto = async (e) => {
