@@ -19,16 +19,26 @@ export default function LoginCliente() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      toast.success('Sessão iniciada com sucesso.');
-      window.location.href = '/portal';
-    } catch (error) {
-      toast.error(error.message || 'ERRO AO ENTRAR. CONFIRME OS SEUS DADOS');
-    } finally {
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      setErrorMessage(error.message);
       setLoading(false);
+      return;
     }
+
+    const role = data.user?.user_metadata?.role;
+
+    if (role !== 'cliente' && role !== 'global') {
+      // CORREÇÃO DE SEGURANÇA: Destrói o token local gerado para limpar o estado da app
+      await supabase.auth.signOut();
+      navigate('/sem-acesso');
+      return;
+    }
+
+    // Permissão válida -> Segue para o Dashboard do Condómino
+    navigate('/cliente/dashboard');
   };
 
   const handleRegisto = async (e) => {
@@ -55,7 +65,7 @@ export default function LoginCliente() {
         options: {
           data: { full_name: nome, role: 'cliente' },
           // Força o link de confirmação do e-mail a apontar para o portal de clientes:
-          emailRedirectTo: 'https://clientes.agencia-avenida.pt/portal' 
+          emailRedirectTo: 'https://clientes.agencia-avenida.pt/portal'
         }
       });
 
@@ -94,14 +104,14 @@ export default function LoginCliente() {
     <div className="min-h-screen bg-muted/10 flex items-center justify-center p-4">
       {/* Cartão principal alargado de max-w-md para max-w-lg */}
       <div className="w-full max-w-lg bg-card p-8 rounded-2xl border border-border shadow-sm space-y-6">
-        
+
         {/* LOGOTIPO E CABEÇALHO DA ÁREA DE CLIENTE */}
         <div className="text-center space-y-3 pb-2">
           <div className="mx-auto w-24 h-24 flex items-center justify-center overflow-hidden rounded-xl">
-            <img 
-              src="/aa_regular.jpg" 
-              alt="Logotipo Agência Avenida" 
-              className="w-full h-full object-contain" 
+            <img
+              src="/aa_regular.jpg"
+              alt="Logotipo Agência Avenida"
+              className="w-full h-full object-contain"
             />
           </div>
           <div>
@@ -116,14 +126,14 @@ export default function LoginCliente() {
 
         {/* SELEÇÃO LOGIN / REGISTO */}
         <div className="grid grid-cols-2 border-b pb-2 gap-4">
-          <button 
-            className={`text-xs font-black uppercase pb-2 tracking-wider transition-all text-center ${isLogin ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`} 
+          <button
+            className={`text-xs font-black uppercase pb-2 tracking-wider transition-all text-center ${isLogin ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`}
             onClick={() => setIsLogin(true)}
           >
             Aceder à Área de Cliente
           </button>
-          <button 
-            className={`text-xs font-black uppercase pb-2 tracking-wider transition-all text-center ${!isLogin ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`} 
+          <button
+            className={`text-xs font-black uppercase pb-2 tracking-wider transition-all text-center ${!isLogin ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`}
             onClick={() => setIsLogin(false)}
           >
             Criar Nova Conta

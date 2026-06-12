@@ -15,24 +15,37 @@ export default function LoginBackoffice() {
     const [loading, setLoading] = useState(false);
     const [showRgpd, setShowRgpd] = useState(false);
 
+    useEffect(() => {
+        if (isAuthenticated && user) {
+          const role = user.user_metadata?.role;
+          if (role === 'backoffice' || role === 'global') {
+            navigate('/hub', { replace: true });
+          }
+        }
+      }, [isAuthenticated, user, navigate]);
+
     const handleLogin = async (e) => {
         e.preventDefault();
         setLoading(true);
-    
-        try {
-          // Usamos diretamente o motor do Supabase
-          const { error } = await supabase.auth.signInWithPassword({ email, password });
-          
-          if (error) throw error;
-    
-          // Sucesso na autenticação -> Mostra o modal RGPD
-          setShowRgpd(true);
-        } catch (error) {
-          toast.error(error.message || 'CREDENCIAIS INVÁLIDAS');
-        } finally {
-          setLoading(false);
+
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+        if (error) {
+            setErrorMessage(error.message);
+            setLoading(false);
+            return;
         }
-      };
+
+        const role = data.user?.user_metadata?.role;
+
+        if (role !== 'backoffice' && role !== 'global') {
+            // CORREÇÃO DE SEGURANÇA: Destrói o token local gerado para limpar o estado da app
+            await supabase.auth.signOut();
+            navigate('/sem-acesso');
+            return;
+        }
+
+    };
 
     const handleAceitarRgpd = () => {
         setShowRgpd(false);
