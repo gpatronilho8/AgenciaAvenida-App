@@ -37,6 +37,17 @@ function StatCard({ title, value, icon: Icon, color = 'blue', subtitle, to }) {
   );
 }
 
+const tiposOcorrencia = {
+  avaria: 'Avaria ou Reparação Técnica',
+  manutencao: 'Manutenção',
+  limpeza: 'Limpeza',
+  seguranca: 'Segurança',
+  duvidas_faturacao: 'Dúvidas de Faturação',
+  atualizacao_dados: 'Atualização de Dados Fiscais/Gerais',
+  associar_dados: 'Associar Dados Portal Condómino',
+  outro: 'Outro Assunto',
+};
+
 function OcorrenciaPreviewDialog({ ocorrencia, condominios, fracoes, onClose }) {
   if (!ocorrencia) return null;
   const condNome = condominios.find(c => c.id === ocorrencia.condominio_id)?.nome || '-';
@@ -56,7 +67,7 @@ function OcorrenciaPreviewDialog({ ocorrencia, condominios, fracoes, onClose }) 
         <div className="grid grid-cols-2 gap-2 bg-muted/40 rounded-lg p-3 text-sm mb-3">
           <div className="flex items-center gap-2"><span className="font-medium">Estado:</span> <StatusBadge status={ocorrencia.estado} /></div>
           <div className="flex items-center gap-2"><span className="font-medium">Prioridade:</span> <StatusBadge status={ocorrencia.prioridade} /></div>
-          <div><span className="font-medium">Tipo:</span> <span className="capitalize ml-1">{ocorrencia.tipo}</span></div>
+          <div><span className="font-medium">Tipo:</span> <span className="capitalize ml-1">{tiposOcorrencia[ocorrencia.tipo] || ocorrencia.tipo}</span></div>
           {ocorrencia.data_abertura && <div><span className="font-medium">Abertura:</span> <span className="ml-1">{ocorrencia.data_abertura}</span></div>}
         </div>
         {ocorrencia.descricao && <p className="text-sm text-muted-foreground mb-2">{ocorrencia.descricao}</p>}
@@ -196,7 +207,7 @@ export default function CondominiosDashboard() {
               <div key={o.id} className="px-5 py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setPreviewOcorrencia(o)}>
                 <div>
                   <p className="text-sm font-medium">{o.titulo}</p>
-                  <p className="text-xs text-muted-foreground">{o.tipo} · {o.area}</p>
+                  <p className="text-xs text-muted-foreground">{tiposOcorrencia[o.tipo] || o.tipo} · {o.area}</p>
                 </div>
                 <StatusBadge status={o.prioridade} />
               </div>
