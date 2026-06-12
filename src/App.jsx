@@ -39,6 +39,18 @@ import Pessoas from '@/pages/Pessoas';
 import Configuracoes from '@/pages/Configuracoes';
 import PortalCondomino from '@/pages/PortalCondomino';
 
+const RotaInicialInteligente = () => {
+  const dominio = window.location.hostname;
+  
+  // Se for o subdomínio de clientes, atira para o portal
+  if (dominio.includes('clientes')) {
+    return <Navigate to="/portal" replace />;
+  }
+  
+  // Caso contrário (localhost ou backoffice), atira para o Hub
+  return <Navigate to="/" replace />;
+};
+
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
@@ -64,7 +76,7 @@ const AuthenticatedApp = () => {
   return (
     <Routes>
       {/* Hub — página inicial autenticada */}
-      <Route path="/" element={<Hub />} />
+      <Route path="/" element={<RotaInicialInteligente />} />
 
       {/* Portal do Condómino */}
       <Route path="/portal" element={<PortalCondomino />} />
