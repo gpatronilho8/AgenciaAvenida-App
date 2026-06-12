@@ -23,6 +23,8 @@ export default function LoginCliente() {
 
   // REDIRECIONAMENTO INTELIGENTE (E AUTO-LOGIN)
   useEffect(() => {
+    document.title = "ÁREA CLIENTE AGÊNCIA AVENIDA";
+
     if (isAuthenticated && user) {
       const role = user.user_metadata?.role;
       if (role === 'cliente' || role === 'global') {

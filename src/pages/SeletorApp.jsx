@@ -8,6 +8,9 @@ export default function SeletorApp() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Define o título da aba do navegador
+    document.title = "AGÊNCIA AVENIDA";
+
     async function checkActiveSession() {
       // 1. Redirecionamento inteligente por Subdomínio
       const dominio = window.location.hostname;
@@ -30,76 +33,83 @@ export default function SeletorApp() {
     checkActiveSession();
   }, [navigate]);
 
-  const handleNavigation = (targetPath, allowedRoles) => {
+  // Adicionámos o parâmetro "subdominio" à função
+  const handleNavigation = (targetPath, allowedRoles, subdominio) => {
     // Se o utilizador já estiver logado e tentar forçar uma app à qual não pertence
     if (userRole && !allowedRoles.includes(userRole) && userRole !== 'global') {
       navigate('/sem-acesso');
     } else {
-      navigate(targetPath);
+      // Verifica se estamos no ambiente de desenvolvimento local
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      
+      if (isLocalhost) {
+        // Em local, navega normalmente pelas rotas do React
+        navigate(targetPath);
+      } else {
+        // Em produção, força o redirecionamento absoluto para o subdomínio correspondente
+        window.location.href = `https://${subdominio}.agencia-avenida.pt${targetPath}`;
+      }
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#000000] text-[#f8fafc] flex flex-col items-center justify-center p-6 font-sans">
-      <div className="w-full max-w-4xl text-center mb-14">
-        <h1 className="text-3xl md:text-4xl font-bold tracking-wider mb-2 text-white">AGÊNCIA AVENIDA</h1>
-        <p className="text-xs tracking-widest text-[#94a3b8] uppercase font-semibold">Plataforma Digital Unificada</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-3xl">
+    <div className="min-h-screen bg-white flex items-center justify-center p-4 font-sans">
+      
+      {/* Grelha reduzida para cartões mais próximos e pequenos */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-xl">
+        
         {/* CARD 1: Plataforma de Gestão (Backoffice) */}
         <button
-          onClick={() => handleNavigation('/login', ['backoffice'])}
+          // Passamos 'backoffice' como o subdomínio desejado
+          onClick={() => handleNavigation('/login', ['backoffice'], 'backoffice')}
           disabled={loading}
-          className={`flex flex-col items-center justify-center bg-[#1e293b] border-2 rounded-2xl p-10 transition-all duration-300 group aspect-square shadow-2xl relative ${
+          className={`flex flex-col items-center justify-center bg-white border border-gray-200 rounded-xl p-8 transition-all duration-300 group shadow-sm relative ${
             userRole === 'cliente' 
-              ? 'border-red-900/50 opacity-30 cursor-not-allowed' 
-              : 'border-[#334155] hover:border-blue-500'
+              ? 'opacity-40 cursor-not-allowed bg-gray-50' 
+              : 'hover:border-blue-500 hover:shadow-md'
           }`}
         >
           <img 
             src="/aa_favicon.png" 
             alt="Agência Avenida Logo" 
-            className="w-24 h-24 mb-6 object-contain filter brightness-100 group-hover:scale-105 transition-transform duration-300"
+            className="w-16 h-16 mb-4 object-contain transition-transform duration-300 group-hover:scale-105"
           />
-          <span className="text-xs tracking-widest text-[#94a3b8] uppercase mb-1 font-semibold">Agência Avenida</span>
-          <span className="text-lg font-bold tracking-wide uppercase text-white">Plataforma de Gestão</span>
+          <span className="text-[10px] tracking-widest text-gray-400 uppercase mb-1 font-bold">Agência Avenida</span>
+          <span className="text-sm font-black tracking-wide uppercase text-gray-900">Plataforma de Gestão</span>
           
           {userRole === 'cliente' && (
-            <span className="absolute bottom-4 text-[10px] font-bold text-red-400 tracking-widest uppercase bg-red-950/80 px-3 py-1 rounded-full border border-red-800">
-              Acesso Restrito
+            <span className="absolute top-3 right-3 text-[9px] font-bold text-red-600 tracking-widest uppercase bg-red-50 px-2 py-1 rounded-md border border-red-100">
+              Restrito
             </span>
           )}
         </button>
 
         {/* CARD 2: Área de Cliente (Portal do Condómino) */}
         <button
-          onClick={() => handleNavigation('/login-cliente', ['cliente'])}
+          // Passamos 'clientes' como o subdomínio desejado
+          onClick={() => handleNavigation('/login-cliente', ['cliente'], 'clientes')}
           disabled={loading}
-          className={`flex flex-col items-center justify-center bg-[#1e293b] border-2 rounded-2xl p-10 transition-all duration-300 group aspect-square shadow-2xl relative ${
+          className={`flex flex-col items-center justify-center bg-white border border-gray-200 rounded-xl p-8 transition-all duration-300 group shadow-sm relative ${
             userRole === 'backoffice' 
-              ? 'border-red-900/50 opacity-30 cursor-not-allowed' 
-              : 'border-[#334155] hover:border-blue-500'
+              ? 'opacity-40 cursor-not-allowed bg-gray-50' 
+              : 'hover:border-blue-500 hover:shadow-md'
           }`}
         >
           <img 
             src="/aa_favicon.png" 
             alt="Agência Avenida Logo" 
-            className="w-24 h-24 mb-6 object-contain filter brightness-100 group-hover:scale-105 transition-transform duration-300"
+            className="w-16 h-16 mb-4 object-contain transition-transform duration-300 group-hover:scale-105"
           />
-          <span className="text-xs tracking-widest text-[#94a3b8] uppercase mb-1 font-semibold">Agência Avenida</span>
-          <span className="text-lg font-bold tracking-wide uppercase text-white">Área de Cliente</span>
+          <span className="text-[10px] tracking-widest text-gray-400 uppercase mb-1 font-bold">Agência Avenida</span>
+          <span className="text-sm font-black tracking-wide uppercase text-gray-900">Área de Cliente</span>
           
           {userRole === 'backoffice' && (
-            <span className="absolute bottom-4 text-[10px] font-bold text-red-400 tracking-widest uppercase bg-red-950/80 px-3 py-1 rounded-full border border-red-800">
-              Acesso Restrito
+            <span className="absolute top-3 right-3 text-[9px] font-bold text-red-600 tracking-widest uppercase bg-red-50 px-2 py-1 rounded-md border border-red-100">
+              Restrito
             </span>
           )}
         </button>
-      </div>
-
-      <div className="mt-20 text-[11px] text-[#64748b] tracking-wider uppercase">
-        &copy; 2026 Agência Avenida · Plataforma de Gestão
+        
       </div>
     </div>
   );
