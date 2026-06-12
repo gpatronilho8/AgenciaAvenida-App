@@ -30,7 +30,7 @@ export default function NotificationBell() {
 
   const { data: notificacoes = [] } = useQuery({
     queryKey: ['notificacoes'],
-    queryFn: () => agenciaAvenida.entities.Notificacao.list('-created_date', 30),
+    queryFn: () => agenciaAvenida.entities.Notificacao.list('-created_at', 30),
     refetchInterval: 30000,
   });
 
@@ -152,9 +152,9 @@ export default function NotificationBell() {
                     <div className="flex-1 min-w-0">
                       <p className={cn('text-sm leading-snug', !n.lida ? 'font-semibold text-foreground' : 'text-muted-foreground')}>{n.titulo}</p>
                       {n.mensagem && <p className="text-xs text-muted-foreground mt-0.5">{n.mensagem}</p>}
-                      {n.created_date && (
+                      {n.created_at && (
                         <p className="text-xs text-muted-foreground/60 mt-1">
-                          {new Date(n.created_date).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          {new Date(n.created_at).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                         </p>
                       )}
                     </div>

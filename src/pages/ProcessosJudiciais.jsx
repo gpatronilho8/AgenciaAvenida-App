@@ -283,7 +283,7 @@ export default function ProcessosJudiciais() {
   const [comboDev, setComboDev] = useState(false);
   const [comboAdv, setComboAdv] = useState(false);
 
-  const { data: processos = [] } = useQuery({ queryKey: ['processos-judiciais'], queryFn: () => agenciaAvenida.entities.ProcessoJudicial.list('-created_date') });
+  const { data: processos = [] } = useQuery({ queryKey: ['processos-judiciais'], queryFn: () => agenciaAvenida.entities.ProcessoJudicial.list('-created_at') });
   const { data: condominios = [] } = useQuery({ queryKey: ['condominios'], queryFn: () => agenciaAvenida.entities.Condominio.list() });
   const { data: fracoes = [] } = useQuery({ queryKey: ['fracoes'], queryFn: () => agenciaAvenida.entities.Fracao.list() });
   const { data: pessoas = [] } = useQuery({ queryKey: ['pessoas'], queryFn: () => agenciaAvenida.entities.Pessoa.list() });
