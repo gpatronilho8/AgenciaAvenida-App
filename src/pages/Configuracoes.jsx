@@ -384,7 +384,7 @@ export default function Configuracoes() {
           {/* Alterado de overflow-visible para flex-1 overflow-y-auto pr-1 pb-2 */}
           <div className="space-y-4 mt-2 flex-1 overflow-y-auto pr-1 pb-2 no-scrollbar">
             
-            <div className="flex gap-4 border-b pb-2">
+            <div className="flex justify-center gap-6 border-b pb-2">
               <button className={`text-xs font-black uppercase pb-1 tracking-wider ${cartaForm.modoOrigem === 'pesquisa' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`} onClick={() => setCartaForm(p => ({ ...p, modoOrigem: 'pesquisa', nomeManual: '' }))}>Consultar Base de Dados</button>
               <button className={`text-xs font-black uppercase pb-1 tracking-wider ${cartaForm.modoOrigem === 'manual' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`} onClick={() => setCartaForm(p => ({ ...p, modoOrigem: 'manual', entidadeId: '', morada: '', codigoPostal: '', localidade: '' }))}>Escrever Manualmente</button>
             </div>
