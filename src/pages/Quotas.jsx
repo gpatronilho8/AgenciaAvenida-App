@@ -529,9 +529,17 @@ export default function Quotas() {
                 <SelectValue placeholder="Fração" />
               </SelectTrigger>
               <SelectContent className="max-h-56">
-                <SelectItem value="all">Todas as Frações</SelectItem>
-                {fracoesDoCondominioAtual.map(f => <SelectItem key={f.id} value={f.id}>{formatFracao(f)}</SelectItem>)}
-              </SelectContent>
+              <SelectItem value="all">Todas as Frações</SelectItem>
+              {[...fracoesDoCondominioAtual]
+                .sort((a, b) => {
+                  const codA = String(a.codigo_fracao || '').trim();
+                  const codB = String(b.codigo_fracao || '').trim();
+                  return codA.localeCompare(codB, 'pt', { numeric: true, sensitivity: 'base' });
+                })
+                .map(f => (
+                  <SelectItem key={f.id} value={f.id}>{formatFracao(f)}</SelectItem>
+                ))}
+            </SelectContent>
             </Select>
           </div>
         </div>
@@ -921,13 +929,19 @@ export default function Quotas() {
                 {pagamentoFiltro === 'fracao' ? (
                   <Select disabled={selectedCondominioId === 'all'} value={pagamentoAlvoId} onValueChange={setPagamentoAlvoId}>
                     <SelectTrigger className="mt-1 bg-background">
-                      <SelectValue placeholder={selectedCondominioId === 'all' ? "Deve especificar um condomínio" : (fracoesDoCondominioAtual.length === 0 ? "Sem frações disponíveis" : "Escolha a fração...")} />
+                      <SelectValue placeholder={selectedCondominioId === 'all' ? "Deve Especificar um Condomínio" : (fracoesDoCondominioAtual.length === 0 ? "Sem Frações Disponíveis" : "Escolha a fração...")} />
                     </SelectTrigger>
                     <SelectContent className="z-[210] no-scrollbar max-h-40">
-                      {fracoesDoCondominioAtual.map(f => (
+                    {[...fracoesDoCondominioAtual]
+                      .sort((a, b) => {
+                        const codA = String(a.codigo_fracao || '').trim();
+                        const codB = String(b.codigo_fracao || '').trim();
+                        return codA.localeCompare(codB, 'pt', { numeric: true, sensitivity: 'base' });
+                      })
+                      .map(f => (
                         <SelectItem key={f.id} value={f.id}>{formatFracao(f)}</SelectItem>
                       ))}
-                    </SelectContent>
+                  </SelectContent>
                   </Select>
                 ) : (
                   <Popover open={comboCondominoOpen} onOpenChange={setComboCondominoOpen}>
@@ -940,7 +954,7 @@ export default function Quotas() {
                     <PopoverContent className="p-0 z-[210]">
                       <Command>
                         <CommandInput placeholder="Pesquisar pelo nome..." />
-                        <CommandEmpty>Nenhum condómino encontrado.</CommandEmpty>
+                        <CommandEmpty>Nenhum Condómino Encontrado</CommandEmpty>
                         <CommandGroup className="max-h-48 overflow-y-auto no-scrollbar">
                           {condominosAtivos.map(p => (
                             <CommandItem key={p.id} value={p.nome} onSelect={() => { setPagamentoAlvoId(p.id); setComboCondominoOpen(false); setQuotasSelecionadas([]); setTipoLiquidacao('total'); }}>
